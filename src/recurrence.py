@@ -2,28 +2,63 @@ from datetime import datetime, timedelta
 from daytime import daytime
 from abc import ABC, abstractmethod
 from types import List, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from blob import Blob
+from utils import TimeRange
 
-class RecurrenceRule(ABC):
+def has_overlapping_blobs(L: List[Blob]) -> bool:
+    sorted_blobs = sorted(L, key=lambda b: b.valid_schedulable_timerange.start)
+
+    for i in range(len(sorted_blobs) - 1):
+        if sorted_blobs[i].overlaps(sorted_blobs[i+1]):
+            return False
+        
+    return True
+
+class BlobRecurrence(ABC):
     """Abstract base class for recurrence rules""" 
     @abstractmethod
-    def next_occurrence(self, current: datetime) -> Optional[datetime]:
+    def next_occurrence(self, current: datetime) -> Optional[Blob]:
         """Generate the next occurrence after the given datetime"""
         pass
     
     @abstractmethod
-    def all_occurrences(self, start: datetime, end: datetime) -> List[datetime]:
+    def all_occurrences(self, timerange: TimeRange) -> List[Blob]:
         """Generate all occurrences within the given time range"""
         pass
 
+class SingleBlobOccurrence(BlobRecurrence):
+    blob: Blob = field(default_factory=Blob())
+
+    def next_occurrence(self, current: datetime) -> Optional[Blob]:
+        timerange = self.blob.get_timerange()
+        
+        if current < timerange.start
+            return self.blob
+        
+        return None
+        
+    def all_occurrences(self, timerange: TimeRange) -> List[Blob]:
+        if timerange.contains(self.blob.get_timerange()):
+            return [self.blob]
+
+        return []
+
 @dataclass
-class WeeklyRecurrence(RecurrenceRule):
+class WeeklyBlobRecurrence(BlobRecurrence):
     """Weekly recurrence rule"""
-    days_of_week: List[daytime]  # 0=Monday, 6=Sunday
+    blobs_of_week: List[Blob]  # 0=Monday, 6=Sunday
     interval: int = 1  # Every N weeks
+    __days_of_week: Optional[List[daytime]] = field(default=None)
     
     def __post_init__(self):
-        self.days_of_week.sort()
+        if has_overlapping_blobs(self.blobs_of_week):
+            raise ValueError("Weekly blob recurrence requires non-overlapping blobs")
+        self.blobs_of_week.sort()
+        self.__days_of_week = [
+            daytime(blob.get_timerange().start.weekday(), blob.get_timerange().start.time())
+            for blob in self.blobs_of_week
+        ]
     
     def next_occurrence(self, current: datetime) -> Optional[datetime]:
         curr_daytime = daytime(current.weekday(), current.time())
@@ -61,7 +96,7 @@ class WeeklyRecurrence(RecurrenceRule):
         return occurrences
 
 @dataclass
-class DeltaRecurrence(RecurrenceRule):
+class DeltaBlobRecurrence(BlobRecurrence):
     """Delta recurrence rule - recurring events at fixed time intervals"""
     delta: timedelta
     start_datetime: datetime
@@ -97,7 +132,7 @@ class DeltaRecurrence(RecurrenceRule):
         return occurrences
 
 @dataclass
-class DateRecurrence(RecurrenceRule):
+class DateBlobRecurrence(BlobRecurrence):
     date: datetime
     
     def next_occurrence(self, current: datetime) -> Optional[datetime]:
