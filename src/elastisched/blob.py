@@ -1,20 +1,21 @@
 import uuid
 from datetime import datetime, timezone
-from policy import Policy, PolicyType
-from recurrence import *
-from utils import TimeRange, round_datetime_future_bias
+from elastisched.policy import Policy
+from elastisched.recurrence import *
+from elastisched.utils import round_datetime_future_bias
+from elastisched.timerange import TimeRange
+from elastisched.constants import *
 from dataclasses import dataclass, field
-from constants import *
 
 @dataclass
 class Blob:
     """Core scheduling unit representing a task/event"""
-    default_scheduled_timerange: Optional[TimeRange]
-    valid_schedulable_timerange: Optional[TimeRange]
+    default_scheduled_timerange: TimeRange
+    schedulable_timerange: TimeRange
     name: str = field(default="Unnamed Blob")
     description: Optional[str] = field(default=None)
     tz: timezone = field(default_factory=lambda: DEFAULT_TZ)
-    policy: Policy = field(default_factory=lambda: Policy(PolicyType.FLEXIBLE))
+    policy: Policy = field(default_factory=lambda: Policy)
 
     # Optional fields
     dependencies: List[str] = field(default_factory=list)  # IDs of other blobs
@@ -27,14 +28,7 @@ class Blob:
     __created_at: datetime = field(default=datetime.now())
 
     def __post_init__(self):
-        policy = self.policy.policy_type
-
-        if policy == PolicyType.RIGID or policy == PolicyType.INVISIBLE:
-            if self.default_scheduled_timerange != self.valid_schedulable_timerange:
-                raise ValueError("Blob with Rigid or Invisible policy type must have same default_scheduled_timerange and valid_schedulable_timerange")
-            self.__actual_scheduled_timerange = self.default_scheduled_timerange
-
-        if not self.valid_schedulable_timerange.contains(self.default_scheduled_timerange):
+        if not self.schedulable_timerange.contains(self.default_scheduled_timerange):
             raise ValueError("Valid schedulable range must contain [default_datetime, default_datetime+duration]")
 
     def __str__(self) -> str:
@@ -55,13 +49,13 @@ class Blob:
         if not isinstance(other, Blob):
             raise NotImplemented
 
-        return self.valid_schedulable_timerange < other.valid_schedulable_timerange
+        return self.schedulable_timerange < other.schedulable_timerange
     
     def __le__(self, other) -> bool:
         if not isinstance(other, Blob):
             raise NotImplemented
         
-        return self.valid_schedulable_timerange <= other.valid_schedulable_timerange
+        return self.schedulable_timerange <= other.schedulable_timerange
     
     def __hash__(self) -> int:
         """Make hashable so it can be used in sets and as dict keys"""
@@ -71,13 +65,24 @@ class Blob:
         if self.__actual_scheduled_timerange is not None:
             return self.__actual_scheduled_timerange.duration()
         return None
+
+    def get_default_scheduled_timerange(self) -> TimeRange:
+        return self.default_scheduled_timerange
+
+    def get_schedulable_timerange(self) -> TimeRange:
+        return self.schedulable_timerange
     
-    def get_timerange(self) -> Optional[TimeRange]:
-        return self.valid_schedulable_timerange
+    def set_default_scheduled_timerange(self, timerange : TimeRange):
+        self.default_scheduled_timerange = timerange
+        return
+    
+    def set_scheduble_timerange(self, timerange: TimeRange):
+        self.schedulable_timerange = timerange
+        return
     
     def set_completed(self, completed):
         self.__completed = completed
         return
     
     def overlaps(self, other) -> bool:
-        return self.valid_schedulable_timerange.overlaps(other.valid_schedulable_timerange)
+        return self.schedulable_timerange.overlaps(other.schedulable_timerange)
