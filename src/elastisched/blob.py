@@ -7,6 +7,7 @@ from elastisched.recurrence import *
 from elastisched.tag import Tag
 from elastisched.timerange import TimeRange
 from elastisched.utils import round_datetime_future_bias
+from typing import List, Optional, Set
 
 @dataclass
 class Blob:
@@ -22,12 +23,12 @@ class Blob:
     # Optional fields
     dependencies: List[str] = field(default_factory=list)  # IDs of other blobs
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    tag: List[Tag] = field(default_factory=List)
+    tag: Set[Tag] = field(default_factory=set)
 
     # Scheduling metadata
-    __actual_scheduled_timerange: Optional[TimeRange] = field(default=None)
-    __actual_duration: Optional[timedelta] = field(default=None)
-    __completed: bool = field(default=False)
+    __actual_scheduled_timerange: Optional[TimeRange] = None
+    __actual_duration: Optional[timedelta] = None
+    __completed: bool = False
     __created_at: datetime = field(default=datetime.now())
 
     def __post_init__(self):
