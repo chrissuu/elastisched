@@ -4,14 +4,18 @@ from typing import List, Dict, Optional, Callable, Any, Tuple
 from dataclasses import dataclass, field
 from elastisched.constants import *
 
+
 @dataclass
 class Policy:
     """Defines how a blob can be scheduled"""
+
     is_splittable: bool = False
     is_overlappable: bool = False
     is_invisible: bool = False
     max_splits: Optional[int] = None
-    min_split_duration: timedelta = field(default_factory=lambda : MINIMUM_BLOB_SPLIT_DURATION)
+    min_split_duration: timedelta = field(
+        default_factory=lambda: MINIMUM_BLOB_SPLIT_DURATION
+    )
 
     # policies we want:
     # can overlap

@@ -21,6 +21,7 @@
  * as best as possible.
  */
 
+#include <pybind11/pybind11.h>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -30,41 +31,6 @@
 #include <limits>
 #include <queue>
 
-using BlobId = int;
-
 struct Blob {
-    BlobId id;
-    TimeRange schedulable_timerange;
-    std::unordered_set<BlobId> dependencies;
+    vector
 };
-class Blob {
-public:
-    BlobId id;
-    TimeUnit duration;
-    TimeUnit earliest_start;
-    TimeUnit latest_finish;
-    std::vector<ResourceId> required_resources;
-    std::unordered_set<JobId> dependencies;  // Jobs that must complete before this one
-    std::unordered_map<std::string, double> properties;  // Custom job properties
-    
-    Job(JobId job_id, TimeUnit dur) 
-        : id(job_id), duration(dur), earliest_start(0), 
-          latest_finish(std::numeric_limits<TimeUnit>::max()) {}
-    
-    void add_dependency(JobId dep_job) {
-        dependencies.insert(dep_job);
-    }
-    
-    void set_time_window(TimeUnit earliest, TimeUnit latest) {
-        earliest_start = earliest;
-        latest_finish = latest;
-    }
-    
-    void add_resource_requirement(ResourceId resource) {
-        required_resources.push_back(resource);
-    }
-    
-    void set_property(const std::string& key, double value) {
-        properties[key] = value;
-    }
-}

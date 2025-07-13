@@ -2,8 +2,12 @@ from datetime import datetime, timedelta, timezone, date
 
 DEFAULT_TZ = timezone.utc
 
-DEFAULT_START_DATE = datetime(date.min.year, date.min.month, date.min.day, tzinfo=timezone.utc)
-DEFAULT_END_DATE = datetime(date.max.year, date.max.month, date.max.day, tzinfo=timezone.utc)
+DEFAULT_START_DATE = datetime(
+    date.min.year, date.min.month, date.min.day, tzinfo=timezone.utc
+)
+DEFAULT_END_DATE = datetime(
+    date.max.year, date.max.month, date.max.day, tzinfo=timezone.utc
+)
 MIN_DATE = date.min
 MAX_DATE = date.max
 

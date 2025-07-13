@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from .constants import *
 from math import ceil
 
+
 class Day(Enum):
     MONDAY = 0
     TUESDAY = 1
@@ -13,6 +14,7 @@ class Day(Enum):
     SATURDAY = 5
     SUNDAY = 6
 
+
 def round_datetime_future_bias(dt: datetime, granularity: timedelta) -> datetime:
     """
     Round datetime to nearest granularity with future bias.
@@ -20,22 +22,22 @@ def round_datetime_future_bias(dt: datetime, granularity: timedelta) -> datetime
     """
     if granularity <= timedelta(0):
         raise ValueError("Granularity must be positive timedelta")
-    
+
     # Create a reference point (start of day) to align boundaries properly
     start_of_day = dt.replace(hour=0, minute=0, second=0, microsecond=0)
-    
+
     # Calculate seconds elapsed since start of day
     elapsed = (dt - start_of_day).total_seconds()
     granularity_seconds = granularity.total_seconds()
-    
+
     # Calculate how many granularity units have passed since start of day
     units_passed = elapsed / granularity_seconds
-    
+
     # Always round up to next boundary
     rounded_units = ceil(units_passed)
-    
+
     # Calculate the rounded time
     rounded_elapsed = rounded_units * granularity_seconds
     result = start_of_day + timedelta(seconds=rounded_elapsed)
-    
+
     return result

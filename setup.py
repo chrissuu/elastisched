@@ -8,5 +8,5 @@ setup(
     author_email="chrisssu19@gmail.com",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
-    python_requires=">=3.11"
+    python_requires=">=3.11",
 )
