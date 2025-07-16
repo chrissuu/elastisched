@@ -1,6 +1,6 @@
 #ifndef COST_FUNCTION_H
 #define COST_FUNCTION_H
-#include "schedule.h"
+#include "schedule.hpp"
 
 double busy_saturday_afternoon_cost(Schedule* S);
 double busy_friday_afternoon_cost(Schedule* S);
@@ -19,6 +19,6 @@ double schedule_cost(Schedule* S) {
         + bad_sleep_cost(S)
         + context_switch_cost(S)
         + finish_later_cost(S)
-        + priority_inversion_cost(S)
+        + priority_inversion_cost(S);
 };
 #endif
