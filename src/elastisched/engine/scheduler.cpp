@@ -1,7 +1,8 @@
 #include "job.hpp"
 #include "policy.hpp"
 #include "schedule.hpp"
-#include "utils/interval_tree.hpp"
+#include "utils/IntervalTree.hpp"
+#include "cost_function.hpp"
 
 #include "constants.hpp"
 
@@ -9,7 +10,10 @@
 #include <memory>
 #include <algorithm>
 #include <cstddef>
+#include <map>
 #include <random>
+
+#include "optimizer/SimulatedAnnealingOptimizer.hpp"
 
 std::optional<time_t> getMaxIntervalTime(const std::vector<std::unique_ptr<Job>>& jobs) {
     if (jobs.empty()) return std::nullopt;
@@ -49,29 +53,29 @@ std::optional<time_t> optionalMax(std::optional<time_t> a, std::optional<time_t>
     else return b;
 }
 
-std::vector<std::vector<std::unique_ptr<Job>>> getDisjointIntervals(std::vector<std::unique_ptr<Job>> jobs) {
+std::vector<std::vector<Job>> getDisjointIntervals(std::vector<Job> jobs) {
     if (jobs.empty()) {
         return {};
     }
 
-    std::vector<std::vector<std::unique_ptr<Job>>> disjointIntervals;
+    std::vector<std::vector<Job>> disjointIntervals;
 
     std::sort(jobs.begin(), jobs.end(), [](const std::unique_ptr<Job>& a, const std::unique_ptr<Job>& b) {
         return a->schedulableTimeRange.low() < b->schedulableTimeRange.low();
     });
 
-    time_t currEnd = jobs[0]->schedulableTimeRange.high();
-    disjointIntervals.push_back({std::move(jobs[0])});
+    time_t currEnd = jobs[0].schedulableTimeRange.high();
+    disjointIntervals.push_back({jobs[0]});
 
     for (size_t i = 1; i < jobs.size(); ++i) {
         auto& job = jobs[i];
 
-        if (job->schedulableTimeRange.low() >= currEnd) {
-            disjointIntervals.push_back({std::move(job)});
-            currEnd = disjointIntervals.back().back()->schedulableTimeRange.high();
+        if (job.schedulableTimeRange.low() >= currEnd) {
+            disjointIntervals.push_back({job});
+            currEnd = disjointIntervals.back().back().schedulableTimeRange.high();
         } else {
             disjointIntervals.back().push_back(std::move(job));
-            currEnd = std::max(currEnd, disjointIntervals.back().back()->schedulableTimeRange.high());
+            currEnd = std::max(currEnd, disjointIntervals.back().back().schedulableTimeRange.high());
         }
     }
 
@@ -83,7 +87,7 @@ TimeRange generateRandomTimeRangeWithin(
     const TimeRange& schedulableTimeRange,
     time_t duration,
     time_t GRANULARITY,
-    std::mt19937& gen)
+    const std::mt19937& gen)
 {
     time_t earliestStart = ((schedulableTimeRange.low() + GRANULARITY - 1) / GRANULARITY) * GRANULARITY;
 
@@ -106,7 +110,7 @@ TimeRange generateRandomTimeRangeWithin(
 
 
 Schedule generateRandomSchedule(
-    std::vector<std::vector<std::unique_ptr<Job>>> disjointJobs, 
+    std::vector<std::vector<Job>> disjointJobs, 
     time_t GRANULARITY,
     std::mt19937& gen
 ) {
@@ -115,8 +119,8 @@ Schedule generateRandomSchedule(
     
     for (auto jobGroup : disjointJobs) {
         for (const auto& job : jobGroup) {
-            TimeRange schedulableTimeRange = job->schedulableTimeRange;
-            time_t duration = job->defaultScheduledTimeRange.length();
+            TimeRange schedulableTimeRange = job.schedulableTimeRange;
+            time_t duration = job.defaultScheduledTimeRange.length();
             TimeRange randomTimeRange = generateRandomTimeRangeWithin(
                 schedulableTimeRange,
                 duration,
@@ -124,9 +128,38 @@ Schedule generateRandomSchedule(
                 gen
             );
 
-            ScheduledJob randomScheduledJob = { job->tags, randomTimeRange, job->id };
+            ScheduledJob randomScheduledJob = { job.tags, randomTimeRange, job.id };
 
             randomScheduledJobs.push_back(randomScheduledJob);
+        }
+    }
+}
+
+template<typename T>
+T randomChoice(const std::vector<T>& vec, const std::mt19937& gen) {
+    std::uniform_int_distribution<> dist(0, vec.size() - 1);
+    return vec[dist(gen)];
+}
+
+Schedule generateRandomScheduleNeighbor(
+    Schedule s, 
+    const IntervalTree<time_t>& rigidIntervals,
+    std::map<ID, Job> idBlobMap,
+    const time_t GRANULARITY,
+    const std::mt19937& gen
+) {
+    std::vector<ScheduledJob> scheduledJobs = s.scheduledJobs;
+    for (;;) {
+        ScheduledJob randomScheduledJob = randomChoice(scheduledJobs, gen);
+        ID currId = randomScheduledJob.id;
+        Job currJob = idBlobMap[currId];
+        if (!currJob.isRigid()) {
+            TimeRange randomTimeRange = generateRandomTimeRangeWithin(
+                currJob.schedulableTimeRange,
+                currJob.schedulableTimeRange.length(),
+                GRANULARITY,
+                gen
+            );
         }
     }
 }
@@ -142,39 +175,49 @@ Schedule generateRandomSchedule(
  * Returns the approximately best Schedule.
  * 
  */
-std::optional<Schedule> schedule_jobs(
-    std::vector<std::unique_ptr<Job>> jobs,
+Schedule schedule_jobs(
+    std::vector<Job> jobs,
     const time_t GRANULARITY, 
     const time_t START_EPOCH,
     const uint64_t NUM_SAMPLES
 ) {
     IntervalTree<time_t> rigidIntervals;
+    std::map<ID, Job> idBlobMap;
     for (const auto& job : jobs) {
-        if (job->defaultScheduledTimeRange == job->schedulableTimeRange) {
-            rigidIntervals.insert(job->defaultScheduledTimeRange);
+        if (job.defaultScheduledTimeRange == job.schedulableTimeRange) {
+            rigidIntervals.insert(job.defaultScheduledTimeRange);
         }
+        idBlobMap[job.id] = job;
     }
 
-    auto minIntervalTimeOpt = getMinIntervalTime(jobs);
-    auto maxIntervalTimeOpt = getMaxIntervalTime(jobs);
-
-    std::vector<std::vector<std::unique_ptr<Job>>> disjointJobs = getDisjointIntervals(jobs);
-
-    std::vector<Schedule> randomSchedules;
-
+    std::vector<std::vector<Job>> disjointJobs = getDisjointIntervals(jobs);
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    for (auto i = 0; i < NUM_SAMPLES; i++) {
-        randomSchedules.push_back(generateRandomSchedule(disjointJobs, GRANULARITY, gen));
-    }
+    Schedule randomSchedule = generateRandomSchedule(disjointJobs, GRANULARITY, gen);
 
-    return std::nullopt;
+    SimulatedAnnealingOptimizer<Schedule> optimizer = SimulatedAnnealingOptimizer<Schedule>(
+        scheduleCost,
+        [rigidIntervals, idBlobMap, GRANULARITY, gen](Schedule s) { 
+            return generateRandomScheduleNeighbor(
+                s, 
+                rigidIntervals, 
+                idBlobMap,
+                GRANULARITY,
+                gen); },
+        100.0f,
+        1e-4,
+        100000
+    );
+
+    Schedule bestSchedule = optimizer.optimize(randomSchedule);
+
+    return bestSchedule;
 }
 
-int schedule(std::vector<std::unique_ptr<Job>> jobs, uint8_t num_jobs, const uint64_t GRANULARITY, const uint64_t START_EPOCH) {
+Schedule schedule(std::vector<Job> jobs, uint8_t num_jobs, const uint64_t GRANULARITY, const uint64_t START_EPOCH) {
     if (num_jobs == 0) {
-        return 1;
+        return Schedule();
     }
 
     schedule_jobs(jobs, GRANULARITY, START_EPOCH, 1UL);

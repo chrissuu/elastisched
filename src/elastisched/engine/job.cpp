@@ -1,7 +1,7 @@
 #include "job.hpp"
 
 Job::Job(TimeRange defaultScheduledTimeRange, TimeRange schedulableTimeRange,
-        ID id, Policy policy, std::vector<ID> dependencies, std::set<Tag> tags) 
+        ID id, Policy policy, std::set<ID> dependencies, std::set<Tag> tags) 
 :   defaultScheduledTimeRange(defaultScheduledTimeRange),
     schedulableTimeRange(schedulableTimeRange),
     id(id),
@@ -11,3 +11,7 @@ Job::Job(TimeRange defaultScheduledTimeRange, TimeRange schedulableTimeRange,
 {
         return;
 };
+
+bool Job::isRigid() {
+    return defaultScheduledTimeRange == schedulableTimeRange;
+}

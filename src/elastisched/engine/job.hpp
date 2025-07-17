@@ -15,7 +15,7 @@ public:
     TimeRange schedulableTimeRange;
     ID id;
     Policy policy;
-    std::vector<ID> dependencies;
+    std::set<ID> dependencies;
     std::set<Tag> tags;
 
     // Constructor
@@ -23,8 +23,10 @@ public:
         TimeRange schedulableTimeRange,
         ID id,
         Policy policy,
-        std::vector<ID> dependencies,
+        std::set<ID> dependencies,
         std::set<Tag> tags);
+
+    bool isRigid();
 };
 
 #endif // JOB_HPP

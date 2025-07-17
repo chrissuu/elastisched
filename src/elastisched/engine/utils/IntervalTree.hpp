@@ -65,4 +65,9 @@ public:
         Interval<T> query(low, high);
         return overlapSearch(root.get(), query);
     }
+
+    bool isIn(Interval<T> interval) {
+        const Interval<T>* overlappingInterval = searchOverlap(interval.low(), interval.high());
+        return overlappingInterval != nullptr;
+    }
 };
