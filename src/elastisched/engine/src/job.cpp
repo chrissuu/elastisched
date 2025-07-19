@@ -1,9 +1,10 @@
 #include "job.hpp"
 
-Job::Job(TimeRange defaultScheduledTimeRange, TimeRange schedulableTimeRange,
+Job::Job(time_t duration, TimeRange schedulableTimeRange, TimeRange scheduledTimeRange,
         ID id, Policy policy, std::set<ID> dependencies, std::set<Tag> tags) 
-:   defaultScheduledTimeRange(defaultScheduledTimeRange),
+:   duration(duration),
     schedulableTimeRange(schedulableTimeRange),
+    scheduledTimeRange(scheduledTimeRange),
     id(id),
     policy(policy),
     dependencies(dependencies),
@@ -12,6 +13,6 @@ Job::Job(TimeRange defaultScheduledTimeRange, TimeRange schedulableTimeRange,
         return;
 };
 
-bool Job::isRigid() {
-    return defaultScheduledTimeRange == schedulableTimeRange;
-}
+bool Job::isRigid() const {
+    return duration == schedulableTimeRange.length();
+};

@@ -66,10 +66,10 @@ public:
 private:
     CostFunction costFn;
     NeighborFunction neighborFn;
-    TemperatureSchedule tempSchedule;
     double initialTemp;
     double finalTemp;
     int maxIters;
+    TemperatureSchedule tempSchedule;
 
     static double defaultSchedule(double T0, int iter) {
         return T0 * std::pow(0.95, iter); // geometric cooling

@@ -4,29 +4,31 @@
 #include "policy.hpp"
 #include "tag.hpp"
 #include "constants.hpp"
-#include "utils/interval.hpp"
+#include "utils/Interval.hpp"
 
 #include <vector>
 #include <set>
 
 class Job {
 public:
-    TimeRange defaultScheduledTimeRange;
+    time_t duration;
     TimeRange schedulableTimeRange;
+    TimeRange scheduledTimeRange;
     ID id;
     Policy policy;
     std::set<ID> dependencies;
     std::set<Tag> tags;
 
     // Constructor
-    Job(TimeRange defaultScheduledTimeRange,
+    Job(time_t duration,
         TimeRange schedulableTimeRange,
+        TimeRange scheduledTimeRange,
         ID id,
         Policy policy,
         std::set<ID> dependencies,
         std::set<Tag> tags);
 
-    bool isRigid();
+    bool isRigid() const;
 };
 
 #endif // JOB_HPP

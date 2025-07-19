@@ -6,24 +6,26 @@
 template<typename T>
 class Interval {
 private:
-    T low_;
-    T high_;
+    T low;
+    T high;
 
 public:
     // Constructor
-    Interval(T low, T high) : low_(low), high_(high) {
+    Interval(T time) : low(time), high(time) {}
+
+    Interval(T low, T high) : low(low), high(high) {
         if (high < low) {
             throw std::invalid_argument("Interval: high must be >= low");
         }
     }
 
     // Accessors
-    T low() const { return low_; }
-    T high() const { return high_; }
+    T getLow() const { return low; }
+    T getHigh() const { return high; }
 
     // Equality operators
     bool operator==(const Interval& other) const {
-        return low_ == other.low_ && high_ == other.high_;
+        return low == other.getLow() && high == other.getHigh();
     }
 
     bool operator!=(const Interval& other) const {
@@ -32,17 +34,17 @@ public:
 
     // Check if intervals overlap
     bool overlaps(const Interval& other) const {
-        return !(high_ < other.low_ || other.high_ < low_);
+        return !(high < other.getLow() || other.getHigh() < low);
     }
 
     // Check if contains a value
     bool contains(T value) const {
-        return low_ <= value && value <= high_;
+        return low <= value && value <= high;
     }
 
     // Length of interval
     T length() const {
-        return high_ - low_;
+        return high - low;
     }
 };
 
