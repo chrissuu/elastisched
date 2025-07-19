@@ -51,12 +51,12 @@ m_startEpoch(startEpoch) {
         m_max = safemax<time_t>(m_max, job.scheduledTimeRange.getHigh());
     }
 
-    TimeRange curr = TimeRange(startEpoch, startEpoch + constants::DAY_TO_SECONDS - 1);
+    TimeRange curr = TimeRange(startEpoch, startEpoch + constants::DAY - 1);
     m_dayBasedSchedule.insert(curr, std::nullopt);
 
     while (curr.getHigh() < m_max.value()) {
         time_t nextLow = curr.getHigh() + 1;
-        TimeRange next = TimeRange(nextLow, nextLow + constants::DAY_TO_SECONDS - 1);
+        TimeRange next = TimeRange(nextLow, nextLow + constants::DAY - 1);
         m_dayBasedSchedule.insert(next, std::nullopt);
         curr = next;
     }
@@ -72,13 +72,15 @@ m_startEpoch(startEpoch) {
 
 
 double ScheduleCostFunction::busy_friday_afternoon_cost() const {
-    time_t TIME_TO_FIRST_FRIDAY = m_startEpoch + 4 * constants::DAY_TO_SECONDS;
+    time_t TIME_TO_FIRST_FRIDAY = m_startEpoch + 4 * constants::DAY;
     TimeRange currFriday = TimeRange(TIME_TO_FIRST_FRIDAY);
     std::optional<std::vector<Job>>* currFridayJobs = m_dayBasedSchedule.searchValue(currFriday);
     double cost = 0;
     while (currFriday.getHigh() < m_max) {
-        cost += constants::FRIDAY_HOURLY_COST_FACTOR * (double)getTotalJobsLength(currFridayJobs->value());
-        currFriday = TimeRange(currFriday.getHigh() + constants::WEEK_TO_SECONDS);
+        if (currFridayJobs->has_value()) {
+            cost += constants::FRIDAY_HOURLY_COST_FACTOR * (double)getTotalJobsLength(currFridayJobs->value());
+        }
+        currFriday = TimeRange(currFriday.getHigh() + constants::WEEK);
         currFridayJobs = m_dayBasedSchedule.searchValue(currFriday);
     }
     return cost;
@@ -86,18 +88,21 @@ double ScheduleCostFunction::busy_friday_afternoon_cost() const {
 
 
 double ScheduleCostFunction::busy_saturday_afternoon_cost() const {
-    time_t TIME_TO_FIRST_SAT = m_startEpoch + 5 * constants::DAY_TO_SECONDS;
+    time_t TIME_TO_FIRST_SAT = m_startEpoch + 5 * constants::DAY;
     TimeRange currSat = TimeRange(TIME_TO_FIRST_SAT);
     std::optional<std::vector<Job>>* currSatJobs = m_dayBasedSchedule.searchValue(currSat);
     double cost = 0;
     while (currSat.getHigh() < m_max) {
-        cost += constants::SATURDAY_HOURLY_COST_FACTOR * (double)getTotalJobsLength(currSatJobs->value());
-        currSat = TimeRange(currSat.getHigh() + constants::WEEK_TO_SECONDS);
+        if (currSatJobs->has_value()) {
+            cost += constants::SATURDAY_HOURLY_COST_FACTOR * (double)getTotalJobsLength(currSatJobs->value());
+        }
+        currSat = TimeRange(currSat.getHigh() + constants::WEEK);
         currSatJobs = m_dayBasedSchedule.searchValue(currSat);
     }
     return cost;
 }
 
 double ScheduleCostFunction::scheduleCost() const {
-    return busy_friday_afternoon_cost() + busy_saturday_afternoon_cost();
+    double cost = busy_friday_afternoon_cost() + busy_saturday_afternoon_cost();
+    return cost;
 }

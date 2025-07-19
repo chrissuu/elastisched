@@ -2,12 +2,18 @@
 #define INTERVAL_H
 
 #include <stdexcept>  // for std::invalid_argument
+#include <iostream>
 
 template<typename T>
 class Interval {
 private:
     T low;
     T high;
+
+    friend std::ostream& operator<<(std::ostream& os, const Interval<T>& interval) {
+        os << "Low: " << interval.getLow() << " High: " << interval.getHigh();
+        return os;
+    }
 
 public:
     // Constructor

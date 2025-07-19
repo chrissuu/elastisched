@@ -6,6 +6,7 @@
 #include "utils/IntervalTree.hpp"
 
 #include <optional>
+#include <iostream>
 #include <set>
 
 class ScheduleCostFunction {

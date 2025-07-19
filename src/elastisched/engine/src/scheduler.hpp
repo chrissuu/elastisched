@@ -1,3 +1,6 @@
+#ifndef SCHEDULER_H
+#define SCHEDULER_H
+
 #include "job.hpp"
 #include "policy.hpp"
 #include "schedule.hpp"
@@ -14,8 +17,12 @@
 #include <random>
 #include <optional>
 #include <iostream>
+#include <set>
+#include <cassert>
 
 #include "optimizer/SimulatedAnnealingOptimizer.hpp"
+
+Schedule schedule(std::vector<Job> jobs, uint8_t num_jobs, const uint64_t GRANULARITY, const uint64_t START_EPOCH);
 
 std::vector<std::vector<Job>> getDisjointIntervals(std::vector<Job> jobs) {
     if (jobs.empty()) {
@@ -92,7 +99,7 @@ Schedule generateRandomSchedule(
                 gen
             );
 
-            job.schedulableTimeRange = randomTimeRange;
+            job.scheduledTimeRange = randomTimeRange;
             randomlyScheduledJobs.push_back(job);
         }
     }
@@ -111,26 +118,31 @@ Schedule generateRandomScheduleNeighbor(
     const time_t GRANULARITY,
     std::mt19937& gen
 ) {
-    std::vector<Job> jobs = s.scheduledJobs;
-    std::vector<Job> flexibleJobs;
-    for (auto& job : jobs) {
-        if (!job.isRigid()) {
-            flexibleJobs.push_back(job);
+    std::vector<Job>& jobs = s.scheduledJobs;
+    std::vector<size_t> flexibleIndices;
+
+    for (size_t i = 0; i < jobs.size(); ++i) {
+        if (!jobs[i].isRigid()) {
+            flexibleIndices.push_back(i);
         }
     }
 
-    if (flexibleJobs.size() == 0) {
+    if (flexibleIndices.empty()) {
         return s;
     }
 
-    Job* randomFlexibleJob = randomChoice(flexibleJobs, gen);
+    std::uniform_int_distribution<> dist(0, flexibleIndices.size() - 1);
+    size_t chosenIndex = flexibleIndices[dist(gen)];
+
+    Job& randomFlexibleJob = jobs[chosenIndex];
     TimeRange randomTimeRange = generateRandomTimeRangeWithin(
-        randomFlexibleJob->schedulableTimeRange,
-        randomFlexibleJob->schedulableTimeRange.length(),
+        randomFlexibleJob.schedulableTimeRange,
+        randomFlexibleJob.duration,
         GRANULARITY,
         gen
     );
-    randomFlexibleJob->scheduledTimeRange = randomTimeRange;
+
+    randomFlexibleJob.scheduledTimeRange = randomTimeRange;
 
     return s;
 }
@@ -167,9 +179,9 @@ Schedule schedule_jobs(
                 s, 
                 GRANULARITY,
                 gen); },
-        100.0f,
+        10.0f,
         1e-4,
-        100000
+        10000
     );
 
     Schedule bestSchedule = optimizer.optimize(randomSchedule);
@@ -186,7 +198,5 @@ Schedule schedule(std::vector<Job> jobs, uint8_t num_jobs, const uint64_t GRANUL
     return s;
 }
 
-int main(int argc, char** argv) {
-    std::cout << "Hello World!";
-    return 0;
-}
+
+#endif
