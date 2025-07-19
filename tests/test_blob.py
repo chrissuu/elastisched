@@ -1,7 +1,9 @@
-from elastisched.timerange import TimeRange
-from datetime import datetime, timezone, timedelta
-from elastisched.blob import Blob
+from datetime import datetime, timedelta, timezone
+
 import pytest
+
+from elastisched.blob import Blob
+from elastisched.timerange import TimeRange
 
 
 def test_different_timezone_le_comparison_raise_value_error():

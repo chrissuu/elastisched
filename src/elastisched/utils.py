@@ -1,8 +1,9 @@
-from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from .constants import *
+from enum import Enum
 from math import ceil
+
+from elastisched.constants import *
 
 
 class Day(Enum):

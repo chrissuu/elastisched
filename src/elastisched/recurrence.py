@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
-from typing import List, Optional
-from dataclasses import dataclass, field
-from elastisched.daytime import daytime
-from elastisched.blob import Blob
-from elastisched.timerange import TimeRange
 from copy import deepcopy
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import List, Optional
+
+from elastisched.blob import Blob
+from elastisched.daytime import daytime
+from elastisched.timerange import TimeRange
 
 
 def has_overlapping_blobs(blobs: List[Blob]) -> bool:

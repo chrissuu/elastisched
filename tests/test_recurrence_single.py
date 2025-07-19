@@ -1,7 +1,8 @@
-from elastisched.recurrence import SingleBlobOccurrence
-from elastisched.blob import Blob
-from elastisched.timerange import TimeRange
 from datetime import datetime, timedelta, timezone
+
+from elastisched.blob import Blob
+from elastisched.recurrence import SingleBlobOccurrence
+from elastisched.timerange import TimeRange
 
 
 def test_schedulable_after_current_next_occurrence():

@@ -1,6 +1,8 @@
-from elastisched.timerange import TimeRange
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
 import pytest
+
+from elastisched.timerange import TimeRange
 
 
 def test_default_timerange_is_utc():

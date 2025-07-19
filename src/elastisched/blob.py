@@ -1,13 +1,14 @@
 import uuid
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import List, Optional, Set
+
 from elastisched.constants import *
 from elastisched.policy import Policy
 from elastisched.recurrence import *
 from elastisched.tag import Tag
 from elastisched.timerange import TimeRange
-from elastisched.utils import round_datetime_future_bias
-from typing import List, Optional, Set
+
 
 @dataclass
 class Blob:
@@ -23,7 +24,7 @@ class Blob:
     # Optional fields
     dependencies: List[str] = field(default_factory=list)  # IDs of other blobs
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    tag: Set[Tag] = field(default_factory=set)
+    tags: Set[Tag] = field(default_factory=set)
 
     # Scheduling metadata
     __actual_scheduled_timerange: Optional[TimeRange] = None
@@ -77,6 +78,9 @@ class Blob:
 
     def get_schedulable_timerange(self) -> TimeRange:
         return self.schedulable_timerange
+    
+    def get_policy(self) -> Policy:
+        return self.policy
 
     def set_default_scheduled_timerange(self, timerange: TimeRange):
         self.default_scheduled_timerange = timerange

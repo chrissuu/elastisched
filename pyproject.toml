@@ -1,0 +1,32 @@
+[build-system]
+requires = [
+    "scikit-build-core>=0.3.3",
+    "pybind11>=2.10.0",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "elastisched"
+version = "1.0.0"
+authors = [
+    {name = "Chris Su", email = "chrisssu19@gmail.com"},
+]
+description = "Package description"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "black"]
+
+[project.urls]
+Homepage = "https://github.com/chrissuu/elastisched"
+
+[tool.scikit-build]
+cmake.version = ">=3.15"
+build.verbose = true
+cmake.source-dir = "src/elastisched/engine"

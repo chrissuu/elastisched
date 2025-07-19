@@ -1,8 +1,9 @@
 from dataclasses import dataclass, field
-from typing import Tuple
 from datetime import datetime, timedelta, timezone
-from elastisched.constants import DEFAULT_START_DATE, DEFAULT_END_DATE, DEFAULT_TZ
 from functools import wraps
+from typing import Tuple
+
+from elastisched.constants import DEFAULT_END_DATE, DEFAULT_START_DATE, DEFAULT_TZ
 
 
 def validate_timezone_compatibility(func):
@@ -38,6 +39,8 @@ class TimeRange:
 
     @validate_timezone_compatibility
     def overlaps(self, other: "TimeRange") -> bool:
+        if not isinstance(other, TimeRange):
+            raise TypeError("Passed argument should be of type TimeRange")
         return self.start < other.end and other.start < self.end
 
     @validate_timezone_compatibility
