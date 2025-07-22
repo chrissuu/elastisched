@@ -51,39 +51,39 @@ endif()
 
 # Python extension module (only build if pybind11 is found and SKBUILD is set)
 if(pybind11_FOUND AND SKBUILD)
-    pybind11_add_module(scheduler_py 
+    pybind11_add_module(engine_py 
         src/pybind_scheduler.cpp     # Your pybind file
         # Don't include main.cpp here since it has a main() function
     )
     
     # Link against the core library
-    target_link_libraries(scheduler_py PRIVATE scheduler_lib)
+    target_link_libraries(engine_py PRIVATE scheduler_lib)
     
     # Set the module name to match your Python import
-    set_target_properties(scheduler_py PROPERTIES 
-        OUTPUT_NAME "scheduler"  # This will be the Python module name
+    set_target_properties(engine_py PROPERTIES 
+        OUTPUT_NAME "engine"  # This will be the Python module name
     )
     
     # Include directories for the Python module
-    target_include_directories(scheduler_py PRIVATE
+    target_include_directories(engine_py PRIVATE
         src
         src/utils
         src/optimizer
     )
     
     # Set properties for the module
-    target_compile_definitions(scheduler_py PRIVATE VERSION_INFO=${PROJECT_VERSION})
+    target_compile_definitions(engine_py PRIVATE VERSION_INFO=${PROJECT_VERSION})
     
     # Install the Python module (scikit-build-core handles this)
-    install(TARGETS scheduler_py DESTINATION .)
+    install(TARGETS engine_py DESTINATION .)
     
     # Platform-specific settings for Python module
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-        set_target_properties(scheduler_py PROPERTIES
+        set_target_properties(engine_py PROPERTIES
             INSTALL_RPATH "@loader_path"
         )
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        set_target_properties(scheduler_py PROPERTIES
+        set_target_properties(engine_py PROPERTIES
             INSTALL_RPATH "$ORIGIN"
         )
     endif()

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "utils/Interval.hpp"
+#include "tag.hpp"
 
 #define time_t uint64_t
 #define TimeRange Interval<time_t>
@@ -20,7 +21,14 @@ namespace constants {
     constexpr time_t DAY = ((uint64_t)24 * HOUR);
     constexpr time_t WEEK = ((uint64_t)7 * DAY);
 
+    constexpr time_t AFTERNOON_START = HOUR * 17;
+
     constexpr double FRIDAY_HOURLY_COST_FACTOR = 2.0f;
     constexpr double SATURDAY_HOURLY_COST_FACTOR = 3.0f;
+
+    constexpr double EXP_DOWNFACTOR = 0.1f;
+
+    const Tag WORK_TAG = Tag("ELASTISCHED_WORK_TYPE");
+    constexpr double ILLEGAL_SCHEDULE_COST = 1e12f;
 }
 #endif

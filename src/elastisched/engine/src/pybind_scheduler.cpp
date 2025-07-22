@@ -13,7 +13,7 @@ namespace py = pybind11;
 #include "constants.hpp"
 #include "utils/Interval.hpp"
 
-PYBIND11_MODULE(scheduler, m) {
+PYBIND11_MODULE(engine, m) {
     // Tag
     py::class_<Tag>(m, "Tag")
         .def(py::init<const std::string&>())

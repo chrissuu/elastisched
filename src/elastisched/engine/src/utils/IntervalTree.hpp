@@ -1,5 +1,5 @@
-#ifndef INTERVALTREE_H
-#define INTERVALTREE_H
+#ifndef INTERVALTREE_HPP
+#define INTERVALTREE_HPP
 #include <memory>
 #include <iostream>
 #include <utility>
@@ -104,11 +104,14 @@ public:
         auto i = std::make_unique<Interval<T>>(interval);
         root = insert(std::move(root), std::move(i), value);
     }
-    
-    Interval<T>* searchOverlap(T low, T high) const {
-        Interval<T> query(low, high);
+
+    Interval<T>* searchOverlap(Interval<T> query) const {
         auto result = overlapSearch(root.get(), query);
         return result ? result->interval.get() : nullptr;
+    }
+    
+    Interval<T>* searchOverlap(T low, T high) const {
+        return searchOverlap(Interval<T>(low, high));
     }
     
     U* searchValue(T low, T high) const {

@@ -1,20 +1,20 @@
-import scheduler
+import engine
 
 def main():
     # Create a Tag
-    tag = scheduler.Tag("work")
+    tag = engine.Tag("work")
     print("Tag name:", tag.name)
 
     # Create a Policy
-    policy = scheduler.Policy(0, 0.0, 0)
+    policy = engine.Policy(0, 0.0, 0)
     print("Policy is splittable?", policy.isSplittable())
 
     # Create a TimeRange
-    tr_schedulable = scheduler.TimeRange(0, 60*60)  # 0 to 1 hour
-    tr_scheduled = scheduler.TimeRange(0, 60*30)    # 0 to 30 min
+    tr_schedulable = engine.TimeRange(0, 60*60)  # 0 to 1 hour
+    tr_scheduled = engine.TimeRange(0, 60*30)    # 0 to 30 min
 
     # Create a Job
-    job = scheduler.Job(
+    job = engine.Job(
         60*30,  # duration: 30 min
         tr_schedulable,
         tr_scheduled,
@@ -25,13 +25,13 @@ def main():
     )
 
     # Create a Schedule and add the job
-    sched = scheduler.Schedule()
+    sched = engine.Schedule()
     sched.addJob(job)
     print("Number of jobs in schedule:", len(sched.scheduledJobs))
 
-    # Run the scheduler function
+    # Run the engine.function
     jobs = [job]
-    result = scheduler.schedule(jobs, len(jobs), 60*15, 0)  # granularity: 15 min, start_epoch: 0
+    result = engine.schedule(jobs, len(jobs), 60*15, 0)  # granularity: 15 min, start_epoch: 0
     print("Scheduled jobs:", result.scheduledJobs)
 
 if __name__ == "__main__":

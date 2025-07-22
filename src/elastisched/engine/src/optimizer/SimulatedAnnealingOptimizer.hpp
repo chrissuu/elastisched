@@ -1,5 +1,5 @@
-#ifndef SIMULATED_ANNEALING_OPTIMIZER
-#define SIMULATED_ANNEALING_OPTIMIZER
+#ifndef SIMULATED_ANNEALING_OPTIMIZER_HPP
+#define SIMULATED_ANNEALING_OPTIMIZER_HPP
 #include <functional>
 #include <random>
 #include <cmath>

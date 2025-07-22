@@ -71,38 +71,87 @@ m_startEpoch(startEpoch) {
 }
 
 
-double ScheduleCostFunction::busy_friday_afternoon_cost() const {
-    time_t TIME_TO_FIRST_FRIDAY = m_startEpoch + 4 * constants::DAY;
-    TimeRange currFriday = TimeRange(TIME_TO_FIRST_FRIDAY);
-    std::optional<std::vector<Job>>* currFridayJobs = m_dayBasedSchedule.searchValue(currFriday);
+/**
+ * Adds a cost to busy afternoons, exponentially increasing cost for jobs appearing later in the day.
+ */
+double ScheduleCostFunction::busy_afternoon_exponential_cost(uint64_t DAYS_SINCE_MONDAY) const {
+    time_t TIME_TO_FIRST_DAY = m_startEpoch + DAYS_SINCE_MONDAY * constants::DAY;
+    TimeRange currDay = TimeRange(TIME_TO_FIRST_DAY);
+    std::optional<std::vector<Job>>* currJobs = m_dayBasedSchedule.searchValue(currDay);
     double cost = 0;
-    while (currFriday.getHigh() < m_max) {
-        if (currFridayJobs->has_value()) {
-            cost += constants::FRIDAY_HOURLY_COST_FACTOR * (double)getTotalJobsLength(currFridayJobs->value());
+    while (currDay.getHigh() < m_max) {
+        if (currJobs->has_value()) {
+            std::vector<Job> filteredWorkJobs;
+            for (const auto& job : currJobs->value()) {
+                bool is_work_type = job.tags.find(constants::WORK_TAG) != job.tags.end();
+                bool is_scheduled_in_afternoon = job.scheduledTimeRange.getLow() > constants::AFTERNOON_START;
+                if (is_work_type && is_scheduled_in_afternoon) {
+                    filteredWorkJobs.push_back(job);
+                }
+            }
+            std::sort(filteredWorkJobs.begin(), filteredWorkJobs.end(), [](const Job& U, const Job& V) {
+                return U.scheduledTimeRange.getLow() < V.scheduledTimeRange.getLow();
+            });
+            
+            /* Apply greater cost for work type jobs scheduled later in the afternoon */
+            for (const auto& job : filteredWorkJobs) {
+                cost += std::exp(constants::EXP_DOWNFACTOR * (job.scheduledTimeRange.getLow() - currDay.getLow() / constants::HOUR));
+            }
         }
-        currFriday = TimeRange(currFriday.getHigh() + constants::WEEK);
-        currFridayJobs = m_dayBasedSchedule.searchValue(currFriday);
+        currDay = TimeRange(currDay.getHigh() + constants::WEEK);
+        currJobs = m_dayBasedSchedule.searchValue(currDay);
     }
-    return cost;
+    return cost;    
+}
+
+
+double ScheduleCostFunction::busy_friday_afternoon_cost() const {
+    return busy_afternoon_exponential_cost((uint64_t)4);
 }
 
 
 double ScheduleCostFunction::busy_saturday_afternoon_cost() const {
-    time_t TIME_TO_FIRST_SAT = m_startEpoch + 5 * constants::DAY;
-    TimeRange currSat = TimeRange(TIME_TO_FIRST_SAT);
-    std::optional<std::vector<Job>>* currSatJobs = m_dayBasedSchedule.searchValue(currSat);
-    double cost = 0;
-    while (currSat.getHigh() < m_max) {
-        if (currSatJobs->has_value()) {
-            cost += constants::SATURDAY_HOURLY_COST_FACTOR * (double)getTotalJobsLength(currSatJobs->value());
-        }
-        currSat = TimeRange(currSat.getHigh() + constants::WEEK);
-        currSatJobs = m_dayBasedSchedule.searchValue(currSat);
-    }
-    return cost;
+    return busy_afternoon_exponential_cost((uint64_t)5);
 }
 
+
+/**
+ * Adds an "INFINITE" cost to illegal schedulings.
+ */
+double ScheduleCostFunction::illegal_schedule_cost() const {
+    const std::vector<Job>& scheduledJobs = m_schedule.scheduledJobs;
+    IntervalTree<time_t, size_t> nonOverlappableJobs;
+    
+    for (size_t i = 0; i < scheduledJobs.size(); ++i) {
+        const Job& curr = scheduledJobs[i];
+        Policy currPolicy = curr.policy;
+        
+        if (!currPolicy.isOverlappable()) {
+            auto overlappingInterval = nonOverlappableJobs.searchOverlap(
+                curr.scheduledTimeRange
+            );
+            
+            if (overlappingInterval != nullptr) {
+                return constants::ILLEGAL_SCHEDULE_COST;
+            }
+            
+            nonOverlappableJobs.insert(
+                curr.scheduledTimeRange,
+                i
+            );
+        }
+    }
+    
+    DependencyCheckResult dependencyCheck = checkDependencyViolations(m_schedule);
+    if (dependencyCheck.hasCyclicDependencies || dependencyCheck.hasViolations) {
+        return constants::ILLEGAL_SCHEDULE_COST;
+    }
+    
+    return 0.0f;
+}
+
+
 double ScheduleCostFunction::scheduleCost() const {
-    double cost = busy_friday_afternoon_cost() + busy_saturday_afternoon_cost();
+    double cost = busy_friday_afternoon_cost() + busy_saturday_afternoon_cost() + illegal_schedule_cost();
     return cost;
 }

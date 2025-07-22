@@ -4,10 +4,14 @@
 #include "schedule.hpp"
 #include "constants.hpp"
 #include "utils/IntervalTree.hpp"
+#include "utils/DependencyChecker.hpp"
 
 #include <optional>
 #include <iostream>
 #include <set>
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 class ScheduleCostFunction {
 private:
@@ -22,6 +26,8 @@ private:
 public:
     double busy_saturday_afternoon_cost() const;
     double busy_friday_afternoon_cost() const;
+    double busy_afternoon_exponential_cost(uint64_t DAYS_SINCE_MONDAY) const;
+    // double overlapping_job_cost() const;
     // double work_block_duration_cost() const;
     // double daily_work_load_balance() const;
     // double bad_sleep_cost() const;
@@ -29,6 +35,7 @@ public:
     // double finish_later_cost() const;
     // double priority_inversion_cost() const;
 
+    double illegal_schedule_cost() const;
     double scheduleCost() const;
     
     ScheduleCostFunction(const Schedule& schedule, time_t granularity, time_t startEpoch);
