@@ -14,9 +14,9 @@ def has_overlapping_blobs(blobs: List[Blob]) -> bool:
 
     for i in range(len(sorted_blobs) - 1):
         if sorted_blobs[i].overlaps(sorted_blobs[i + 1]):
-            return False
+            return True
 
-    return True
+    return False
 
 
 def blob_copy_with_delta_future(blob: Blob, td: timedelta):
@@ -70,34 +70,57 @@ class WeeklyBlobRecurrence(BlobRecurrence):
 
     blobs_of_week: List[Blob]
     interval: int = 1  # Every N weeks
-    days_of_week: Optional[List[daytime]] = field(default=None)
 
     def __post_init__(self):
+        if len(self.blobs_of_week) == 0:
+            raise ValueError("There must be at least one occurrence in a weekly recurrence")
+
         if has_overlapping_blobs(self.blobs_of_week):
             raise ValueError("Weekly blob recurrence requires non-overlapping blobs")
 
         self.blobs_of_week.sort()
-        self.days_of_week = [
+        self.__days_of_week = [
             daytime(
-                blob.get_timerange().start.weekday(), blob.get_timerange().start.time()
+                blob.get_schedulable_timerange().start.weekday(), blob.get_schedulable_timerange().start.time()
             )
             for blob in self.blobs_of_week
         ]
 
+
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
-        curr_daytime = daytime(current.weekday(), current.time())
+        occurrences = []
 
-        for blob, day in zip(self.blobs_of_week, self.days_of_week):
-            if day > curr_daytime:
-                days_ahead = day.day_of_week - current.weekday()
-                delta_to_occurrence = timedelta(days=days_ahead)
-                return blob_copy_with_delta_future(blob, delta_to_occurrence)
+        for blob, day in zip(self.blobs_of_week, self.__days_of_week):
+            base_start = blob.get_schedulable_timerange().start
 
-        # All this week's blobs have passed — go to next interval
-        days_to_next_week = 7 * self.interval
-        delta_to_occurrence = timedelta(days=days_to_next_week)
+            total_days = (current - base_start).days
+            weeks_since_start = max(0, total_days // 7)  # clamp to 0 if before start
 
-        return blob_copy_with_delta_future(self.blobs_of_week[0], delta_to_occurrence)
+            candidate_weeks = [
+                weeks_since_start * self.interval,
+                (weeks_since_start + 1) * self.interval
+            ]
+
+            for week_offset in candidate_weeks:
+                days_since_base = week_offset * 7 + (day.day_of_week - base_start.weekday())
+                occurrence_date = base_start + timedelta(days=days_since_base)
+                occurrence_datetime = datetime.combine(occurrence_date.date(), day.time)
+
+                if occurrence_datetime < base_start:
+                    continue
+
+                if occurrence_datetime > current:
+                    delta = occurrence_datetime - base_start
+                    future_blob = blob_copy_with_delta_future(blob, delta)
+                    occurrences.append((occurrence_datetime, future_blob))
+                    break
+
+        if not occurrences:
+            return None
+
+        occurrences.sort(key=lambda tup: tup[0])
+        return occurrences[0][1]
+
 
     def all_occurrences(self, timerange: TimeRange) -> List[Blob]:
         occurrences = []
@@ -105,6 +128,7 @@ class WeeklyBlobRecurrence(BlobRecurrence):
 
         while True:
             next_blob = self.next_occurrence(current)
+            print(next_blob.get_schedulable_timerange().start)
             if next_blob is None:
                 break
 
@@ -136,7 +160,7 @@ class DeltaBlobRecurrence(BlobRecurrence):
             )
 
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
-        if current < self.start_blob.get_timerange():
+        if current < self.start_blob.get_schedulable_timerange():
             return deepcopy(self.start_blob)
 
         time_diff = current - self.start_blob.get_schedulable_timerange().start
@@ -192,7 +216,7 @@ class DateBlobRecurrence(BlobRecurrence):
     blob: Blob
 
     def __post_init__(self):
-        timerange = self.blob.get_timerange()
+        timerange = self.blob.get_schedulable_timerange()
         start: datetime = timerange.start
         end: datetime = timerange.end
 

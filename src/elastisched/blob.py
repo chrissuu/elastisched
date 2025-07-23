@@ -5,7 +5,6 @@ from typing import List, Optional, Set
 
 from elastisched.constants import *
 from elastisched.policy import Policy
-from elastisched.recurrence import *
 from elastisched.tag import Tag
 from elastisched.timerange import TimeRange
 
@@ -41,10 +40,6 @@ class Blob:
     def __str__(self) -> str:
         """String representation"""
         return ""
-
-    def __repr__(self) -> str:
-        """Developer-friendly representation"""
-        return f"daytime(day_of_week={self.day_of_week}, time='{self.time}')"
 
     def __eq__(self, other) -> bool:
         """Check equality with another daytime object"""
@@ -86,7 +81,7 @@ class Blob:
         self.default_scheduled_timerange = timerange
         return
 
-    def set_scheduble_timerange(self, timerange: TimeRange):
+    def set_schedulable_timerange(self, timerange: TimeRange):
         self.schedulable_timerange = timerange
         return
 

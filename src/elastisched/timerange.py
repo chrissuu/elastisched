@@ -84,7 +84,7 @@ class TimeRange:
 
         return self < other or self == other
 
-    def __add__(self, td) -> bool:
+    def __add__(self, td) -> "TimeRange":
         """Adds td timedelta to start and end"""
         if not isinstance(td, timedelta):
             return NotImplemented

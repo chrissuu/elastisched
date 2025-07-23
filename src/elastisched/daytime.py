@@ -5,13 +5,13 @@ from typing import Union
 class daytime:
     """Represents a specific day of the week with a time"""
 
-    def __init__(self, day_of_week: int, time: Union[time, str]):
+    def __init__(self, day_of_week: int, time_of_day: time):
         """
         Initialize a daytime object
 
         Args:
             day_of_week: Integer representing day (0=Monday, 6=Sunday)
-            time: Either a time object or string in format "HH:MM" or "HH:MM:SS"
+            time: a time object
         """
         if not isinstance(day_of_week, int) or day_of_week < 0 or day_of_week > 6:
             raise ValueError(
@@ -20,30 +20,12 @@ class daytime:
 
         self.day_of_week = day_of_week
 
-        if isinstance(time, str):
-            self.time = self._parse_time_string(time)
-        elif isinstance(time, time):
-            self.time = time
+        if isinstance(time_of_day, time):
+            self.time = time_of_day
         else:
             raise ValueError(
-                "time must be a time object or string in format 'HH:MM' or 'HH:MM:SS'"
+                "Time must be a time object" 
             )
-
-    def _parse_time_string(self, time_str: str) -> time:
-        """Parse time string into time object"""
-        try:
-            # Try HH:MM:SS format first
-            if time_str.count(":") == 2:
-                hour, minute, second = map(int, time_str.split(":"))
-                return time(hour, minute, second)
-            # Try HH:MM format
-            elif time_str.count(":") == 1:
-                hour, minute = map(int, time_str.split(":"))
-                return time(hour, minute)
-            else:
-                raise ValueError("Invalid time format")
-        except ValueError:
-            raise ValueError("time string must be in format 'HH:MM' or 'HH:MM:SS'")
 
     def __str__(self) -> str:
         """String representation"""
