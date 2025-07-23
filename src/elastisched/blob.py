@@ -20,7 +20,6 @@ class Blob:
     tz: timezone = field(default_factory=lambda: DEFAULT_TZ)
     policy: Policy = field(default_factory=lambda: Policy)
 
-    # Optional fields
     dependencies: List[str] = field(default_factory=list)  # IDs of other blobs
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     tags: Set[Tag] = field(default_factory=set)
@@ -73,7 +72,7 @@ class Blob:
 
     def get_schedulable_timerange(self) -> TimeRange:
         return self.schedulable_timerange
-    
+
     def get_policy(self) -> Policy:
         return self.policy
 

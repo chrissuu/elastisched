@@ -23,9 +23,7 @@ class daytime:
         if isinstance(time_of_day, time):
             self.time = time_of_day
         else:
-            raise ValueError(
-                "Time must be a time object" 
-            )
+            raise ValueError("Time must be a time object")
 
     def __str__(self) -> str:
         """String representation"""

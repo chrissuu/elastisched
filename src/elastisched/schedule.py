@@ -63,5 +63,3 @@ class Schedule:
                 events.append(id)
 
         return events
-    
-

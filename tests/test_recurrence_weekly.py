@@ -4,6 +4,7 @@ from elastisched.recurrence import WeeklyBlobRecurrence
 from elastisched.timerange import TimeRange
 import pytest
 
+
 def test_weekly_next_occurrence_same_week():
     # Given
     monday_blob = Blob(
@@ -26,12 +27,14 @@ def test_weekly_next_occurrence_same_week():
             end=datetime(year=2000, month=1, day=5, hour=16),
         ),
     )
-    
-    weekly_recurrence = WeeklyBlobRecurrence(blobs_of_week=[monday_blob, wednesday_blob])
-    
+
+    weekly_recurrence = WeeklyBlobRecurrence(
+        blobs_of_week=[monday_blob, wednesday_blob]
+    )
+
     current_time = datetime(year=2000, month=1, day=3, hour=10, minute=30)
     next_occurrence = weekly_recurrence.next_occurrence(current_time)
-    
+
     # Assert that
     assert next_occurrence is not None
     assert next_occurrence.get_schedulable_timerange().start.weekday() == 2
@@ -62,12 +65,14 @@ def test_weekly_next_occurrence_next_week():
             end=datetime(year=2000, month=1, day=5, hour=16),
         ),
     )
-    
-    weekly_recurrence = WeeklyBlobRecurrence(blobs_of_week=[monday_blob, wednesday_blob])
-    
+
+    weekly_recurrence = WeeklyBlobRecurrence(
+        blobs_of_week=[monday_blob, wednesday_blob]
+    )
+
     current_time = datetime(year=2000, month=1, day=7, hour=15)
     next_occurrence = weekly_recurrence.next_occurrence(current_time)
-    
+
     # Assert that
     assert next_occurrence is not None
     assert next_occurrence.get_schedulable_timerange().start.weekday() == 0
@@ -89,12 +94,12 @@ def test_weekly_next_occurrence_with_interval():
             end=datetime(year=2000, month=1, day=3, hour=11),
         ),
     )
-    
+
     weekly_recurrence = WeeklyBlobRecurrence(blobs_of_week=[monday_blob], interval=2)
-    
+
     current_time = datetime(year=2000, month=1, day=7, hour=15)
     next_occurrence = weekly_recurrence.next_occurrence(current_time)
-    
+
     # Assert that
     assert next_occurrence is not None
     expected_date = datetime(year=2000, month=1, day=17, hour=8)
@@ -113,12 +118,12 @@ def test_weekly_next_occurrence_exact_time_match():
             end=datetime(year=2000, month=1, day=3, hour=11),
         ),
     )
-    
+
     weekly_recurrence = WeeklyBlobRecurrence(blobs_of_week=[monday_blob])
-    
+
     current_time = datetime(year=2000, month=1, day=3, hour=8)
     next_occurrence = weekly_recurrence.next_occurrence(current_time)
-    
+
     # Assert that
     assert next_occurrence is not None
     expected_date = datetime(year=2000, month=1, day=10, hour=8)
@@ -137,16 +142,16 @@ def test_weekly_all_occurrences_single_blob():
             end=datetime(year=2000, month=1, day=3, hour=11),
         ),
     )
-    
+
     weekly_recurrence = WeeklyBlobRecurrence(blobs_of_week=[monday_blob])
-    
+
     search_range = TimeRange(
         start=datetime(year=2000, month=1, day=1),
         end=datetime(year=2000, month=1, day=22),
     )
 
     occurrences = weekly_recurrence.all_occurrences(search_range)
-    
+
     # Assert that
     assert len(occurrences) == 3
     expected_dates = [
@@ -180,22 +185,32 @@ def test_weekly_all_occurrences_multiple_blobs():
             end=datetime(year=2000, month=1, day=5, hour=16),
         ),
     )
-    
-    weekly_recurrence = WeeklyBlobRecurrence(blobs_of_week=[monday_blob, wednesday_blob])
-    
+
+    weekly_recurrence = WeeklyBlobRecurrence(
+        blobs_of_week=[monday_blob, wednesday_blob]
+    )
+
     search_range = TimeRange(
         start=datetime(year=2000, month=1, day=1),
         end=datetime(year=2000, month=1, day=15),
     )
     occurrences = weekly_recurrence.all_occurrences(search_range)
-    
+
     # Assert that
     assert len(occurrences) == 4
 
-    assert occurrences[0].get_schedulable_timerange().start == datetime(year=2000, month=1, day=3, hour=8)
-    assert occurrences[1].get_schedulable_timerange().start == datetime(year=2000, month=1, day=5, hour=13)
-    assert occurrences[2].get_schedulable_timerange().start == datetime(year=2000, month=1, day=10, hour=8)
-    assert occurrences[3].get_schedulable_timerange().start == datetime(year=2000, month=1, day=12, hour=13)
+    assert occurrences[0].get_schedulable_timerange().start == datetime(
+        year=2000, month=1, day=3, hour=8
+    )
+    assert occurrences[1].get_schedulable_timerange().start == datetime(
+        year=2000, month=1, day=5, hour=13
+    )
+    assert occurrences[2].get_schedulable_timerange().start == datetime(
+        year=2000, month=1, day=10, hour=8
+    )
+    assert occurrences[3].get_schedulable_timerange().start == datetime(
+        year=2000, month=1, day=12, hour=13
+    )
 
 
 def test_weekly_all_occurrences_with_interval():
@@ -210,19 +225,23 @@ def test_weekly_all_occurrences_with_interval():
             end=datetime(year=2000, month=1, day=3, hour=11),
         ),
     )
-    
+
     weekly_recurrence = WeeklyBlobRecurrence(blobs_of_week=[monday_blob], interval=2)
-    
+
     search_range = TimeRange(
         start=datetime(year=2000, month=1, day=1),
         end=datetime(year=2000, month=1, day=29),
     )
     occurrences = weekly_recurrence.all_occurrences(search_range)
-    
+
     # Assert that
     assert len(occurrences) == 2
-    assert occurrences[0].get_schedulable_timerange().start == datetime(year=2000, month=1, day=3, hour=8)
-    assert occurrences[1].get_schedulable_timerange().start == datetime(year=2000, month=1, day=17, hour=8)
+    assert occurrences[0].get_schedulable_timerange().start == datetime(
+        year=2000, month=1, day=3, hour=8
+    )
+    assert occurrences[1].get_schedulable_timerange().start == datetime(
+        year=2000, month=1, day=17, hour=8
+    )
 
 
 def test_weekly_all_occurrences_no_matches():
@@ -237,15 +256,15 @@ def test_weekly_all_occurrences_no_matches():
             end=datetime(year=2000, month=1, day=3, hour=11),
         ),
     )
-    
+
     weekly_recurrence = WeeklyBlobRecurrence(blobs_of_week=[monday_blob])
-    
+
     search_range = TimeRange(
         start=datetime(year=1999, month=1, day=1),
         end=datetime(year=1999, month=12, day=31),
     )
     occurrences = weekly_recurrence.all_occurrences(search_range)
-    
+
     # Assert that
     assert len(occurrences) == 0
 
@@ -272,7 +291,7 @@ def test_weekly_overlapping_blobs_validation():
             end=datetime(year=2000, month=1, day=3, hour=13),
         ),
     )
-    
+
     # Assert that
     with pytest.raises(ValueError):
         WeeklyBlobRecurrence(blobs_of_week=[blob1, blob2])
