@@ -34,6 +34,19 @@ class TimeRange:
             self.start.replace(tzinfo=DEFAULT_TZ)
             self.end.replace(tzinfo=DEFAULT_TZ)
 
+    def to_dict(self):
+        return {
+            'start': self.start.isoformat(),
+            'end': self.end.isoformat()
+        }
+    
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            start=datetime.fromisoformat(data['start']),
+            end=datetime.fromisoformat(data['end'])
+        )
+
     def duration(self) -> timedelta:
         return self.end - self.start
 

@@ -57,14 +57,19 @@ PYBIND11_MODULE(engine, m) {
         .def_readwrite("policy", &Job::policy)
         .def_readwrite("dependencies", &Job::dependencies)
         .def_readwrite("tags", &Job::tags)
-        .def("isRigid", &Job::isRigid);
+        .def("isRigid", &Job::isRigid)
+        .def("__str__", &Job::toString);
 
     // Schedule
     py::class_<Schedule>(m, "Schedule")
         .def(py::init<>())
         .def_readwrite("scheduledJobs", &Schedule::scheduledJobs)
         .def("addJob", &Schedule::addJob)
-        .def("clear", &Schedule::clear);
+        .def("clear", &Schedule::clear)
+        .def("__len__", [](const Schedule& schedule) { return schedule.scheduledJobs.size(); })
+        .def("__iter__", [](const Schedule& schedule) {
+            return py::make_iterator(schedule.scheduledJobs.begin(), schedule.scheduledJobs.end());
+        }, py::keep_alive<0, 1>());
 
     // Expose the schedule function
     m.def("schedule", &schedule, "Run the scheduler",

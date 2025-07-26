@@ -49,6 +49,21 @@ class BlobRecurrence(ABC):
 class SingleBlobOccurrence(BlobRecurrence):
     blob: Blob
 
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation"""
+        return {
+            'type': 'SingleBlobOccurrence',
+            'blob': self.blob.to_dict()
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'SingleBlobOccurrence':
+        """Create from dictionary representation"""
+        if 'blob' not in data:
+            raise KeyError("Missing 'blob' field in SingleBlobOccurrence data")
+        
+        return cls(blob=Blob.from_dict(data['blob']))
+
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
         timerange = self.blob.get_schedulable_timerange()
 
@@ -88,6 +103,29 @@ class WeeklyBlobRecurrence(BlobRecurrence):
             )
             for blob in self.blobs_of_week
         ]
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation"""
+        return {
+            'type': 'WeeklyBlobRecurrence',
+            'blobs_of_week': [blob.to_dict() for blob in self.blobs_of_week],
+            'interval': self.interval
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'WeeklyBlobRecurrence':
+        """Create from dictionary representation"""
+        required_keys = ['blobs_of_week']
+        missing_keys = [key for key in required_keys if key not in data]
+        if missing_keys:
+            raise KeyError(f"Missing required keys: {missing_keys}")
+        
+        blobs_of_week = [Blob.from_dict(blob_data) for blob_data in data['blobs_of_week']]
+        
+        return cls(
+            blobs_of_week=blobs_of_week,
+            interval=data.get('interval', 1)
+        )
 
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
         occurrences = []
@@ -162,6 +200,27 @@ class DeltaBlobRecurrence(BlobRecurrence):
                 "Blob schedulable timerange duration should not be larger than delta"
             )
 
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation"""
+        return {
+            'type': 'DeltaBlobRecurrence',
+            'delta': self.delta.total_seconds(),
+            'start_blob': self.start_blob.to_dict()
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'DeltaBlobRecurrence':
+        """Create from dictionary representation"""
+        required_keys = ['delta', 'start_blob']
+        missing_keys = [key for key in required_keys if key not in data]
+        if missing_keys:
+            raise KeyError(f"Missing required keys: {missing_keys}")
+        
+        delta = timedelta(seconds=data['delta'])
+        start_blob = Blob.from_dict(data['start_blob'])
+        
+        return cls(delta=delta, start_blob=start_blob)
+
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
         if current < self.start_blob.get_schedulable_timerange().start:
             return deepcopy(self.start_blob)
@@ -179,7 +238,6 @@ class DeltaBlobRecurrence(BlobRecurrence):
         start = timerange.start
         end = timerange.end
 
-        # Determine the first occurrence to consider
         if start <= start_schedulable_timerange.start:
             curr_datetime = start_schedulable_timerange.start
         else:
@@ -192,14 +250,11 @@ class DeltaBlobRecurrence(BlobRecurrence):
             if curr_datetime < start:
                 curr_datetime += self.delta
 
-        # Generate all occurrences within the range
         while curr_datetime <= end:
-            # Calculate the time difference from the original start
             time_diff = curr_datetime - start_schedulable_timerange.start
             intervals_passed = time_diff // self.delta
             delta_to_occurrence = intervals_passed * self.delta
 
-            # Create a copy of the start blob and adjust its timeranges
             blob_copy = blob_copy_with_delta_future(
                 self.start_blob, delta_to_occurrence
             )
@@ -233,6 +288,21 @@ class DateBlobRecurrence(BlobRecurrence):
                 "Date blob recurrence should have a blob with timerange that starts and ends on the same year"
             )
 
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation"""
+        return {
+            'type': 'DateBlobRecurrence',
+            'blob': self.blob.to_dict()
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'DateBlobRecurrence':
+        """Create from dictionary representation"""
+        if 'blob' not in data:
+            raise KeyError("Missing 'blob' field in DateBlobRecurrence data")
+        
+        return cls(blob=Blob.from_dict(data['blob']))
+
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
         schedulable_timerange = self.blob.get_schedulable_timerange()
         start = schedulable_timerange.start
@@ -255,9 +325,7 @@ class DateBlobRecurrence(BlobRecurrence):
             )
 
             if target_this_year > current:
-                # If the target date this year is after current, check if we need to move the blob
                 if current.year >= start.year:
-                    # Current year is same or after the original blob's year
                     years_diff = current.year - start.year
                     actual_target = datetime(
                         year=start.year + years_diff,
@@ -271,18 +339,15 @@ class DateBlobRecurrence(BlobRecurrence):
                     delta_to_occurrence = actual_target - start
                     return blob_copy_with_delta_future(self.blob, delta_to_occurrence)
                 else:
-                    # Current year is before the original blob's year, return original blob
                     return self.blob
 
         except ValueError:
             # This shouldn't happen for non-leap days, but handle it just in case
             pass
 
-        # Next year
         if current.year >= start.year:
             years_diff = (current.year + 1) - start.year
         else:
-            # If current year is before original blob's year, next occurrence is original blob
             return self.blob
 
         target_next_year = datetime(
@@ -423,9 +488,7 @@ class DateBlobRecurrence(BlobRecurrence):
         end = timerange.end
         schedulable_timerange = self.blob.get_schedulable_timerange()
 
-        # Fixed: Define dt, date, and time variables
         dt = schedulable_timerange.start
-        date = dt.date()
         time = dt.time()
 
         current_year = start.year
@@ -436,10 +499,10 @@ class DateBlobRecurrence(BlobRecurrence):
                     year=current_year,
                     month=2,
                     day=29,
-                    hour=time.hour,  # Fixed: was date.hour
-                    minute=time.minute,  # Fixed: was date.minute
-                    second=time.second,  # Fixed: was date.second
-                    microsecond=time.microsecond,  # Fixed: was date.microsecond
+                    hour=time.hour,
+                    minute=time.minute,
+                    second=time.second,
+                    microsecond=time.microsecond,
                 )
 
                 delta_to_occurrence = target_date - schedulable_timerange.start
@@ -448,7 +511,7 @@ class DateBlobRecurrence(BlobRecurrence):
 
                 if start <= target_date <= end and timerange.contains(
                     blob_copy.get_schedulable_timerange()
-                ):  # Fixed: added .get_schedulable_timerange()
+                ):
                     occurrences.append(blob_copy)
 
             current_year += 1

@@ -8,6 +8,8 @@
 
 #include <vector>
 #include <set>
+#include <iostream>
+#include <sstream>
 
 class Job {
 public:
@@ -29,6 +31,7 @@ public:
         std::set<Tag> tags);
 
     bool isRigid() const;
+    std::string toString() const;
 };
 
 #endif // JOB_HPP

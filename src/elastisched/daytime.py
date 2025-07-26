@@ -1,5 +1,4 @@
 from datetime import time
-from typing import Union
 
 
 class daytime:
@@ -24,6 +23,46 @@ class daytime:
             self.time = time_of_day
         else:
             raise ValueError("Time must be a time object")
+
+    def to_dict(self) -> dict:
+        """
+        Convert the daytime object to a dictionary representation
+        Returns:
+            dict: Dictionary containing day_of_week and time components
+        """
+        return {
+            'day_of_week': self.day_of_week,
+            'hour': self.time.hour,
+            'minute': self.time.minute,
+            'second': self.time.second,
+            'microsecond': self.time.microsecond
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'daytime':
+        """
+        Create a daytime object from a dictionary representation
+        Args:
+            data: Dictionary containing day_of_week and time components
+        Returns:
+            daytime: New daytime object
+        Raises:
+            KeyError: If required keys are missing from the dictionary
+            ValueError: If values are invalid
+        """
+        required_keys = ['day_of_week', 'hour', 'minute', 'second']
+        missing_keys = [key for key in required_keys if key not in data]
+        if missing_keys:
+            raise KeyError(f"Missing required keys: {missing_keys}")
+        
+        time_obj = time(
+            hour=data['hour'],
+            minute=data['minute'],
+            second=data['second'],
+            microsecond=data.get('microsecond', 0)
+        )
+        
+        return cls(data['day_of_week'], time_obj)
 
     def __str__(self) -> str:
         """String representation"""
