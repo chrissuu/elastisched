@@ -35,7 +35,8 @@ def main():
     result = engine.schedule(
         jobs, len(jobs), 60 * 15, 0
     )  # granularity: 15 min, start_epoch: 0
-    print("Scheduled jobs:", result.scheduledJobs)
+    for e in result.scheduledJobs:
+        print(e)
 
 
 if __name__ == "__main__":

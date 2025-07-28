@@ -1,16 +1,21 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
-from uuid import uuid4
-
-
-@dataclass
-class TagGroup:
-    name: str
-    id: str = field(default_factory=lambda: str(uuid4))
-
 
 @dataclass
 class Tag:
     name: str
-    id: str = field(default_factory=lambda: str(uuid4()))
-    group: Optional[TagGroup] = None
+    group: Optional[str] = None
+    
+    def __str__(self):
+        if self.group:
+            return f"{self.group}:{self.name}"
+        return self.name
+    
+    def __hash__(self):
+        # Include group in hash so tags with same name but different groups are different
+        return hash((self.name, self.group))
+    
+    def __eq__(self, other):
+        if isinstance(other, Tag):
+            return self.name == other.name and self.group == other.group
+        return False

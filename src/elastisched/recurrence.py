@@ -3,6 +3,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import List, Optional
+import uuid
 
 from elastisched.blob import Blob
 from elastisched.daytime import daytime
@@ -30,9 +31,10 @@ def blob_copy_with_delta_future(blob: Blob, td: timedelta):
 
     return blob_copy
 
-
+@dataclass
 class BlobRecurrence(ABC):
     """Abstract base class for recurrence rules"""
+    _id: str = field(default_factory=lambda: str(uuid.uuid4()), init=False)
 
     @abstractmethod
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
@@ -43,6 +45,17 @@ class BlobRecurrence(ABC):
     def all_occurrences(self, timerange: TimeRange) -> List[Blob]:
         """Generate all occurrences within the given time range"""
         pass
+
+    def __eq__(self, other):
+        if not isinstance(other, BlobRecurrence):
+            return False
+        return self._id == other.get_id()
+    
+    def get_id(self):
+        return self._id
+    
+    def __hash__(self):
+        return hash(self._id)
 
 
 @dataclass
@@ -192,14 +205,11 @@ class DeltaBlobRecurrence(BlobRecurrence):
             if curr_datetime < start:
                 curr_datetime += self.delta
 
-        # Generate all occurrences within the range
         while curr_datetime <= end:
-            # Calculate the time difference from the original start
             time_diff = curr_datetime - start_schedulable_timerange.start
             intervals_passed = time_diff // self.delta
             delta_to_occurrence = intervals_passed * self.delta
 
-            # Create a copy of the start blob and adjust its timeranges
             blob_copy = blob_copy_with_delta_future(
                 self.start_blob, delta_to_occurrence
             )
@@ -255,9 +265,7 @@ class DateBlobRecurrence(BlobRecurrence):
             )
 
             if target_this_year > current:
-                # If the target date this year is after current, check if we need to move the blob
                 if current.year >= start.year:
-                    # Current year is same or after the original blob's year
                     years_diff = current.year - start.year
                     actual_target = datetime(
                         year=start.year + years_diff,
@@ -271,18 +279,15 @@ class DateBlobRecurrence(BlobRecurrence):
                     delta_to_occurrence = actual_target - start
                     return blob_copy_with_delta_future(self.blob, delta_to_occurrence)
                 else:
-                    # Current year is before the original blob's year, return original blob
                     return self.blob
 
         except ValueError:
             # This shouldn't happen for non-leap days, but handle it just in case
             pass
 
-        # Next year
         if current.year >= start.year:
             years_diff = (current.year + 1) - start.year
         else:
-            # If current year is before original blob's year, next occurrence is original blob
             return self.blob
 
         target_next_year = datetime(
@@ -369,30 +374,27 @@ class DateBlobRecurrence(BlobRecurrence):
         schedulable_timerange = self.blob.get_schedulable_timerange()
         schedulable_timerange_start = schedulable_timerange.start
 
-        # Fixed: Define dt, date, and time variables
         dt = schedulable_timerange_start
         date = dt.date()
         time = dt.time()
 
-        # Special handling for leap day (Feb 29)
         if date.month == 2 and date.day == 29:
             return self._all_leap_day_occurrences(timerange)
 
         current_year = start.year
 
         while True:
-            try:  # Fixed: Added try-catch for invalid dates
+            try:
                 target_date = datetime(
                     year=current_year,
                     month=date.month,
                     day=date.day,
-                    hour=time.hour,  # Fixed: was date.hour
-                    minute=time.minute,  # Fixed: was date.minute
-                    second=time.second,  # Fixed: was date.second
-                    microsecond=time.microsecond,  # Fixed: was date.microsecond
+                    hour=time.hour,
+                    minute=time.minute,
+                    second=time.second,
+                    microsecond=time.microsecond,
                 )
             except ValueError:
-                # Skip invalid dates (e.g., Feb 29 in non-leap years)
                 current_year += 1
                 continue
 
@@ -423,7 +425,6 @@ class DateBlobRecurrence(BlobRecurrence):
         end = timerange.end
         schedulable_timerange = self.blob.get_schedulable_timerange()
 
-        # Fixed: Define dt, date, and time variables
         dt = schedulable_timerange.start
         date = dt.date()
         time = dt.time()
@@ -436,10 +437,10 @@ class DateBlobRecurrence(BlobRecurrence):
                     year=current_year,
                     month=2,
                     day=29,
-                    hour=time.hour,  # Fixed: was date.hour
-                    minute=time.minute,  # Fixed: was date.minute
-                    second=time.second,  # Fixed: was date.second
-                    microsecond=time.microsecond,  # Fixed: was date.microsecond
+                    hour=time.hour,
+                    minute=time.minute,
+                    second=time.second,
+                    microsecond=time.microsecond,
                 )
 
                 delta_to_occurrence = target_date - schedulable_timerange.start
@@ -448,7 +449,7 @@ class DateBlobRecurrence(BlobRecurrence):
 
                 if start <= target_date <= end and timerange.contains(
                     blob_copy.get_schedulable_timerange()
-                ):  # Fixed: added .get_schedulable_timerange()
+                ):
                     occurrences.append(blob_copy)
 
             current_year += 1

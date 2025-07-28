@@ -24,18 +24,13 @@ class Blob:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     tags: Set[Tag] = field(default_factory=set)
 
-    # Scheduling metadata
-    __actual_scheduled_timerange: Optional[TimeRange] = None
-    __actual_duration: Optional[timedelta] = None
-    __completed: bool = False
-    __created_at: datetime = field(default=datetime.now())
-
     def __post_init__(self):
+        self.duration: timedelta = self.default_scheduled_timerange.duration()
         if not self.schedulable_timerange.contains(self.default_scheduled_timerange):
             raise ValueError(
-                "Valid schedulable range must contain [default_datetime, default_datetime+duration]"
+                "Valid schedulable range must contain default scheduled timerange"
             )
-
+        
     def __str__(self) -> str:
         """String representation"""
         return ""
@@ -59,13 +54,10 @@ class Blob:
         return self.schedulable_timerange <= other.schedulable_timerange
 
     def __hash__(self) -> int:
-        """Make hashable so it can be used in sets and as dict keys"""
         return hash(self.id)
 
-    def get_duration(self) -> Optional[timedelta]:
-        if self.__actual_scheduled_timerange is not None:
-            return self.__actual_scheduled_timerange.duration()
-        return None
+    def get_duration(self) -> timedelta:
+        return self.duration
 
     def get_default_scheduled_timerange(self) -> TimeRange:
         return self.default_scheduled_timerange
@@ -82,10 +74,6 @@ class Blob:
 
     def set_schedulable_timerange(self, timerange: TimeRange):
         self.schedulable_timerange = timerange
-        return
-
-    def set_completed(self, completed):
-        self.__completed = completed
         return
 
     def overlaps(self, other) -> bool:
