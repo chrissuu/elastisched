@@ -3,10 +3,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List, Optional, Set
 
-from elastisched.constants import *
-from elastisched.policy import Policy
-from elastisched.tag import Tag
 from elastisched.timerange import TimeRange
+from elastisched.constants import *
+from engine import Policy, Tag, Job, TimeRange as tr
 
 
 @dataclass
@@ -30,7 +29,66 @@ class Blob:
             raise ValueError(
                 "Valid schedulable range must contain default scheduled timerange"
             )
-        
+
+    def to_job(self, EPOCH_BEGIN: datetime) -> Job:
+        schedulable_timerange_start = self.schedulable_timerange.start
+        schedulable_timerange_end = self.schedulable_timerange.end
+        schedulable_tr = tr(
+            schedulable_timerange_start - EPOCH_BEGIN,
+            schedulable_timerange_end - EPOCH_BEGIN,
+        )
+
+        scheduled_timerange_start = self.default_scheduled_timerange.start
+        scheduled_timerange_end = self.default_scheduled_timerange.end
+        scheduled_tr = tr(
+            scheduled_timerange_start - EPOCH_BEGIN,
+            scheduled_timerange_end - EPOCH_BEGIN,
+        )
+
+        return Job(
+            int(self.duration.total_seconds()),
+            schedulable_tr,
+            scheduled_tr,
+            self._id,
+            self.policy,
+            self.dependencies,
+            self.tags,
+        )
+    
+    @classmethod
+    def from_job(cls, 
+        job: Job, 
+        EPOCH_BEGIN: datetime, 
+        name: str,
+        description: str,
+        tz: timezone
+    ) -> 'Blob':
+        scheduled_tr_start_delta = job.schedulableTimeRange.getLow()
+        scheduled_tr_end_delta = job.schedulableTimeRange.getHigh()
+        scheduled_timerange=  TimeRange(
+            start=EPOCH_BEGIN + timedelta(seconds=scheduled_tr_start_delta),
+            end=EPOCH_BEGIN + timedelta(seconds=scheduled_tr_end_delta)
+        )
+
+        schedulable_tr_start_delta = job.schedulableTimeRange.getLow()
+        schedulable_tr_end_delta = job.schedulableTimeRange.getHigh()
+        schedulable_timerange = TimeRange(
+            start=EPOCH_BEGIN + timedelta(seconds=schedulable_tr_start_delta),
+            end=EPOCH_BEGIN + timedelta(seconds=schedulable_tr_end_delta)
+        )
+
+        return Blob(
+            default_scheduled_timerange=scheduled_timerange,
+            schedulable_timerange=schedulable_timerange,
+            name=name,
+            description=description,
+            tz=tz,
+            policy=job.policy,
+            dependencies=job.dependencies,
+            id=job.id,
+            tags=job.tags
+        )
+
     def __str__(self) -> str:
         """String representation"""
         return ""
@@ -39,7 +97,7 @@ class Blob:
         """Check equality with another daytime object"""
         if not isinstance(other, Blob):
             return False
-        return self.id == other.id
+        return self.id == other.get_id()
 
     def __lt__(self, other) -> bool:
         if not isinstance(other, Blob):
@@ -55,6 +113,9 @@ class Blob:
 
     def __hash__(self) -> int:
         return hash(self.id)
+
+    def get_id(self) -> str:
+        return self.id
 
     def get_duration(self) -> timedelta:
         return self.duration

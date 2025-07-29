@@ -1,7 +1,7 @@
 #ifndef INTERVAL_H
 #define INTERVAL_H
 
-#include <stdexcept>  // for std::invalid_argument
+#include <stdexcept>
 #include <iostream>
 
 template<typename T>
@@ -25,11 +25,9 @@ public:
         }
     }
 
-    // Accessors
     T getLow() const { return low; }
     T getHigh() const { return high; }
 
-    // Equality operators
     bool operator==(const Interval& other) const {
         return low == other.getLow() && high == other.getHigh();
     }
@@ -38,17 +36,14 @@ public:
         return !(*this == other);
     }
 
-    // Check if intervals overlap
     bool overlaps(const Interval& other) const {
         return !(high < other.getLow() || other.getHigh() < low);
     }
 
-    // Check if contains a value
     bool contains(T value) const {
         return low <= value && value <= high;
     }
 
-    // Length of interval
     T length() const {
         return high - low;
     }

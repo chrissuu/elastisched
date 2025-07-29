@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from elastisched.blob import Blob
 from elastisched.constants import DEFAULT_TZ
-from elastisched.timerange import TimeRange
+from engine import TimeRange
 from engine import schedule
 from typing import List, Tuple, Dict
 

@@ -1,5 +1,7 @@
 import engine
-
+from elastisched.blob import Blob
+from datetime import datetime
+from datetime import timezone
 
 def main():
     # Create a Tag
@@ -37,6 +39,10 @@ def main():
     )  # granularity: 15 min, start_epoch: 0
     for e in result.scheduledJobs:
         print(e)
+
+    blob = Blob.from_job(result.scheduledJobs[0], datetime.now(), "TestBlob", "Hello world!", timezone.utc)
+    print(f"Blob id: {blob.get_id()}")
+    print(f"Blob policy: {blob.policy.isSplittable()}")
 
 
 if __name__ == "__main__":

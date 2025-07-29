@@ -17,3 +17,7 @@ bool Policy::isSplittable() const {
 bool Policy::isOverlappable() const {
     return (scheduling_policies & static_cast<char>(2)) >> 1;
 }
+
+bool Policy::isInvisible() const {
+    return (scheduling_policies & static_cast<char>(3)) >> 2;
+}

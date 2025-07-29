@@ -7,7 +7,7 @@ import uuid
 
 from elastisched.blob import Blob
 from elastisched.daytime import daytime
-from elastisched.timerange import TimeRange
+from engine import TimeRange
 
 
 def has_overlapping_blobs(blobs: List[Blob]) -> bool:
@@ -31,9 +31,11 @@ def blob_copy_with_delta_future(blob: Blob, td: timedelta):
 
     return blob_copy
 
+
 @dataclass
 class BlobRecurrence(ABC):
     """Abstract base class for recurrence rules"""
+
     _id: str = field(default_factory=lambda: str(uuid.uuid4()), init=False)
 
     @abstractmethod
@@ -50,10 +52,10 @@ class BlobRecurrence(ABC):
         if not isinstance(other, BlobRecurrence):
             return False
         return self._id == other.get_id()
-    
+
     def get_id(self):
         return self._id
-    
+
     def __hash__(self):
         return hash(self._id)
 

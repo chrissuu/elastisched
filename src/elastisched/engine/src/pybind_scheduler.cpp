@@ -71,7 +71,6 @@ PYBIND11_MODULE(engine, m) {
             return py::make_iterator(schedule.scheduledJobs.begin(), schedule.scheduledJobs.end());
         }, py::keep_alive<0, 1>());
 
-    // Expose the schedule function
     m.def("schedule", &schedule, "Run the scheduler",
           py::arg("jobs"), py::arg("num_jobs"), py::arg("granularity"), py::arg("start_epoch"));
 } 

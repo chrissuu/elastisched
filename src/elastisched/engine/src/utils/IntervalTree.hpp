@@ -29,7 +29,6 @@ private:
             return std::make_unique<Node<T, U>>(std::move(i), value);
         }
         
-        // CRITICAL FIX: Store values before moving the interval
         T intervalLow = i->getLow();
         T intervalHigh = i->getHigh();
         
@@ -39,7 +38,6 @@ private:
             node->right = insert(std::move(node->right), std::move(i), value);
         }
         
-        // CRITICAL FIX: Use stored value instead of moved interval
         node->max = std::max(node->max, intervalHigh);
         return node;
     }
