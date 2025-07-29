@@ -2,6 +2,7 @@
 #define POLICY_HPP
 
 #include <cstdint>
+#include "constants.hpp"
 
 /**
  * Policy
@@ -15,15 +16,15 @@
  */
 class Policy {
 private:
+    time_t min_split_duration;
     uint8_t max_splits;
-    double min_split_duration;
     uint8_t scheduling_policies;  // Bitfield: bit 0 = is_splittable, bit 1 = is_overlappable, bit 2 = is_invisible
 
 public:
-    Policy(uint8_t max_splits, double min_split_duration, uint8_t scheduling_policies);
+    Policy(uint8_t max_splits, time_t min_split_duration, uint8_t scheduling_policies);
 
     uint8_t getMaxSplits() const;
-    double getMinSplitDuration() const;
+    time_t getMinSplitDuration() const;
     uint8_t getSchedulingPolicies() const;
 
     bool isSplittable() const;

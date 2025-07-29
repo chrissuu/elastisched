@@ -17,7 +17,6 @@ class ScheduleCostFunction {
 private:
     const Schedule& m_schedule;
     const time_t m_granularity;
-    const time_t m_startEpoch;
     const std::set<Tag> m_restTags;
     IntervalTree<time_t, std::optional<std::vector<Job>>> m_dayBasedSchedule;
     std::optional<time_t> m_min = std::nullopt;
@@ -38,6 +37,6 @@ public:
     double illegal_schedule_cost() const;
     double scheduleCost() const;
     
-    ScheduleCostFunction(const Schedule& schedule, time_t granularity, time_t startEpoch);
+    ScheduleCostFunction(const Schedule& schedule, time_t granularity);
 };
 #endif

@@ -28,12 +28,13 @@ PYBIND11_MODULE(engine, m) {
 
     // Policy
     py::class_<Policy>(m, "Policy")
-        .def(py::init<uint8_t, double, uint8_t>())
+        .def(py::init<uint8_t, time_t, uint8_t>())
         .def("getMaxSplits", &Policy::getMaxSplits)
         .def("getMinSplitDuration", &Policy::getMinSplitDuration)
         .def("getSchedulingPolicies", &Policy::getSchedulingPolicies)
         .def("isSplittable", &Policy::isSplittable)
-        .def("isOverlappable", &Policy::isOverlappable);
+        .def("isOverlappable", &Policy::isOverlappable)
+        .def("isINvisible", &Policy::isInvisible);
 
     // TimeRange (Interval<time_t>)
     py::class_<Interval<time_t>>(m, "TimeRange")
@@ -72,5 +73,5 @@ PYBIND11_MODULE(engine, m) {
         }, py::keep_alive<0, 1>());
 
     m.def("schedule", &schedule, "Run the scheduler",
-          py::arg("jobs"), py::arg("num_jobs"), py::arg("granularity"), py::arg("start_epoch"));
+          py::arg("jobs"), py::arg("num_jobs"), py::arg("granularity"));
 } 

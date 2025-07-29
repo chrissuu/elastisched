@@ -27,8 +27,8 @@ class TimeRange:
         if self.start.tzinfo != self.end.tzinfo:
             raise ValueError("Start and end times must have the same timezone")
 
-        if self.start >= self.end:
-            raise ValueError("Start time must be before end time")
+        if self.start > self.end:
+            raise ValueError(f"Start time <{self.start}> must be before or at end time <{self.end}>")
 
         if self.start.tzinfo is None and self.end.tzinfo is None:
             self.start.replace(tzinfo=DEFAULT_TZ)

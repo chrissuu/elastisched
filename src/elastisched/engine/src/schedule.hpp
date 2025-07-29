@@ -9,6 +9,7 @@ public:
     std::vector<Job> scheduledJobs;
 
     Schedule() = default;
+    Schedule(std::vector<Job> scheduledJobs);
     void addJob(const Job& job);
     void clear();
 

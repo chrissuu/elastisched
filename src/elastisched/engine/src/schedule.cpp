@@ -1,5 +1,7 @@
 #include "schedule.hpp"
 
+Schedule::Schedule(std::vector<Job> scheduledJobs) : scheduledJobs(scheduledJobs) {};
+
 void Schedule::addJob(const Job& job) {
     scheduledJobs.push_back(job);
 }

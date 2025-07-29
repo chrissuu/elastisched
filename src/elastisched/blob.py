@@ -19,7 +19,7 @@ class Blob:
     tz: timezone = field(default_factory=lambda: DEFAULT_TZ)
     policy: Policy = field(default_factory=lambda: Policy)
 
-    dependencies: List[str] = field(default_factory=list)  # IDs of other blobs
+    dependencies: Set[str] = field(default_factory=set)  # IDs of other blobs
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     tags: Set[Tag] = field(default_factory=set)
 
@@ -34,22 +34,22 @@ class Blob:
         schedulable_timerange_start = self.schedulable_timerange.start
         schedulable_timerange_end = self.schedulable_timerange.end
         schedulable_tr = tr(
-            schedulable_timerange_start - EPOCH_BEGIN,
-            schedulable_timerange_end - EPOCH_BEGIN,
+            (schedulable_timerange_start - EPOCH_BEGIN).seconds,
+            (schedulable_timerange_end - EPOCH_BEGIN).seconds,
         )
 
         scheduled_timerange_start = self.default_scheduled_timerange.start
         scheduled_timerange_end = self.default_scheduled_timerange.end
         scheduled_tr = tr(
-            scheduled_timerange_start - EPOCH_BEGIN,
-            scheduled_timerange_end - EPOCH_BEGIN,
+            (scheduled_timerange_start - EPOCH_BEGIN).seconds,
+            (scheduled_timerange_end - EPOCH_BEGIN).seconds,
         )
 
         return Job(
             int(self.duration.total_seconds()),
             schedulable_tr,
             scheduled_tr,
-            self._id,
+            self.id,
             self.policy,
             self.dependencies,
             self.tags,

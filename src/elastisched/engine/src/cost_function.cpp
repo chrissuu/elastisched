@@ -39,11 +39,11 @@ time_t getTotalJobsLength(std::vector<Job> jobs) {
     return length;
 }
 
-ScheduleCostFunction::ScheduleCostFunction(const Schedule& schedule, time_t granularity, time_t startEpoch)
+ScheduleCostFunction::ScheduleCostFunction(const Schedule& schedule, time_t granularity)
     : 
 m_schedule(schedule),
-m_granularity(granularity), 
-m_startEpoch(startEpoch) { 
+m_granularity(granularity)
+{ 
     if (schedule.scheduledJobs.size() == 0) return;
 
     for (const auto& job : schedule.scheduledJobs) {
@@ -51,7 +51,7 @@ m_startEpoch(startEpoch) {
         m_max = safemax<time_t>(m_max, job.scheduledTimeRange.getHigh());
     }
 
-    TimeRange curr = TimeRange(startEpoch, startEpoch + constants::DAY - 1);
+    TimeRange curr = TimeRange(0, constants::DAY - 1);
     m_dayBasedSchedule.insert(curr, std::nullopt);
 
     while (curr.getHigh() < m_max.value()) {
@@ -75,7 +75,7 @@ m_startEpoch(startEpoch) {
  * Adds a cost to busy afternoons, exponentially increasing cost for jobs appearing later in the day.
  */
 double ScheduleCostFunction::busy_afternoon_exponential_cost(uint64_t DAYS_SINCE_MONDAY) const {
-    time_t TIME_TO_FIRST_DAY = m_startEpoch + DAYS_SINCE_MONDAY * constants::DAY;
+    time_t TIME_TO_FIRST_DAY = DAYS_SINCE_MONDAY * constants::DAY;
     TimeRange currDay = TimeRange(TIME_TO_FIRST_DAY);
     std::optional<std::vector<Job>>* currJobs = m_dayBasedSchedule.searchValue(currDay);
     double cost = 0;

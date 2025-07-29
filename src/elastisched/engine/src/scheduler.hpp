@@ -22,7 +22,7 @@
 
 #include "optimizer/SimulatedAnnealingOptimizer.hpp"
 
-Schedule schedule(std::vector<Job> jobs, uint8_t num_jobs, const uint64_t GRANULARITY, const uint64_t START_EPOCH);
+Schedule schedule(std::vector<Job> jobs, uint8_t num_jobs, const uint64_t GRANULARITY);
 
 std::vector<std::vector<Job>> getDisjointIntervals(std::vector<Job> jobs) {
     if (jobs.empty()) {
@@ -152,8 +152,6 @@ Schedule generateRandomScheduleNeighbor(
  * @param rigid := a linked list containing nodes which cannot be moved
  * @param flexible := a linked list containing all flexible nodes
  * @param GRANULARITY := the smallest schedulable delta
- * @param START_EPOCH := the time (in seconds) since an epoch which indicates 
- *                       the start of the most recent Sunday (timezone agnostic)
  * 
  * Returns the approximately best Schedule.
  * 
@@ -161,7 +159,9 @@ Schedule generateRandomScheduleNeighbor(
 Schedule schedule_jobs(
     std::vector<Job> jobs,
     const time_t GRANULARITY, 
-    const time_t START_EPOCH
+    const double INITIAL_TEMP,
+    const double FINAL_TEMP,
+    const uint64_t NUM_ITERS
 ) {
     std::vector<std::vector<Job>> disjointJobs = getDisjointIntervals(jobs);
     std::random_device rd;
@@ -170,8 +170,8 @@ Schedule schedule_jobs(
     Schedule randomSchedule = generateRandomSchedule(disjointJobs, GRANULARITY, gen);
 
     SimulatedAnnealingOptimizer<Schedule> optimizer = SimulatedAnnealingOptimizer<Schedule>(
-        [GRANULARITY, START_EPOCH](Schedule s) {
-            ScheduleCostFunction costFunction = ScheduleCostFunction(s, GRANULARITY, START_EPOCH);
+        [GRANULARITY](Schedule s) {
+            ScheduleCostFunction costFunction = ScheduleCostFunction(s, GRANULARITY);
             return costFunction.scheduleCost();
         },
         [GRANULARITY, &gen](Schedule s) { 
@@ -179,9 +179,9 @@ Schedule schedule_jobs(
                 s, 
                 GRANULARITY,
                 gen); },
-        10.0f,
-        1e-4,
-        10000
+        INITIAL_TEMP,
+        FINAL_TEMP,
+        NUM_ITERS
     );
 
     Schedule bestSchedule = optimizer.optimize(randomSchedule);
@@ -189,12 +189,22 @@ Schedule schedule_jobs(
     return bestSchedule;
 }
 
-Schedule schedule(std::vector<Job> jobs, uint8_t num_jobs, const uint64_t GRANULARITY, const uint64_t START_EPOCH) {
+Schedule schedule(
+    std::vector<Job> jobs, 
+    uint8_t num_jobs, 
+    const uint64_t GRANULARITY
+) {
     if (num_jobs == 0) {
         return Schedule();
     }
 
-    Schedule s = schedule_jobs(jobs, GRANULARITY, START_EPOCH);
+    Schedule s = schedule_jobs(
+        jobs, 
+        GRANULARITY, 
+        10.0f, 
+        1e-4, 
+        10000
+    );
     return s;
 }
 
