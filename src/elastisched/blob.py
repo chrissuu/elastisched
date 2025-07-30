@@ -34,15 +34,15 @@ class Blob:
         schedulable_timerange_start = self.schedulable_timerange.start
         schedulable_timerange_end = self.schedulable_timerange.end
         schedulable_tr = tr(
-            (schedulable_timerange_start - EPOCH_BEGIN).seconds,
-            (schedulable_timerange_end - EPOCH_BEGIN).seconds,
+            int((schedulable_timerange_start - EPOCH_BEGIN).total_seconds()),
+            int((schedulable_timerange_end - EPOCH_BEGIN).total_seconds()),
         )
 
         scheduled_timerange_start = self.default_scheduled_timerange.start
         scheduled_timerange_end = self.default_scheduled_timerange.end
         scheduled_tr = tr(
-            (scheduled_timerange_start - EPOCH_BEGIN).seconds,
-            (scheduled_timerange_end - EPOCH_BEGIN).seconds,
+            int((scheduled_timerange_start - EPOCH_BEGIN).total_seconds()),
+            int((scheduled_timerange_end - EPOCH_BEGIN).total_seconds()),
         )
 
         return Job(
