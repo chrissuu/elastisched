@@ -22,7 +22,8 @@
 
 #include "optimizer/SimulatedAnnealingOptimizer.hpp"
 
-Schedule schedule(std::vector<Job> jobs, uint8_t num_jobs, const uint64_t GRANULARITY);
+Schedule schedule(std::vector<Job> jobs, const uint64_t GRANULARITY);
+Schedule scheduleJobs(std::vector<Job> jobs, const uint64_t GRANULARITY, const double INITIAL_TEMP, const double FINAL_TEMP, const uint64_t NUM_ITERS);
 
 std::vector<std::vector<Job>> getDisjointIntervals(std::vector<Job> jobs) {
     if (jobs.empty()) {
@@ -156,13 +157,17 @@ Schedule generateRandomScheduleNeighbor(
  * Returns the approximately best Schedule.
  * 
  */
-Schedule schedule_jobs(
+Schedule scheduleJobs(
     std::vector<Job> jobs,
     const time_t GRANULARITY, 
     const double INITIAL_TEMP,
     const double FINAL_TEMP,
     const uint64_t NUM_ITERS
 ) {
+    if (jobs.size() == 0) {
+        return Schedule();
+    };
+
     std::vector<std::vector<Job>> disjointJobs = getDisjointIntervals(jobs);
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -191,14 +196,9 @@ Schedule schedule_jobs(
 
 Schedule schedule(
     std::vector<Job> jobs, 
-    uint8_t num_jobs, 
     const uint64_t GRANULARITY
 ) {
-    if (num_jobs == 0) {
-        return Schedule();
-    }
-
-    Schedule s = schedule_jobs(
+    Schedule s = scheduleJobs(
         jobs, 
         GRANULARITY, 
         10.0f, 

@@ -16,8 +16,7 @@ private:
     }
 
 public:
-    // Constructor
-    Interval(T time) : low(time), high(time) {}
+    Interval(T e) : low(e), high(e) {}
 
     Interval(T low, T high) : low(low), high(high) {
         if (high < low) {

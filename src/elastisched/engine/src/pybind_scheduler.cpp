@@ -34,7 +34,7 @@ PYBIND11_MODULE(engine, m) {
         .def("getSchedulingPolicies", &Policy::getSchedulingPolicies)
         .def("isSplittable", &Policy::isSplittable)
         .def("isOverlappable", &Policy::isOverlappable)
-        .def("isINvisible", &Policy::isInvisible);
+        .def("isInvisible", &Policy::isInvisible);
 
     // TimeRange (Interval<time_t>)
     py::class_<Interval<time_t>>(m, "TimeRange")
@@ -72,6 +72,9 @@ PYBIND11_MODULE(engine, m) {
             return py::make_iterator(schedule.scheduledJobs.begin(), schedule.scheduledJobs.end());
         }, py::keep_alive<0, 1>());
 
-    m.def("schedule", &schedule, "Run the scheduler",
-          py::arg("jobs"), py::arg("num_jobs"), py::arg("granularity"));
+    m.def("schedule", &schedule, "Run the scheduler with default configurations",
+          py::arg("jobs"), py::arg("granularity"));
+
+    m.def("schedule_jobs", &scheduleJobs, "Run the scheduler",
+          py::arg("jobs"), py::arg("granularity"), py::arg("initialTemp"), py::arg("finalTemp"), py::arg("numIters"));
 } 

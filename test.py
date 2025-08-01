@@ -9,7 +9,7 @@ def main():
     print("Tag name:", tag.name)
 
     # Create a Policy
-    policy = engine.Policy(0, 0.0, 0)
+    policy = engine.Policy(0, 0, 0)
     print("Policy is splittable?", policy.isSplittable())
 
     # Create a TimeRange
@@ -34,8 +34,8 @@ def main():
 
     # Run the engine.function
     jobs = [job]
-    result = engine.schedule(
-        jobs, len(jobs), 60 * 15
+    result = engine.schedule_jobs(
+        jobs, 60 * 15, 1000.0, 1.0, 100000000
     )  # granularity: 15 min, start_epoch: 0
     for e in result.scheduledJobs:
         print(e)
