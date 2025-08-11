@@ -17,6 +17,7 @@
 #include <random>
 #include <optional>
 #include <iostream>
+#include <fstream>
 #include <set>
 #include <cassert>
 
@@ -168,11 +169,22 @@ Schedule scheduleJobs(
         return Schedule();
     };
 
+
     std::vector<std::vector<Job>> disjointJobs = getDisjointIntervals(jobs);
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    Schedule randomSchedule = generateRandomSchedule(disjointJobs, GRANULARITY, gen);
+    Schedule initialSchedule = Schedule(jobs);
+
+    ScheduleCostFunction initialCostFunction = ScheduleCostFunction(initialSchedule, GRANULARITY);
+    std::ofstream log("/Users/chrissu/Desktop/elastisched/logs/debug.log");
+    if (!log.is_open()) {
+        std::cerr << "Failed to open log file!" << std::endl;
+    } else {
+        std::cout << "File open succeeded!" << std::endl;
+    }
+    log << "Initial Cost: " << initialCostFunction.scheduleCost() << std::endl;
+    log.flush();
 
     SimulatedAnnealingOptimizer<Schedule> optimizer = SimulatedAnnealingOptimizer<Schedule>(
         [GRANULARITY](Schedule s) {
@@ -189,7 +201,7 @@ Schedule scheduleJobs(
         NUM_ITERS
     );
 
-    Schedule bestSchedule = optimizer.optimize(randomSchedule);
+    Schedule bestSchedule = optimizer.optimize(initialSchedule);
 
     return bestSchedule;
 }
@@ -203,7 +215,7 @@ Schedule schedule(
         GRANULARITY, 
         10.0f, 
         1e-4, 
-        10000
+        1000000
     );
     return s;
 }

@@ -21,7 +21,6 @@ public:
     std::set<ID> dependencies;
     std::set<Tag> tags;
 
-    // Constructor
     Job(time_t duration,
         TimeRange schedulableTimeRange,
         TimeRange scheduledTimeRange,

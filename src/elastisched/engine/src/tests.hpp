@@ -26,7 +26,6 @@ void test_basic_scheduling() {
     std::cout << "Running basic scheduler test...\n";
     
     const time_t GRANULARITY = 15 * constants::MINUTE; // 15 minutes
-    const time_t START_EPOCH = 0; // Start of Sunday
     
     std::vector<Job> jobs;
     
@@ -82,7 +81,7 @@ void test_basic_scheduling() {
         workTags
     );
     
-    Schedule result = schedule(jobs, jobs.size(), GRANULARITY, START_EPOCH);
+    Schedule result = schedule(jobs, GRANULARITY);
     
     std::cout << "Scheduled " << result.scheduledJobs.size() << " jobs\n";
     
@@ -110,9 +109,8 @@ void test_empty_schedule() {
     
     std::vector<Job> empty_jobs;
     const time_t GRANULARITY = 15 * constants::MINUTE;
-    const time_t START_EPOCH = 0;
     
-    Schedule result = schedule(empty_jobs, 0, GRANULARITY, START_EPOCH);
+    Schedule result = schedule(empty_jobs, GRANULARITY);
     
     assert(result.scheduledJobs.empty());
     std::cout << "Empty schedule test passed!\n\n";
@@ -122,7 +120,6 @@ void test_rigid_job() {
     std::cout << "Running rigid job test...\n";
     
     const time_t GRANULARITY = 15 * constants::MINUTE;
-    const time_t START_EPOCH = 0;
     
     Policy rigidPolicy(0, 0.0, 3); // Both bits set
     std::set<ID> noDependencies;
@@ -145,7 +142,7 @@ void test_rigid_job() {
         meetingTags
     );
     
-    Schedule result = schedule(jobs, 1, GRANULARITY, START_EPOCH);
+    Schedule result = schedule(jobs, GRANULARITY);
     
     assert(result.scheduledJobs.size() == 1);
     
@@ -158,7 +155,6 @@ void test_friday_cost_optimization() {
     std::cout << "Running Friday cost optimization test...\n";
     
     const time_t GRANULARITY = 15 * constants::MINUTE; // 15 minutes
-    const time_t START_EPOCH = 0; // Start of Monday
 
     time_t thursday_start = 3 * constants::DAY;  // Thursday 9 AM
     time_t thursday_end = 3 * constants::DAY + 17 * constants::HOUR_TO_MINUTES * constants::MINUTE;   // Thursday 5 PM
@@ -190,7 +186,7 @@ void test_friday_cost_optimization() {
     std::cout << "Job can be rescheduled between Thursday 9 AM and Friday 5 PM\n";
     std::cout << "Expected: Optimizer should move job to Thursday due to lower cost\n";
     
-    Schedule result = schedule(jobs, 1, GRANULARITY, START_EPOCH);
+    Schedule result = schedule(jobs, GRANULARITY);
     
     assert(result.scheduledJobs.size() == 1);
     
@@ -231,6 +227,14 @@ void test_friday_cost_optimization() {
     }
     
     std::cout << "Friday cost optimization test completed!\n\n";
+}
+
+
+void test_fri_sat_cost_optimization() {
+    // std::cout << "Running Friday, Saturday Cost optimization test" << "\n";
+
+    // Should expect for task schedulable between Thursday-Saturday to be scheduled on Thursday
+    return;
 }
 
 #endif
