@@ -20,11 +20,12 @@
 #include <fstream>
 #include <set>
 #include <cassert>
+#include <utility>
 
 #include "optimizer/SimulatedAnnealingOptimizer.hpp"
 
 Schedule schedule(std::vector<Job> jobs, const uint64_t GRANULARITY);
-Schedule scheduleJobs(std::vector<Job> jobs, const uint64_t GRANULARITY, const double INITIAL_TEMP, const double FINAL_TEMP, const uint64_t NUM_ITERS);
+std::pair<Schedule, std::vector<double>> scheduleJobs(std::vector<Job> jobs, const uint64_t GRANULARITY, const double INITIAL_TEMP, const double FINAL_TEMP, const uint64_t NUM_ITERS);
 
 std::vector<std::vector<Job>> getDisjointIntervals(std::vector<Job> jobs) {
     if (jobs.empty()) {
@@ -158,7 +159,7 @@ Schedule generateRandomScheduleNeighbor(
  * Returns the approximately best Schedule.
  * 
  */
-Schedule scheduleJobs(
+std::pair<Schedule, std::vector<double>> scheduleJobs(
     std::vector<Job> jobs,
     const time_t GRANULARITY, 
     const double INITIAL_TEMP,
@@ -166,7 +167,7 @@ Schedule scheduleJobs(
     const uint64_t NUM_ITERS
 ) {
     if (jobs.size() == 0) {
-        return Schedule();
+        return std::make_pair<Schedule, std::vector<double>>(Schedule(), {});
     };
 
 
@@ -202,22 +203,25 @@ Schedule scheduleJobs(
     );
 
     Schedule bestSchedule = optimizer.optimize(initialSchedule);
+    std::vector<double> costHistory = optimizer.getCostHistory();
 
-    return bestSchedule;
+    return std::make_pair(bestSchedule, costHistory);
 }
 
 Schedule schedule(
     std::vector<Job> jobs, 
     const uint64_t GRANULARITY
 ) {
-    Schedule s = scheduleJobs(
+    std::pair<Schedule, std::vector<double>> s = scheduleJobs(
         jobs, 
         GRANULARITY, 
         10.0f, 
         1e-4, 
         1000000
     );
-    return s;
+
+    std::cout << "Test1" << std::endl;
+    return s.first;
 }
 
 

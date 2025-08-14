@@ -76,3 +76,5 @@ class Hour(Enum):
         return hash(self.value)
     
 AFTERNOON_START = Hour.FIVE_PM
+
+RANDOM_TEST_ITERATIONS = 30

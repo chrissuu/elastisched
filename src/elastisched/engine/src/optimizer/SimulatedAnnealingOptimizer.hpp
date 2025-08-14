@@ -35,6 +35,8 @@ public:
         double currCost = costFn(currState);
         double bestCost = currCost;
 
+        costHistory.push_back(currCost);
+
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_real_distribution<> dis(0.0, 1.0);
@@ -48,6 +50,8 @@ public:
             State nextState = neighborFn(currState);
             double nextCost = costFn(nextState);
             double delta = nextCost - currCost;
+
+            costHistory.push_back(nextCost);
 
             if (delta < 0 || dis(gen) < std::exp(-delta / temp)) {
                 currState = nextState;
@@ -63,6 +67,10 @@ public:
         return bestState;
     }
 
+    std::vector<double> getCostHistory() const {
+        return costHistory;
+    }
+
 private:
     CostFunction costFn;
     NeighborFunction neighborFn;
@@ -70,6 +78,7 @@ private:
     double finalTemp;
     int maxIters;
     TemperatureSchedule tempSchedule;
+    std::vector<double> costHistory;
 
     static double defaultSchedule(double T0, int iter) {
         return T0 * std::pow(0.95, iter); // geometric cooling

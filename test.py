@@ -34,15 +34,17 @@ def main():
 
     # Run the engine.function
     jobs = [job]
-    result = engine.schedule_jobs(
+    result, cost_history = engine.schedule_jobs(
         jobs, 60 * 15, 1000.0, 1.0, 100000000
     )  # granularity: 15 min, start_epoch: 0
+
     for e in result.scheduledJobs:
         print(e)
 
     blob = Blob.from_job(result.scheduledJobs[0], datetime.now(), "TestBlob", "Hello world!", timezone.utc)
     print(f"Blob id: {blob.get_id()}")
     print(f"Blob policy: {blob.policy.isSplittable()}")
+    print(cost_history)
 
 
 if __name__ == "__main__":
