@@ -78,24 +78,23 @@ double ScheduleCostFunction::busy_afternoon_exponential_cost(uint64_t DAYS_SINCE
     time_t TIME_TO_FIRST_DAY = DAYS_SINCE_MONDAY * constants::DAY;
     TimeRange currDay = TimeRange(TIME_TO_FIRST_DAY);
     std::optional<std::vector<Job>>* currJobs = m_dayBasedSchedule.searchValue(currDay);
+
     double cost = 0;
-    while (currDay.getHigh() < m_max) {
+    while (currDay.getHigh() < m_max.value()) {
         if (currJobs->has_value()) {
             std::vector<Job> filteredWorkJobs;
             for (const auto& job : currJobs->value()) {
                 bool is_work_type = job.tags.find(constants::WORK_TAG) != job.tags.end();
-                bool is_scheduled_in_afternoon = job.scheduledTimeRange.getLow() > constants::AFTERNOON_START;
+                /* scheduledTimeRange.low := DAY * day (since EPOCH) + HOUR * hour + MINUTES * minute + second */
+                bool is_scheduled_in_afternoon = ((job.scheduledTimeRange.getLow() / constants::HOUR) % 24) >= constants::AFTERNOON_START;
                 if (is_work_type && is_scheduled_in_afternoon) {
                     filteredWorkJobs.push_back(job);
                 }
             }
-            std::sort(filteredWorkJobs.begin(), filteredWorkJobs.end(), [](const Job& U, const Job& V) {
-                return U.scheduledTimeRange.getLow() < V.scheduledTimeRange.getLow();
-            });
             
             /* Apply greater cost for work type jobs scheduled later in the afternoon */
             for (const auto& job : filteredWorkJobs) {
-                cost += std::exp(constants::EXP_DOWNFACTOR * (job.scheduledTimeRange.getLow() - currDay.getLow() / constants::HOUR));
+                cost += std::exp(constants::EXP_DOWNFACTOR * ((double)(job.scheduledTimeRange.length()) / constants::HOUR));
             }
         }
         currDay = TimeRange(currDay.getHigh() + constants::WEEK);
@@ -105,13 +104,49 @@ double ScheduleCostFunction::busy_afternoon_exponential_cost(uint64_t DAYS_SINCE
 }
 
 
+/**
+ * Adds a cost to busy days, increasing by constant cost for each hour scheduled on that day
+ */
+double ScheduleCostFunction::busy_day_constant_cost(uint64_t DAYS_SINCE_MONDAY) const {
+    time_t TIME_TO_FIRST_DAY = DAYS_SINCE_MONDAY * constants::DAY;
+    TimeRange currDay = TimeRange(TIME_TO_FIRST_DAY);
+    std::optional<std::vector<Job>>* currJobs = m_dayBasedSchedule.searchValue(currDay);
+    double cost = 0;
+    while (currDay.getHigh() < m_max.value()) {
+        if (currJobs->has_value()) {
+            std::vector<Job> filteredWorkJobs;
+            for (const auto& job : currJobs->value()) {
+                bool is_work_type = job.tags.find(constants::WORK_TAG) != job.tags.end();
+                if (is_work_type) {
+                    filteredWorkJobs.push_back(job);
+                }
+            }
+            
+            for (const auto& job : filteredWorkJobs) {
+                cost += constants::HOURLY_COST_FACTOR * ((double)(job.scheduledTimeRange.length()) / constants::HOUR);
+            }
+        }
+        currDay = TimeRange(currDay.getHigh() + constants::WEEK);
+        currJobs = m_dayBasedSchedule.searchValue(currDay);
+    }
+    return cost;    
+}
+
+
+/**
+ * Adds a cost for scheduling tasks consecutively which are too different from each other
+ */
+double ScheduleCostFunction::context_switch_cost() const {
+    return 0.0f;
+}
+
 double ScheduleCostFunction::busy_friday_afternoon_cost() const {
     return busy_afternoon_exponential_cost((uint64_t)4);
 }
 
 
-double ScheduleCostFunction::busy_saturday_afternoon_cost() const {
-    return busy_afternoon_exponential_cost((uint64_t)5);
+double ScheduleCostFunction::busy_saturday_cost() const {
+    return busy_day_constant_cost((uint64_t)5);
 }
 
 
@@ -146,12 +181,12 @@ double ScheduleCostFunction::illegal_schedule_cost() const {
     if (dependencyCheck.hasCyclicDependencies || dependencyCheck.hasViolations) {
         return constants::ILLEGAL_SCHEDULE_COST;
     }
-    
+
     return 0.0f;
 }
 
 
 double ScheduleCostFunction::scheduleCost() const {
-    double cost = busy_friday_afternoon_cost() + busy_saturday_afternoon_cost() + illegal_schedule_cost();
+    double cost = busy_friday_afternoon_cost() + busy_saturday_cost() + illegal_schedule_cost();
     return cost;
 }

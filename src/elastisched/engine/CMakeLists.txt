@@ -69,7 +69,7 @@ if(pybind11_FOUND AND SKBUILD)
     target_compile_definitions(engine_py PRIVATE VERSION_INFO=${PROJECT_VERSION})
     
     install(TARGETS engine_py DESTINATION .)
-    
+
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         set_target_properties(engine_py PROPERTIES
             INSTALL_RPATH "@loader_path"

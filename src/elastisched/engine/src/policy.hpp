@@ -16,8 +16,8 @@
  */
 class Policy {
 private:
-    time_t min_split_duration;
     uint8_t max_splits;
+    time_t min_split_duration;
     uint8_t scheduling_policies;  // Bitfield: bit 0 = is_splittable, bit 1 = is_overlappable, bit 2 = is_invisible
 
 public:

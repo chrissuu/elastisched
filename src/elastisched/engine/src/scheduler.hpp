@@ -17,13 +17,15 @@
 #include <random>
 #include <optional>
 #include <iostream>
+#include <fstream>
 #include <set>
 #include <cassert>
+#include <utility>
 
 #include "optimizer/SimulatedAnnealingOptimizer.hpp"
 
 Schedule schedule(std::vector<Job> jobs, const uint64_t GRANULARITY);
-Schedule scheduleJobs(std::vector<Job> jobs, const uint64_t GRANULARITY, const double INITIAL_TEMP, const double FINAL_TEMP, const uint64_t NUM_ITERS);
+std::pair<Schedule, std::vector<double>> scheduleJobs(std::vector<Job> jobs, const uint64_t GRANULARITY, const double INITIAL_TEMP, const double FINAL_TEMP, const uint64_t NUM_ITERS);
 
 std::vector<std::vector<Job>> getDisjointIntervals(std::vector<Job> jobs) {
     if (jobs.empty()) {
@@ -157,7 +159,7 @@ Schedule generateRandomScheduleNeighbor(
  * Returns the approximately best Schedule.
  * 
  */
-Schedule scheduleJobs(
+std::pair<Schedule, std::vector<double>> scheduleJobs(
     std::vector<Job> jobs,
     const time_t GRANULARITY, 
     const double INITIAL_TEMP,
@@ -165,14 +167,17 @@ Schedule scheduleJobs(
     const uint64_t NUM_ITERS
 ) {
     if (jobs.size() == 0) {
-        return Schedule();
+        return std::make_pair<Schedule, std::vector<double>>(Schedule(), {});
     };
+
 
     std::vector<std::vector<Job>> disjointJobs = getDisjointIntervals(jobs);
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    Schedule randomSchedule = generateRandomSchedule(disjointJobs, GRANULARITY, gen);
+    Schedule initialSchedule = Schedule(jobs);
+
+    ScheduleCostFunction initialCostFunction = ScheduleCostFunction(initialSchedule, GRANULARITY);
 
     SimulatedAnnealingOptimizer<Schedule> optimizer = SimulatedAnnealingOptimizer<Schedule>(
         [GRANULARITY](Schedule s) {
@@ -183,29 +188,32 @@ Schedule scheduleJobs(
             return generateRandomScheduleNeighbor(
                 s, 
                 GRANULARITY,
-                gen); },
+                gen); 
+        },
         INITIAL_TEMP,
         FINAL_TEMP,
         NUM_ITERS
     );
 
-    Schedule bestSchedule = optimizer.optimize(randomSchedule);
+    Schedule bestSchedule = optimizer.optimize(initialSchedule);
+    std::vector<double> costHistory = optimizer.getCostHistory();
 
-    return bestSchedule;
+    return std::make_pair(bestSchedule, costHistory);
 }
 
 Schedule schedule(
     std::vector<Job> jobs, 
     const uint64_t GRANULARITY
 ) {
-    Schedule s = scheduleJobs(
+    std::pair<Schedule, std::vector<double>> s = scheduleJobs(
         jobs, 
         GRANULARITY, 
         10.0f, 
         1e-4, 
-        10000
+        1000000
     );
-    return s;
+
+    return s.first;
 }
 
 

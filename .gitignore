@@ -1,6 +1,10 @@
 **/.venv
 **/__pycache__
+**/.pytest_cache
 **/*.egg-info
 **/.vscode
 **/build
+**/logs
 src/elastisched/engine/bin
+
+offline-packages

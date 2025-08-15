@@ -39,8 +39,8 @@ public:
         return !(high < other.getLow() || other.getHigh() < low);
     }
 
-    bool contains(T value) const {
-        return low <= value && value <= high;
+    bool contains(const Interval& other) const {
+        return low <= other.getLow() && other.getHigh() <= high;
     }
 
     T length() const {

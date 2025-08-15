@@ -23,14 +23,15 @@ private:
     std::optional<time_t> m_max = std::nullopt;
 
 public:
-    double busy_saturday_afternoon_cost() const;
+    double busy_saturday_cost() const;
     double busy_friday_afternoon_cost() const;
     double busy_afternoon_exponential_cost(uint64_t DAYS_SINCE_MONDAY) const;
+    double busy_day_constant_cost(uint64_t DAYS_SINCE_MONDAY) const;
     // double overlapping_job_cost() const;
     // double work_block_duration_cost() const;
     // double daily_work_load_balance() const;
     // double bad_sleep_cost() const;
-    // double context_switch_cost() const;
+    double context_switch_cost() const;
     // double finish_later_cost() const;
     // double priority_inversion_cost() const;
 

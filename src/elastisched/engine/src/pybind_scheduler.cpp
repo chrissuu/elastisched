@@ -63,7 +63,8 @@ PYBIND11_MODULE(engine, m) {
 
     // Schedule
     py::class_<Schedule>(m, "Schedule")
-        .def(py::init<>())
+        .def(py::init<std::vector<Job>>(),
+             py::arg("scheduledJobs") = std::vector<Job>{})
         .def_readwrite("scheduledJobs", &Schedule::scheduledJobs)
         .def("addJob", &Schedule::addJob)
         .def("clear", &Schedule::clear)
@@ -71,6 +72,17 @@ PYBIND11_MODULE(engine, m) {
         .def("__iter__", [](const Schedule& schedule) {
             return py::make_iterator(schedule.scheduledJobs.begin(), schedule.scheduledJobs.end());
         }, py::keep_alive<0, 1>());
+
+    // Cost Function
+    py::class_<ScheduleCostFunction>(m, "ScheduleCostFunction")
+        .def(py::init<const Schedule&, time_t>())
+        .def("schedule_cost", &ScheduleCostFunction::scheduleCost)
+        .def("busy_saturday_cost", &ScheduleCostFunction::busy_saturday_cost)
+        .def("busy_friday_afternoon_cost", &ScheduleCostFunction::busy_friday_afternoon_cost)
+        .def("busy_afternoon_exponential_cost", &ScheduleCostFunction::busy_afternoon_exponential_cost,
+             py::arg("DAYS_SINCE_MONDAY"))
+        .def("busy_day_constant_cost", &ScheduleCostFunction::busy_day_constant_cost,
+             py::arg("DAYS_SINCE_MONDAY"));
 
     m.def("schedule", &schedule, "Run the scheduler with default configurations",
           py::arg("jobs"), py::arg("granularity"));
