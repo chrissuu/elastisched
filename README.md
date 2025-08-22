@@ -35,3 +35,6 @@ The main idea is as follows:
 4. Sample a random schedule
 5. Do simulated annealing with cost function as defined in cost function class
 6. Return best Schedule approximation
+
+### Troubleshooting
+1. I tried running unit tests (pytest) or interfacing with the engine API while using conda but got a "GLIB_X.X.XX" not found error. **Try**: forcing conda to use the same gcc and gxx version as when it compiles the library.
