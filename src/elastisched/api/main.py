@@ -1,10 +1,16 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from elastisched.api.db import init_db
 from elastisched.api.router import router as blob_router
 
 
 app = FastAPI(title="Elastisched API")
+_UI_DIR = Path(__file__).resolve().parents[3] / "frontend"
+if _UI_DIR.exists():
+    app.mount("/ui", StaticFiles(directory=_UI_DIR, html=True), name="ui")
 
 
 @app.on_event("startup")

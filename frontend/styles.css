@@ -84,6 +84,80 @@ body {
   border: 1px solid #e2d6c7;
 }
 
+.form-panel {
+  display: none;
+}
+
+.form-panel.active {
+  display: block;
+  animation: fadeIn 0.45s ease;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-title {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.form-subtitle {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.blob-form {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.blob-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.blob-form input {
+  border: 1px solid #dfd2c2;
+  background: #fffaf2;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-family: inherit;
+}
+
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.primary {
+  background: #1b1a16;
+  color: #f7f2e8;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.form-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ghost.small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
 .tabs {
   display: inline-flex;
   background: #e9dfd0;
@@ -178,12 +252,11 @@ body {
   grid-template-columns: 80px 1fr;
   gap: 12px;
   align-items: stretch;
-  height: 520px;
+  min-height: 520px;
 }
 
 .hours {
   display: grid;
-  grid-template-rows: repeat(10, 1fr);
   color: var(--muted);
   font-size: 12px;
   text-transform: uppercase;
@@ -203,7 +276,6 @@ body {
   border: 1px solid #e0d3c1;
   padding: 12px;
   display: grid;
-  grid-template-rows: repeat(10, 1fr);
   gap: 8px;
 }
 
@@ -315,6 +387,5 @@ body {
 
   .day-grid {
     grid-template-columns: 60px 1fr;
-    height: 520px;
   }
 }

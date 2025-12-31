@@ -17,10 +17,50 @@
           </div>
         </div>
         <div class="controls">
-          <button class="ghost">Today</button>
-          <button class="ghost">Add</button>
+          <button class="ghost" id="todayBtn">Today</button>
+          <button class="ghost" id="toggleFormBtn">Add</button>
         </div>
       </header>
+
+      <section class="panel form-panel" id="formPanel">
+        <div class="form-header">
+          <div>
+            <div class="form-title">Create a blob</div>
+            <div class="form-subtitle">Quick entry for schedules</div>
+          </div>
+          <button class="ghost small" id="closeFormBtn">Close</button>
+        </div>
+        <form id="blobForm" class="blob-form">
+          <label>
+            Name
+            <input type="text" name="name" placeholder="Focus Sprint" required />
+          </label>
+          <label>
+            Description
+            <input type="text" name="description" placeholder="Optional details" />
+          </label>
+          <label>
+            Default start
+            <input type="datetime-local" name="defaultStart" required />
+          </label>
+          <label>
+            Default end
+            <input type="datetime-local" name="defaultEnd" required />
+          </label>
+          <label>
+            Schedulable start
+            <input type="datetime-local" name="schedulableStart" required />
+          </label>
+          <label>
+            Schedulable end
+            <input type="datetime-local" name="schedulableEnd" required />
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="primary">Create</button>
+            <span class="form-status" id="formStatus"></span>
+          </div>
+        </form>
+      </section>
 
       <section class="panel">
         <div class="tabs" role="tablist">
