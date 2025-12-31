@@ -362,6 +362,7 @@ body {
   color: #1c1a12;
   display: grid;
   gap: 4px;
+  cursor: pointer;
 }
 
 .day-block.focus {

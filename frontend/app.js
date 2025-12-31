@@ -2,6 +2,7 @@ const state = {
   blobs: [],
   view: "day",
   anchorDate: new Date(),
+  editingBlobId: null,
 };
 
 const dateLabel = document.getElementById("dateLabel");
@@ -17,6 +18,8 @@ const toggleFormBtn = document.getElementById("toggleFormBtn");
 const closeFormBtn = document.getElementById("closeFormBtn");
 const formStatus = document.getElementById("formStatus");
 const blobForm = document.getElementById("blobForm");
+const formTitle = document.getElementById("formTitle");
+const formSubmitBtn = document.getElementById("formSubmitBtn");
 const todayBtn = document.getElementById("todayBtn");
 const prevDayBtn = document.getElementById("prevDayBtn");
 const nextDayBtn = document.getElementById("nextDayBtn");
@@ -75,8 +78,36 @@ function toDate(value) {
   return value ? new Date(value) : null;
 }
 
+function formatOffset(minutes) {
+  const sign = minutes <= 0 ? "+" : "-";
+  const abs = Math.abs(minutes);
+  const hours = `${Math.floor(abs / 60)}`.padStart(2, "0");
+  const mins = `${abs % 60}`.padStart(2, "0");
+  return `${sign}${hours}:${mins}`;
+}
+
 function toIso(value) {
-  return new Date(value).toISOString();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hours = `${date.getHours()}`.padStart(2, "0");
+  const minutes = `${date.getMinutes()}`.padStart(2, "0");
+  const seconds = `${date.getSeconds()}`.padStart(2, "0");
+  const offset = formatOffset(date.getTimezoneOffset());
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offset}`;
+}
+
+function toLocalInputValue(isoString) {
+  const date = toDate(isoString);
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hours = `${date.getHours()}`.padStart(2, "0");
+  const minutes = `${date.getMinutes()}`.padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 function pad(num) {
@@ -166,6 +197,7 @@ function renderDay() {
       if (minutes <= 0) return null;
       const top = (clampedStart - dayStart) / 60000;
       return {
+        id: blob.id,
         title: blob.name,
         time: formatTimeRange(blob.default_scheduled_timerange.start, blob.default_scheduled_timerange.end),
         type: getTagType(blob.tags),
@@ -182,7 +214,7 @@ function renderDay() {
   const blockHtml = blocks
     .map(
       (block) => `
-        <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
+        <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
           <span>${block.title}</span>
           <span class="event-time">${block.time}</span>
         </div>
@@ -255,6 +287,7 @@ function renderWeek() {
           if (minutes <= 0) return null;
           const top = (clampedStart - dayStart) / 60000;
           return {
+            id: blob.id,
             title: blob.name,
             time: formatTimeRange(
               blob.default_scheduled_timerange.start,
@@ -272,7 +305,7 @@ function renderWeek() {
       const blockHtml = blocks
         .map(
           (block) => `
-            <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
+            <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
               <span>${block.title}</span>
               <span class="event-time">${block.time}</span>
             </div>
@@ -475,6 +508,36 @@ function toggleForm(show) {
   formPanel.classList.toggle("active", isActive);
 }
 
+function setFormMode(mode) {
+  if (mode === "edit") {
+    formTitle.textContent = "Edit blob";
+    formSubmitBtn.textContent = "Update";
+  } else {
+    formTitle.textContent = "Create a blob";
+    formSubmitBtn.textContent = "Create";
+  }
+}
+
+function openEditForm(blob) {
+  blobForm.name.value = blob.name || "";
+  blobForm.description.value = blob.description || "";
+  blobForm.defaultStart.value = toLocalInputValue(blob.default_scheduled_timerange?.start);
+  blobForm.defaultEnd.value = toLocalInputValue(blob.default_scheduled_timerange?.end);
+  blobForm.schedulableStart.value = toLocalInputValue(blob.schedulable_timerange?.start);
+  blobForm.schedulableEnd.value = toLocalInputValue(blob.schedulable_timerange?.end);
+  state.editingBlobId = blob.id;
+  setFormMode("edit");
+  formStatus.textContent = "";
+  toggleForm(true);
+}
+
+function resetFormMode() {
+  state.editingBlobId = null;
+  blobForm.reset();
+  setFormMode("create");
+  formStatus.textContent = "";
+}
+
 function goToDate(dateIso) {
   const parsed = new Date(dateIso);
   if (!Number.isNaN(parsed.getTime())) {
@@ -506,8 +569,10 @@ blobForm.addEventListener("submit", async (event) => {
   };
 
   try {
-    const response = await fetch(`${API_BASE}/blobs`, {
-      method: "POST",
+    const isEditing = Boolean(state.editingBlobId);
+    const endpoint = isEditing ? `${API_BASE}/blobs/${state.editingBlobId}` : `${API_BASE}/blobs`;
+    const response = await fetch(endpoint, {
+      method: isEditing ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
@@ -523,8 +588,9 @@ blobForm.addEventListener("submit", async (event) => {
       throw new Error(detail);
     }
     blobForm.reset();
-    formStatus.textContent = "Created.";
+    formStatus.textContent = isEditing ? "Updated." : "Created.";
     toggleForm(false);
+    resetFormMode();
     await fetchBlobs();
   } catch (error) {
     formStatus.textContent = error?.message || "Error saving blob.";
@@ -544,8 +610,24 @@ document.addEventListener("click", (event) => {
   }
 });
 
-toggleFormBtn.addEventListener("click", () => toggleForm());
-closeFormBtn.addEventListener("click", () => toggleForm(false));
+document.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-blob-id]");
+  if (!target) return;
+  const blobId = target.getAttribute("data-blob-id");
+  const blob = state.blobs.find((item) => item.id === blobId);
+  if (blob) {
+    openEditForm(blob);
+  }
+});
+
+toggleFormBtn.addEventListener("click", () => {
+  resetFormMode();
+  toggleForm(true);
+});
+closeFormBtn.addEventListener("click", () => {
+  toggleForm(false);
+  resetFormMode();
+});
 todayBtn.addEventListener("click", () => {
   state.anchorDate = new Date();
   renderAll();
@@ -566,5 +648,6 @@ goTodayBtn.addEventListener("click", () => {
   setActive("day");
 });
 
+resetFormMode();
 setActive("day");
 fetchBlobs();
