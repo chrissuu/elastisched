@@ -1,6 +1,12 @@
 import { API_BASE, appConfig, saveSettings, state } from "./core.js";
 import { dom } from "./dom.js";
-import { addDays, getLocalTimeZone, getWeekStart, toIso, toLocalInputValue } from "./utils.js";
+import {
+  addDays,
+  formatDateTimeLocalInTimeZone,
+  getWeekStart,
+  toLocalInputValueInTimeZone,
+  toProjectIsoFromLocalInput,
+} from "./utils.js";
 import { startInteractiveCreate } from "./render.js";
 
 let refreshView = null;
@@ -27,6 +33,7 @@ function hydrateSettingsForm() {
   dom.settingsForm.scheduleName.value = appConfig.scheduleName || "";
   dom.settingsForm.subtitle.value = appConfig.subtitle || "";
   dom.settingsForm.minuteGranularity.value = appConfig.minuteGranularity || 5;
+  dom.settingsForm.userTimeZone.value = appConfig.userTimeZone || "";
 }
 
 function setFormMode(mode) {
@@ -57,7 +64,15 @@ function updateRecurrenceUI() {
   });
 
   const defaultStart = dom.blobForm.defaultStart.value;
-  const startDate = defaultStart ? new Date(defaultStart) : state.anchorDate;
+  const startDate = defaultStart
+    ? new Date(
+        toProjectIsoFromLocalInput(
+          defaultStart,
+          appConfig.userTimeZone,
+          appConfig.projectTimeZone
+        )
+      )
+    : state.anchorDate;
   if (Number.isNaN(startDate.getTime())) {
     dom.recurrenceSummary.textContent = "Set a default start time to preview the cadence.";
     return;
@@ -88,22 +103,18 @@ function timeToMinutes(value) {
   return hours * 60 + minutes;
 }
 
-function pad2(value) {
-  return String(value).padStart(2, "0");
-}
-
-function timeValueFromDate(date, fallback) {
+function timeValueFromDate(date, fallback, timeZone) {
   if (!date || Number.isNaN(date.getTime())) return fallback;
-  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  const local = formatDateTimeLocalInTimeZone(date, timeZone);
+  return local.split("T")[1] || fallback;
 }
 
-function timeToDate(baseDate, timeValue) {
-  const minutes = timeToMinutes(timeValue);
-  if (minutes === null) return null;
-  const result = new Date(baseDate);
-  result.setHours(0, 0, 0, 0);
-  result.setMinutes(minutes);
-  return result;
+function weekdayIndexFromDateString(dateString) {
+  const [year, month, day] = dateString.split("-").map((part) => Number(part));
+  if ([year, month, day].some((item) => Number.isNaN(item))) {
+    return 1;
+  }
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
 function dayOffsetFromMonday(dayIndex) {
@@ -306,10 +317,22 @@ function openEditForm(blob) {
   }
   dom.blobForm.name.value = blob.name || "";
   dom.blobForm.description.value = blob.description || "";
-  dom.blobForm.defaultStart.value = toLocalInputValue(blob.default_scheduled_timerange?.start);
-  dom.blobForm.defaultEnd.value = toLocalInputValue(blob.default_scheduled_timerange?.end);
-  dom.blobForm.schedulableStart.value = toLocalInputValue(blob.schedulable_timerange?.start);
-  dom.blobForm.schedulableEnd.value = toLocalInputValue(blob.schedulable_timerange?.end);
+  dom.blobForm.defaultStart.value = toLocalInputValueInTimeZone(
+    blob.default_scheduled_timerange?.start,
+    appConfig.userTimeZone
+  );
+  dom.blobForm.defaultEnd.value = toLocalInputValueInTimeZone(
+    blob.default_scheduled_timerange?.end,
+    appConfig.userTimeZone
+  );
+  dom.blobForm.schedulableStart.value = toLocalInputValueInTimeZone(
+    blob.schedulable_timerange?.start,
+    appConfig.userTimeZone
+  );
+  dom.blobForm.schedulableEnd.value = toLocalInputValueInTimeZone(
+    blob.schedulable_timerange?.end,
+    appConfig.userTimeZone
+  );
   clearWeeklySlots();
   if (blob.recurrence_payload?.interval && dom.blobForm.weeklyInterval) {
     dom.blobForm.weeklyInterval.value = blob.recurrence_payload.interval;
@@ -331,13 +354,18 @@ function openEditForm(blob) {
       const end = new Date(weeklyBlob.default_scheduled_timerange?.end);
       const schedStart = new Date(weeklyBlob.schedulable_timerange?.start);
       const schedEnd = new Date(weeklyBlob.schedulable_timerange?.end);
-      const dayValue = Number.isNaN(start.getTime()) ? 1 : start.getDay();
+      const startLocal = Number.isNaN(start.getTime())
+        ? ""
+        : formatDateTimeLocalInTimeZone(start, appConfig.userTimeZone);
+      const dayValue = startLocal
+        ? weekdayIndexFromDateString(startLocal.split("T")[0])
+        : 1;
       createWeeklySlot({
         day: dayValue,
-        defaultStart: timeValueFromDate(start, "09:00"),
-        defaultEnd: timeValueFromDate(end, "10:00"),
-        schedStart: timeValueFromDate(schedStart, "08:30"),
-        schedEnd: timeValueFromDate(schedEnd, "10:30"),
+        defaultStart: timeValueFromDate(start, "09:00", appConfig.userTimeZone),
+        defaultEnd: timeValueFromDate(end, "10:00", appConfig.userTimeZone),
+        schedStart: timeValueFromDate(schedStart, "08:30", appConfig.userTimeZone),
+        schedEnd: timeValueFromDate(schedEnd, "10:30", appConfig.userTimeZone),
         name: weeklyBlob.name || "",
         description: weeklyBlob.description || "",
       });
@@ -377,14 +405,30 @@ async function handleBlobSubmit(event) {
   const baseBlob = {
     name: formData.get("name"),
     description: formData.get("description") || null,
-    tz: getLocalTimeZone(),
+    tz: appConfig.projectTimeZone,
     default_scheduled_timerange: {
-      start: toIso(formData.get("defaultStart")),
-      end: toIso(formData.get("defaultEnd")),
+      start: toProjectIsoFromLocalInput(
+        formData.get("defaultStart"),
+        appConfig.userTimeZone,
+        appConfig.projectTimeZone
+      ),
+      end: toProjectIsoFromLocalInput(
+        formData.get("defaultEnd"),
+        appConfig.userTimeZone,
+        appConfig.projectTimeZone
+      ),
     },
     schedulable_timerange: {
-      start: toIso(formData.get("schedulableStart")),
-      end: toIso(formData.get("schedulableEnd")),
+      start: toProjectIsoFromLocalInput(
+        formData.get("schedulableStart"),
+        appConfig.userTimeZone,
+        appConfig.projectTimeZone
+      ),
+      end: toProjectIsoFromLocalInput(
+        formData.get("schedulableEnd"),
+        appConfig.userTimeZone,
+        appConfig.projectTimeZone
+      ),
     },
     policy: {},
     dependencies: [],
@@ -406,21 +450,41 @@ async function handleBlobSubmit(event) {
     const blobsOfWeek = slots.map((slot) => {
       const offset = dayOffsetFromMonday(slot.day);
       const slotDate = addDays(weekStart, offset);
-      const defaultStart = timeToDate(slotDate, slot.defaultStart);
-      const defaultEnd = timeToDate(slotDate, slot.defaultEnd);
-      const schedStart = timeToDate(slotDate, slot.schedStart);
-      const schedEnd = timeToDate(slotDate, slot.schedEnd);
+      const slotDateValue = formatDateTimeLocalInTimeZone(
+        slotDate,
+        appConfig.userTimeZone
+      ).split("T")[0];
+      const defaultStart = toProjectIsoFromLocalInput(
+        `${slotDateValue}T${slot.defaultStart}`,
+        appConfig.userTimeZone,
+        appConfig.projectTimeZone
+      );
+      const defaultEnd = toProjectIsoFromLocalInput(
+        `${slotDateValue}T${slot.defaultEnd}`,
+        appConfig.userTimeZone,
+        appConfig.projectTimeZone
+      );
+      const schedStart = toProjectIsoFromLocalInput(
+        `${slotDateValue}T${slot.schedStart}`,
+        appConfig.userTimeZone,
+        appConfig.projectTimeZone
+      );
+      const schedEnd = toProjectIsoFromLocalInput(
+        `${slotDateValue}T${slot.schedEnd}`,
+        appConfig.userTimeZone,
+        appConfig.projectTimeZone
+      );
       return {
         name: perSlot && slot.name ? slot.name : sharedName,
         description: perSlot ? slot.description || null : sharedDescription,
-        tz: getLocalTimeZone(),
+        tz: appConfig.projectTimeZone,
         default_scheduled_timerange: {
-          start: toIso(defaultStart),
-          end: toIso(defaultEnd),
+          start: defaultStart,
+          end: defaultEnd,
         },
         schedulable_timerange: {
-          start: toIso(schedStart),
-          end: toIso(schedEnd),
+          start: schedStart,
+          end: schedEnd,
         },
         policy: {},
         dependencies: [],
@@ -490,9 +554,21 @@ function handleSettingsSubmit(event) {
   const scheduleName = formData.get("scheduleName")?.toString().trim() || "";
   const subtitle = formData.get("subtitle")?.toString().trim() || "";
   const granularity = Math.max(1, Number(formData.get("minuteGranularity") || 1));
+  const userTimeZone = formData.get("userTimeZone")?.toString().trim() || "";
+  if (userTimeZone) {
+    try {
+      Intl.DateTimeFormat("en-US", { timeZone: userTimeZone });
+    } catch (error) {
+      dom.settingsStatus.textContent = "Invalid timezone. Use an IANA name.";
+      return;
+    }
+  }
   appConfig.scheduleName = scheduleName || appConfig.scheduleName;
   appConfig.subtitle = subtitle || appConfig.subtitle;
   appConfig.minuteGranularity = granularity;
+  if (userTimeZone) {
+    appConfig.userTimeZone = userTimeZone;
+  }
   dom.brandTitle.textContent = appConfig.scheduleName;
   dom.brandSubtitle.textContent = appConfig.subtitle;
   dom.settingsStatus.textContent = "Saved. Refresh to apply granularity.";

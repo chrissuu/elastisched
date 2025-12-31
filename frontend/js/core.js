@@ -1,3 +1,5 @@
+import { getLocalTimeZone } from "./utils.js";
+
 const state = {
   blobs: [],
   view: "day",
@@ -17,6 +19,8 @@ const defaultConfig = {
   scheduleName: window.APP_CONFIG?.scheduleName || "Elastisched",
   subtitle: window.APP_CONFIG?.subtitle || "Schedule at a glance",
   minuteGranularity: Math.max(1, Number(window.APP_CONFIG?.minuteGranularity || 5)),
+  projectTimeZone: window.APP_CONFIG?.projectTimeZone || "UTC",
+  userTimeZone: window.APP_CONFIG?.userTimeZone || null,
 };
 
 const storedConfig = (() => {
@@ -32,6 +36,15 @@ const appConfig = {
   ...defaultConfig,
   ...(storedConfig || {}),
 };
+
+if (!appConfig.userTimeZone) {
+  appConfig.userTimeZone = getLocalTimeZone();
+}
+try {
+  Intl.DateTimeFormat("en-US", { timeZone: appConfig.userTimeZone });
+} catch (error) {
+  appConfig.userTimeZone = getLocalTimeZone();
+}
 
 const minuteGranularity = Math.max(1, Number(appConfig.minuteGranularity || 5));
 const API_BASE = window.location.origin;

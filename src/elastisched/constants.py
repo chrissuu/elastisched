@@ -1,6 +1,12 @@
+import os
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-DEFAULT_TZ = timezone.utc
+PROJECT_TIMEZONE = os.getenv("ELASTISCHED_PROJECT_TZ", "UTC")
+try:
+    DEFAULT_TZ = ZoneInfo(PROJECT_TIMEZONE)
+except ZoneInfoNotFoundError:
+    DEFAULT_TZ = timezone.utc
 
 DEFAULT_START_DATE = datetime(
     date.min.year, date.min.month, date.min.day, tzinfo=timezone.utc

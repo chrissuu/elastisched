@@ -8,6 +8,115 @@ function getLocalTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
+function getTimeZoneParts(date, timeZone) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const map = {};
+  parts.forEach((part) => {
+    if (part.type !== "literal") {
+      map[part.type] = part.value;
+    }
+  });
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour),
+    minute: Number(map.minute),
+    second: Number(map.second),
+  };
+}
+
+function getTimeZoneOffsetMinutes(date, timeZone) {
+  const parts = getTimeZoneParts(date, timeZone);
+  const asUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+  return (asUtc - date.getTime()) / 60000;
+}
+
+function zonedTimeToUtcFromParts(parts, timeZone) {
+  const utcGuess = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second || 0
+  );
+  const offsetMinutes = getTimeZoneOffsetMinutes(new Date(utcGuess), timeZone);
+  return new Date(utcGuess - offsetMinutes * 60000);
+}
+
+function formatDateTimeLocalInTimeZone(date, timeZone) {
+  const parts = getTimeZoneParts(date, timeZone);
+  const year = String(parts.year).padStart(4, "0");
+  const month = String(parts.month).padStart(2, "0");
+  const day = String(parts.day).padStart(2, "0");
+  const hour = String(parts.hour).padStart(2, "0");
+  const minute = String(parts.minute).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function formatIsoInTimeZone(date, timeZone) {
+  const parts = getTimeZoneParts(date, timeZone);
+  const offsetMinutes = getTimeZoneOffsetMinutes(date, timeZone);
+  const sign = offsetMinutes <= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMinutes);
+  const offsetHours = String(Math.floor(abs / 60)).padStart(2, "0");
+  const offsetMins = String(Math.floor(abs % 60)).padStart(2, "0");
+  const year = String(parts.year).padStart(4, "0");
+  const month = String(parts.month).padStart(2, "0");
+  const day = String(parts.day).padStart(2, "0");
+  const hour = String(parts.hour).padStart(2, "0");
+  const minute = String(parts.minute).padStart(2, "0");
+  const second = String(parts.second).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}${sign}${offsetHours}:${offsetMins}`;
+}
+
+function toProjectIsoFromLocalInput(value, userTimeZone, projectTimeZone) {
+  if (!value) return "";
+  const [datePart, timePart] = value.split("T");
+  if (!datePart || !timePart) return "";
+  const [year, month, day] = datePart.split("-").map((part) => Number(part));
+  const [hour, minute] = timePart.split(":").map((part) => Number(part));
+  if (
+    [year, month, day, hour, minute].some((item) => Number.isNaN(item))
+  ) {
+    return "";
+  }
+  const utcDate = zonedTimeToUtcFromParts(
+    { year, month, day, hour, minute, second: 0 },
+    userTimeZone
+  );
+  if (projectTimeZone === "UTC") {
+    return utcDate.toISOString().replace(".000Z", "Z");
+  }
+  return formatIsoInTimeZone(utcDate, projectTimeZone);
+}
+
+function toProjectIsoFromDate(date, projectTimeZone) {
+  if (!date || Number.isNaN(date.getTime())) return "";
+  if (projectTimeZone === "UTC") {
+    return date.toISOString().replace(".000Z", "Z");
+  }
+  return formatIsoInTimeZone(date, projectTimeZone);
+}
+
 function formatOffset(minutes) {
   const sign = minutes <= 0 ? "+" : "-";
   const abs = Math.abs(minutes);
@@ -38,6 +147,12 @@ function toLocalInputValue(isoString) {
   const hours = `${date.getHours()}`.padStart(2, "0");
   const minutes = `${date.getMinutes()}`.padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function toLocalInputValueInTimeZone(isoString, timeZone) {
+  const date = toDate(isoString);
+  if (!date) return "";
+  return formatDateTimeLocalInTimeZone(date, timeZone);
 }
 
 function toLocalInputFromDate(date) {
@@ -163,6 +278,11 @@ export {
   getViewRange,
   getWeekStart,
   getLocalTimeZone,
+  formatDateTimeLocalInTimeZone,
+  formatIsoInTimeZone,
+  toProjectIsoFromLocalInput,
+  toProjectIsoFromDate,
+  toLocalInputValueInTimeZone,
   layoutBlocks,
   overlaps,
   startOfDay,

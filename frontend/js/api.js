@@ -1,11 +1,11 @@
-import { API_BASE, demoBlobs, state } from "./core.js";
-import { toIso } from "./utils.js";
+import { API_BASE, appConfig, demoBlobs, state } from "./core.js";
+import { toProjectIsoFromDate } from "./utils.js";
 
 async function fetchOccurrences(start, end) {
   try {
     const query = new URLSearchParams({
-      start: toIso(start),
-      end: toIso(end),
+      start: toProjectIsoFromDate(start, appConfig.projectTimeZone),
+      end: toProjectIsoFromDate(end, appConfig.projectTimeZone),
     });
     const response = await fetch(`${API_BASE}/occurrences?${query.toString()}`);
     if (!response.ok) {

@@ -24,15 +24,20 @@ class TimeRange:
     end: datetime = field(default=DEFAULT_END_DATE)
 
     def __post_init__(self):
-        if self.start.tzinfo != self.end.tzinfo:
-            raise ValueError("Start and end times must have the same timezone")
+        if self.start.tzinfo is None:
+            self.start = self.start.replace(tzinfo=DEFAULT_TZ)
+        else:
+            self.start = self.start.astimezone(DEFAULT_TZ)
+
+        if self.end.tzinfo is None:
+            self.end = self.end.replace(tzinfo=DEFAULT_TZ)
+        else:
+            self.end = self.end.astimezone(DEFAULT_TZ)
 
         if self.start > self.end:
-            raise ValueError(f"Start time <{self.start}> must be before or at end time <{self.end}>")
-
-        if self.start.tzinfo is None and self.end.tzinfo is None:
-            self.start.replace(tzinfo=DEFAULT_TZ)
-            self.end.replace(tzinfo=DEFAULT_TZ)
+            raise ValueError(
+                f"Start time <{self.start}> must be before or at end time <{self.end}>"
+            )
 
     def duration(self) -> timedelta:
         return self.end - self.start
