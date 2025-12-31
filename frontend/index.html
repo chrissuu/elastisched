@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Elastisched</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="brand">
+          <div class="logo">E</div>
+          <div>
+            <div class="title">Elastisched</div>
+            <div class="subtitle">Schedule at a glance</div>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="ghost">Today</button>
+          <button class="ghost">Add</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-view="day">Day</button>
+          <button class="tab" data-view="week">Week</button>
+          <button class="tab" data-view="month">Month</button>
+          <button class="tab" data-view="year">Year</button>
+        </div>
+        <div class="view-header">
+          <div class="date-label" id="dateLabel">Tuesday, May 21</div>
+          <div class="legend">
+            <span class="legend-dot focus"></span> Focus
+            <span class="legend-dot deep"></span> Deep Work
+            <span class="legend-dot admin"></span> Admin
+          </div>
+        </div>
+
+        <div class="views">
+          <div id="viewDay" class="view active"></div>
+          <div id="viewWeek" class="view"></div>
+          <div id="viewMonth" class="view"></div>
+          <div id="viewYear" class="view"></div>
+        </div>
+      </section>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
