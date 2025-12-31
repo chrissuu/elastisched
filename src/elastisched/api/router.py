@@ -46,6 +46,11 @@ def _to_schema(blob: BlobModel) -> BlobRead:
         schedulable_timerange=TimeRangeSchema(
             start=blob.schedulable_start, end=blob.schedulable_end
         ),
+        realized_timerange=TimeRangeSchema(
+            start=blob.realized_start, end=blob.realized_end
+        )
+        if blob.realized_start and blob.realized_end
+        else None,
         tz=blob.tz,
         policy=blob.policy or {},
         dependencies=blob.dependencies or [],
@@ -58,6 +63,8 @@ async def create_blob(
     payload: BlobCreate, session: AsyncSession = Depends(get_session)
 ) -> BlobRead:
     _validate_timeranges(payload.default_scheduled_timerange, payload.schedulable_timerange)
+    if payload.realized_timerange:
+        _validate_timeranges(payload.realized_timerange, payload.schedulable_timerange)
     blob = BlobModel(
         id=str(uuid.uuid4()),
         name=payload.name,
@@ -67,6 +74,8 @@ async def create_blob(
         default_scheduled_end=payload.default_scheduled_timerange.end,
         schedulable_start=payload.schedulable_timerange.start,
         schedulable_end=payload.schedulable_timerange.end,
+        realized_start=payload.realized_timerange.start if payload.realized_timerange else None,
+        realized_end=payload.realized_timerange.end if payload.realized_timerange else None,
         policy=payload.policy,
         dependencies=payload.dependencies,
         tags=payload.tags,
@@ -125,6 +134,9 @@ async def update_blob(
         start=blob.schedulable_start, end=blob.schedulable_end
     )
     _validate_timeranges(default_tr, schedulable_tr)
+    realized_tr = payload.realized_timerange
+    if realized_tr:
+        _validate_timeranges(realized_tr, schedulable_tr)
 
     if payload.name is not None:
         blob.name = payload.name
@@ -142,6 +154,9 @@ async def update_blob(
     blob.default_scheduled_end = default_tr.end
     blob.schedulable_start = schedulable_tr.start
     blob.schedulable_end = schedulable_tr.end
+    if payload.realized_timerange is not None:
+        blob.realized_start = realized_tr.start
+        blob.realized_end = realized_tr.end
 
     await session.commit()
     await session.refresh(blob)

@@ -13,6 +13,7 @@ class BlobBase(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     default_scheduled_timerange: TimeRangeSchema
     schedulable_timerange: TimeRangeSchema
+    realized_timerange: TimeRangeSchema | None = None
     tz: str = "UTC"
     policy: dict = Field(default_factory=dict)
     dependencies: list[str] = Field(default_factory=list)
@@ -28,6 +29,7 @@ class BlobUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     default_scheduled_timerange: TimeRangeSchema | None = None
     schedulable_timerange: TimeRangeSchema | None = None
+    realized_timerange: TimeRangeSchema | None = None
     tz: str | None = None
     policy: dict | None = None
     dependencies: list[str] | None = None

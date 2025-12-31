@@ -147,6 +147,44 @@ function overlaps(rangeStart, rangeEnd, eventStart, eventEnd) {
   return eventStart < rangeEnd && eventEnd > rangeStart;
 }
 
+function layoutBlocks(blocks) {
+  const sorted = [...blocks].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+  const active = [];
+  let cluster = null;
+  let clusterId = 0;
+
+  sorted.forEach((block) => {
+    for (let i = active.length - 1; i >= 0; i -= 1) {
+      if (active[i].endMin <= block.startMin) {
+        active.splice(i, 1);
+      }
+    }
+
+    if (active.length === 0) {
+      clusterId += 1;
+      cluster = { id: clusterId, maxColumns: 0, events: [] };
+    }
+
+    const used = new Set(active.map((item) => item.column));
+    let column = 0;
+    while (used.has(column)) {
+      column += 1;
+    }
+
+    block.column = column;
+    block.cluster = cluster;
+    cluster.events.push(block);
+    active.push(block);
+
+    const activeColumns = new Set(active.map((item) => item.column));
+    cluster.maxColumns = Math.max(cluster.maxColumns, activeColumns.size);
+  });
+
+  blocks.forEach((block) => {
+    block.columns = block.cluster?.maxColumns || 1;
+  });
+}
+
 function setDateLabel(text) {
   dateLabel.textContent = text;
 }
@@ -185,8 +223,12 @@ function renderDay() {
 
   const blocks = state.blobs
     .map((blob) => {
-      const start = toDate(blob.default_scheduled_timerange?.start);
-      const end = toDate(blob.default_scheduled_timerange?.end);
+      const start = toDate(
+        blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
+      );
+      const end = toDate(
+        blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
+      );
       const schedStart = toDate(blob.schedulable_timerange?.start);
       const schedEnd = toDate(blob.schedulable_timerange?.end);
       if (!start || !end) return null;
@@ -195,14 +237,20 @@ function renderDay() {
       const clampedEnd = end > dayEnd ? dayEnd : end;
       const minutes = (clampedEnd - clampedStart) / 60000;
       if (minutes <= 0) return null;
-      const top = (clampedStart - dayStart) / 60000;
+      const startMin = (clampedStart - dayStart) / 60000;
+      const endMin = (clampedEnd - dayStart) / 60000;
       return {
         id: blob.id,
         title: blob.name,
-        time: formatTimeRange(blob.default_scheduled_timerange.start, blob.default_scheduled_timerange.end),
+        time: formatTimeRange(
+          blob.realized_timerange?.start || blob.default_scheduled_timerange.start,
+          blob.realized_timerange?.end || blob.default_scheduled_timerange.end
+        ),
         type: getTagType(blob.tags),
-        top: (top / 60) * hourHeight,
+        top: (startMin / 60) * hourHeight,
         height: Math.max(18, (minutes / 60) * hourHeight),
+        startMin,
+        endMin,
         schedStart,
         schedEnd,
       };
@@ -210,11 +258,13 @@ function renderDay() {
     .filter(Boolean)
     .sort((a, b) => a.top - b.top);
 
+  layoutBlocks(blocks);
+
   const hoursHtml = hours.map((hour) => `<div class="hour">${hour}</div>`).join("");
   const blockHtml = blocks
     .map(
       (block) => `
-        <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
+        <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px; --column: ${block.column}; --columns: ${block.columns};" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
           <span>${block.title}</span>
           <span class="event-time">${block.time}</span>
         </div>
@@ -236,6 +286,7 @@ function renderDay() {
   const blocksEls = views.day.querySelectorAll(".day-block");
   blocksEls.forEach((blockEl) => {
     blockEl.addEventListener("mouseenter", () => {
+      blockEl.classList.add("hovered");
       const schedStart = toDate(blockEl.getAttribute("data-sched-start"));
       const schedEnd = toDate(blockEl.getAttribute("data-sched-end"));
       if (!schedStart || !schedEnd) return;
@@ -250,6 +301,7 @@ function renderDay() {
       overlay.classList.add("active");
     });
     blockEl.addEventListener("mouseleave", () => {
+      blockEl.classList.remove("hovered");
       overlay.classList.remove("active", "overflow-top", "overflow-bottom");
     });
   });
@@ -275,8 +327,12 @@ function renderWeek() {
       const dayEnd = addDays(dayStart, 1);
       const blocks = state.blobs
         .map((blob) => {
-          const start = toDate(blob.default_scheduled_timerange?.start);
-          const end = toDate(blob.default_scheduled_timerange?.end);
+          const start = toDate(
+            blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
+          );
+          const end = toDate(
+            blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
+          );
           const schedStart = toDate(blob.schedulable_timerange?.start);
           const schedEnd = toDate(blob.schedulable_timerange?.end);
           if (!start || !end) return null;
@@ -285,27 +341,33 @@ function renderWeek() {
           const clampedEnd = end > dayEnd ? dayEnd : end;
           const minutes = (clampedEnd - clampedStart) / 60000;
           if (minutes <= 0) return null;
-          const top = (clampedStart - dayStart) / 60000;
+          const startMin = (clampedStart - dayStart) / 60000;
+          const endMin = (clampedEnd - dayStart) / 60000;
           return {
             id: blob.id,
             title: blob.name,
             time: formatTimeRange(
-              blob.default_scheduled_timerange.start,
-              blob.default_scheduled_timerange.end
+              blob.realized_timerange?.start || blob.default_scheduled_timerange.start,
+              blob.realized_timerange?.end || blob.default_scheduled_timerange.end
             ),
             type: getTagType(blob.tags),
-            top: (top / 60) * hourHeight,
+            top: (startMin / 60) * hourHeight,
             height: Math.max(18, (minutes / 60) * hourHeight),
+            startMin,
+            endMin,
             schedStart,
             schedEnd,
           };
         })
         .filter(Boolean)
         .sort((a, b) => a.top - b.top);
+
+      layoutBlocks(blocks);
+
       const blockHtml = blocks
         .map(
           (block) => `
-            <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
+            <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px; --column: ${block.column}; --columns: ${block.columns};" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
               <span>${block.title}</span>
               <span class="event-time">${block.time}</span>
             </div>
@@ -357,6 +419,7 @@ function renderWeek() {
   dayColumns.forEach((column) => {
     column.querySelectorAll(".day-block").forEach((blockEl) => {
       blockEl.addEventListener("mouseenter", () => {
+        blockEl.classList.add("hovered");
         const schedStart = toDate(blockEl.getAttribute("data-sched-start"));
         const schedEnd = toDate(blockEl.getAttribute("data-sched-end"));
         if (!schedStart || !schedEnd) return;
@@ -377,6 +440,7 @@ function renderWeek() {
         });
       });
       blockEl.addEventListener("mouseleave", () => {
+        blockEl.classList.remove("hovered");
         dayTracks.forEach(({ overlay }) => {
           overlay.classList.remove("active", "overflow-top", "overflow-bottom");
         });

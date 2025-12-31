@@ -17,6 +17,8 @@ class BlobModel(Base):
     default_scheduled_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     schedulable_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     schedulable_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    realized_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    realized_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     policy: Mapped[dict] = mapped_column(JSON, default=dict)
     dependencies: Mapped[list] = mapped_column(JSON, default=list)
     tags: Mapped[list] = mapped_column(JSON, default=list)

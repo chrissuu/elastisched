@@ -353,8 +353,11 @@ body {
 
 .day-block {
   position: absolute;
-  left: 8px;
-  right: 8px;
+  --columns: 1;
+  --column: 0;
+  --col-gap: 6px;
+  left: calc(8px + ((100% - 16px) / var(--columns)) * var(--column));
+  width: calc((100% - 16px) / var(--columns) - var(--col-gap));
   border-radius: 12px;
   padding: 8px 10px;
   font-size: 13px;
@@ -363,6 +366,13 @@ body {
   display: grid;
   gap: 4px;
   cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.day-block.hovered {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(27, 26, 22, 0.18);
+  z-index: 3;
 }
 
 .day-block.focus {
