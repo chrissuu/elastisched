@@ -321,6 +321,8 @@ function renderDay() {
         <div class="schedulable-overlay" id="schedulableOverlay"></div>
         <div class="selection-overlay default-range" id="selectionOverlayDefault"></div>
         <div class="selection-overlay schedulable-range" id="selectionOverlaySchedulable"></div>
+        <div class="selection-caret default-range" id="selectionCaretDefault"></div>
+        <div class="selection-caret schedulable-range" id="selectionCaretSchedulable"></div>
         ${blockHtml || "<div class='day-empty'>No events yet</div>"}
       </div>
     </div>
@@ -330,6 +332,8 @@ function renderDay() {
   const dayTrack = views.day.querySelector(".day-track");
   const selectionOverlayDefault = views.day.querySelector("#selectionOverlayDefault");
   const selectionOverlaySchedulable = views.day.querySelector("#selectionOverlaySchedulable");
+  const selectionCaretDefault = views.day.querySelector("#selectionCaretDefault");
+  const selectionCaretSchedulable = views.day.querySelector("#selectionCaretSchedulable");
   const blocksEls = views.day.querySelectorAll(".day-block");
   blocksEls.forEach((blockEl) => {
     blockEl.addEventListener("mouseenter", () => {
@@ -372,6 +376,12 @@ function renderDay() {
       overlayEl.classList.add("active");
     };
 
+    const updateCaret = (caretEl, minutes) => {
+      const top = (minutes / 60) * hourHeight;
+      caretEl.style.top = `${top}px`;
+      caretEl.classList.add("active");
+    };
+
     const finalizeRange = (startMin, endMin) => {
       const startDate = new Date(dayStart.getTime() + startMin * 60000);
       const endDate = new Date(dayStart.getTime() + endMin * 60000);
@@ -379,12 +389,14 @@ function renderDay() {
         state.pendingDefaultRange = { start: startDate, end: endDate };
         state.selectionStep = "schedulable";
         formStatus.textContent = "Click start/end for schedulable range.";
+        selectionCaretDefault.classList.remove("active");
       } else if (state.selectionStep === "schedulable") {
         state.pendingSchedulableRange = { start: startDate, end: endDate };
         state.selectionMode = false;
         state.selectionStep = null;
         selectionOverlayDefault.classList.add("active");
         selectionOverlaySchedulable.classList.add("active");
+        selectionCaretSchedulable.classList.remove("active");
         const defaultRange = state.pendingDefaultRange;
         const schedRange = state.pendingSchedulableRange;
         if (defaultRange && schedRange) {
@@ -408,8 +420,13 @@ function renderDay() {
           state.selectionStep === "default"
             ? selectionOverlayDefault
             : selectionOverlaySchedulable;
+        const caretEl =
+          state.selectionStep === "default"
+            ? selectionCaretDefault
+            : selectionCaretSchedulable;
         const endMin = Math.min(trackMinutes, minutes + minuteGranularity);
         updateSelectionOverlay(overlayEl, minutes, endMin);
+        updateCaret(caretEl, minutes);
       } else {
         const startMin = Math.min(clickStart, minutes);
         const endMin = Math.min(
@@ -427,20 +444,28 @@ function renderDay() {
     };
 
     const onMouseMove = (event) => {
-      if (clickStart === null) return;
       if (state.selectionStep === null) return;
       const minutes = toMinutes(event.clientY);
-      const startMin = Math.min(clickStart, minutes);
-      const endMin = Math.min(
-        trackMinutes,
-        Math.max(clickStart + minuteGranularity, minutes)
-      );
       const overlayEl =
         state.selectionStep === "default"
           ? selectionOverlayDefault
           : selectionOverlaySchedulable;
-      updateSelectionOverlay(overlayEl, startMin, endMin);
-      state.selectionPointer = { y: event.clientY };
+      const caretEl =
+        state.selectionStep === "default"
+          ? selectionCaretDefault
+          : selectionCaretSchedulable;
+      if (clickStart === null) {
+        updateCaret(caretEl, minutes);
+      } else {
+        const startMin = Math.min(clickStart, minutes);
+        const endMin = Math.min(
+          trackMinutes,
+          Math.max(clickStart + minuteGranularity, minutes)
+        );
+        updateSelectionOverlay(overlayEl, startMin, endMin);
+        updateCaret(caretEl, clickStart);
+      }
+      state.selectionPointer = { x: event.clientX, y: event.clientY };
     };
 
     dayTrack.addEventListener("click", onClick);
@@ -450,19 +475,28 @@ function renderDay() {
       window.removeEventListener("resize", state.selectionScrollHandler);
     }
     state.selectionScrollHandler = () => {
-      if (clickStart === null || state.selectionStep === null) return;
+      if (state.selectionStep === null) return;
       if (!state.selectionPointer) return;
       const minutes = toMinutes(state.selectionPointer.y);
-      const startMin = Math.min(clickStart, minutes);
-      const endMin = Math.min(
-        trackMinutes,
-        Math.max(clickStart + minuteGranularity, minutes)
-      );
       const overlayEl =
         state.selectionStep === "default"
           ? selectionOverlayDefault
           : selectionOverlaySchedulable;
-      updateSelectionOverlay(overlayEl, startMin, endMin);
+      const caretEl =
+        state.selectionStep === "default"
+          ? selectionCaretDefault
+          : selectionCaretSchedulable;
+      if (clickStart === null) {
+        updateCaret(caretEl, minutes);
+      } else {
+        const startMin = Math.min(clickStart, minutes);
+        const endMin = Math.min(
+          trackMinutes,
+          Math.max(clickStart + minuteGranularity, minutes)
+        );
+        updateSelectionOverlay(overlayEl, startMin, endMin);
+        updateCaret(caretEl, clickStart);
+      }
     };
     window.addEventListener("scroll", state.selectionScrollHandler, { passive: true });
     window.addEventListener("resize", state.selectionScrollHandler);
@@ -547,13 +581,15 @@ function renderWeek() {
               })}
             </button>
           </div>
-          <div class="week-day-track">
-            <div class="schedulable-overlay"></div>
-            <div class="selection-overlay default-range"></div>
-            <div class="selection-overlay schedulable-range"></div>
-            ${blockHtml || "<div class='day-empty'>No events yet</div>"}
-          </div>
+        <div class="week-day-track">
+          <div class="schedulable-overlay"></div>
+          <div class="selection-overlay default-range"></div>
+          <div class="selection-overlay schedulable-range"></div>
+          <div class="selection-caret default-range"></div>
+          <div class="selection-caret schedulable-range"></div>
+          ${blockHtml || "<div class='day-empty'>No events yet</div>"}
         </div>
+      </div>
       `;
     })
     .join("");
@@ -632,10 +668,23 @@ function renderWeek() {
       overlayEl.classList.add("active");
     };
 
+    const updateCaret = (caretEl, minutes) => {
+      const top = (minutes / 60) * hourHeight;
+      caretEl.style.top = `${top}px`;
+      caretEl.classList.add("active");
+    };
+
     const clearSelectionOverlays = (overlaySelector) => {
       dayColumns.forEach((column) => {
         const overlay = column.querySelector(overlaySelector);
         overlay.classList.remove("active");
+      });
+    };
+
+    const clearSelectionCarets = (caretSelector) => {
+      dayColumns.forEach((column) => {
+        const caret = column.querySelector(caretSelector);
+        caret.classList.remove("active");
       });
     };
 
@@ -675,6 +724,7 @@ function renderWeek() {
         state.pendingDefaultRange = { start: startDate, end: endDate };
         state.selectionStep = "schedulable";
         formStatus.textContent = "Click start/end for schedulable range.";
+        clearSelectionCarets(".selection-caret.default-range");
       } else if (state.selectionStep === "schedulable") {
         state.pendingSchedulableRange = { start: startDate, end: endDate };
         state.selectionMode = false;
@@ -688,6 +738,7 @@ function renderWeek() {
           blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
         }
         formStatus.textContent = "Ranges captured. Fill details and create.";
+        clearSelectionCarets(".selection-caret.schedulable-range");
       }
     };
 
@@ -706,7 +757,13 @@ function renderWeek() {
             state.selectionStep === "default"
               ? ".selection-overlay.default-range"
               : ".selection-overlay.schedulable-range";
+          const caretSelector =
+            state.selectionStep === "default"
+              ? ".selection-caret.default-range"
+              : ".selection-caret.schedulable-range";
           updateSelectionRange(columnIndex, minutes, columnIndex, endMin, overlaySelector);
+          clearSelectionCarets(caretSelector);
+          updateCaret(column.querySelector(caretSelector), minutes);
         } else {
           const sameDay = activeColumnIndex === columnIndex;
           const startMin = Math.min(clickStart, minutes);
@@ -728,7 +785,6 @@ function renderWeek() {
       };
 
       const onMouseMove = (event) => {
-        if (clickStart === null) return;
         if (state.selectionStep === null) return;
         const minutes = toMinutes(event.clientY, track);
         const sameDay = activeColumnIndex === columnIndex;
@@ -739,8 +795,19 @@ function renderWeek() {
           state.selectionStep === "default"
             ? ".selection-overlay.default-range"
             : ".selection-overlay.schedulable-range";
-        updateSelectionRange(activeColumnIndex, clickStart, columnIndex, endMin, overlaySelector);
-        state.selectionPointer = { y: event.clientY, columnIndex };
+        const caretSelector =
+          state.selectionStep === "default"
+            ? ".selection-caret.default-range"
+            : ".selection-caret.schedulable-range";
+        if (clickStart === null) {
+          clearSelectionCarets(caretSelector);
+          updateCaret(column.querySelector(caretSelector), minutes);
+        } else {
+          updateSelectionRange(activeColumnIndex, clickStart, columnIndex, endMin, overlaySelector);
+          clearSelectionCarets(caretSelector);
+          updateCaret(dayColumns[activeColumnIndex].querySelector(caretSelector), clickStart);
+        }
+        state.selectionPointer = { x: event.clientX, y: event.clientY, columnIndex };
       };
 
       track.addEventListener("click", onClick);
@@ -752,10 +819,18 @@ function renderWeek() {
       window.removeEventListener("resize", state.selectionScrollHandler);
     }
     state.selectionScrollHandler = () => {
-      if (clickStart === null || state.selectionStep === null) return;
+      if (state.selectionStep === null) return;
       if (!state.selectionPointer) return;
-      const columnIndex = state.selectionPointer.columnIndex ?? activeColumnIndex;
-      if (columnIndex === null || columnIndex === undefined) return;
+      const target = document.elementFromPoint(
+        state.selectionPointer.x,
+        state.selectionPointer.y
+      );
+      const columnEl = target ? target.closest(".week-day-column") : null;
+      const columnIndex =
+        (columnEl && dayColumns.indexOf(columnEl)) ??
+        state.selectionPointer.columnIndex ??
+        activeColumnIndex;
+      if (columnIndex === null || columnIndex === undefined || columnIndex < 0) return;
       const track = dayColumns[columnIndex].querySelector(".week-day-track");
       const minutes = toMinutes(state.selectionPointer.y, track);
       const sameDay = activeColumnIndex === columnIndex;
@@ -766,7 +841,18 @@ function renderWeek() {
         state.selectionStep === "default"
           ? ".selection-overlay.default-range"
           : ".selection-overlay.schedulable-range";
-      updateSelectionRange(activeColumnIndex, clickStart, columnIndex, endMin, overlaySelector);
+      const caretSelector =
+        state.selectionStep === "default"
+          ? ".selection-caret.default-range"
+          : ".selection-caret.schedulable-range";
+      if (clickStart === null) {
+        clearSelectionCarets(caretSelector);
+        updateCaret(dayColumns[columnIndex].querySelector(caretSelector), minutes);
+      } else {
+        updateSelectionRange(activeColumnIndex, clickStart, columnIndex, endMin, overlaySelector);
+        clearSelectionCarets(caretSelector);
+        updateCaret(dayColumns[activeColumnIndex].querySelector(caretSelector), clickStart);
+      }
     };
     window.addEventListener("scroll", state.selectionScrollHandler, { passive: true });
     window.addEventListener("resize", state.selectionScrollHandler);
@@ -973,6 +1059,10 @@ function resetFormMode() {
     overlay.classList.remove("active");
     overlay.style.top = "";
     overlay.style.height = "";
+  });
+  document.querySelectorAll(".selection-caret").forEach((caret) => {
+    caret.classList.remove("active");
+    caret.style.top = "";
   });
 }
 
