@@ -3,6 +3,10 @@ const state = {
   view: "day",
   anchorDate: new Date(),
   editingBlobId: null,
+  selectionMode: false,
+  selectionStep: null,
+  pendingDefaultRange: null,
+  pendingSchedulableRange: null,
 };
 
 const dateLabel = document.getElementById("dateLabel");
@@ -26,6 +30,7 @@ const nextDayBtn = document.getElementById("nextDayBtn");
 const goTodayBtn = document.getElementById("goTodayBtn");
 const brandTitle = document.getElementById("brandTitle");
 const brandSubtitle = document.getElementById("brandSubtitle");
+const minuteGranularity = Math.max(1, Number(window.APP_CONFIG?.minuteGranularity || 5));
 
 if (window.APP_CONFIG) {
   brandTitle.textContent = window.APP_CONFIG.scheduleName || brandTitle.textContent;
@@ -108,6 +113,20 @@ function toLocalInputValue(isoString) {
   const hours = `${date.getHours()}`.padStart(2, "0");
   const minutes = `${date.getMinutes()}`.padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function toLocalInputFromDate(date) {
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hours = `${date.getHours()}`.padStart(2, "0");
+  const minutes = `${date.getMinutes()}`.padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function clampToGranularity(minutes) {
+  return Math.round(minutes / minuteGranularity) * minuteGranularity;
 }
 
 function pad(num) {
@@ -277,12 +296,17 @@ function renderDay() {
       <div class="hours">${hoursHtml}</div>
       <div class="day-track">
         <div class="schedulable-overlay" id="schedulableOverlay"></div>
+        <div class="selection-overlay default-range" id="selectionOverlayDefault"></div>
+        <div class="selection-overlay schedulable-range" id="selectionOverlaySchedulable"></div>
         ${blockHtml || "<div class='day-empty'>No events yet</div>"}
       </div>
     </div>
   `;
 
   const overlay = views.day.querySelector("#schedulableOverlay");
+  const dayTrack = views.day.querySelector(".day-track");
+  const selectionOverlayDefault = views.day.querySelector("#selectionOverlayDefault");
+  const selectionOverlaySchedulable = views.day.querySelector("#selectionOverlaySchedulable");
   const blocksEls = views.day.querySelectorAll(".day-block");
   blocksEls.forEach((blockEl) => {
     blockEl.addEventListener("mouseenter", () => {
@@ -305,6 +329,103 @@ function renderDay() {
       overlay.classList.remove("active", "overflow-top", "overflow-bottom");
     });
   });
+
+  if (state.selectionMode) {
+    let clickStart = null;
+    const padding = 8;
+    const trackMinutes = 24 * 60;
+    const trackHeight = hourHeight * 24;
+
+    const toMinutes = (clientY) => {
+      const rect = dayTrack.getBoundingClientRect();
+      const y = Math.min(
+        Math.max(clientY - rect.top - padding, 0),
+        trackHeight
+      );
+      return clampToGranularity(Math.round((y / trackHeight) * trackMinutes));
+    };
+
+    const updateSelectionOverlay = (overlayEl, startMin, endMin) => {
+      const top = (startMin / 60) * hourHeight;
+      const height = Math.max(12, ((endMin - startMin) / 60) * hourHeight);
+      overlayEl.style.top = `${top}px`;
+      overlayEl.style.height = `${height}px`;
+      overlayEl.classList.add("active");
+    };
+
+    const finalizeRange = (startMin, endMin) => {
+      const startDate = new Date(dayStart.getTime() + startMin * 60000);
+      const endDate = new Date(dayStart.getTime() + endMin * 60000);
+      if (state.selectionStep === "default") {
+        state.pendingDefaultRange = { start: startDate, end: endDate };
+        state.selectionStep = "schedulable";
+        formStatus.textContent = "Click start/end for schedulable range.";
+      } else if (state.selectionStep === "schedulable") {
+        state.pendingSchedulableRange = { start: startDate, end: endDate };
+        state.selectionMode = false;
+        state.selectionStep = null;
+        selectionOverlayDefault.classList.add("active");
+        selectionOverlaySchedulable.classList.add("active");
+        const defaultRange = state.pendingDefaultRange;
+        const schedRange = state.pendingSchedulableRange;
+        if (defaultRange && schedRange) {
+          blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
+          blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
+          blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
+          blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
+        }
+        formStatus.textContent = "Ranges captured. Fill details and create.";
+      }
+    };
+
+    const onClick = (event) => {
+      if (event.button !== 0) return;
+      if (event.target.closest(".day-block")) return;
+      if (state.selectionStep === null) return;
+      const minutes = toMinutes(event.clientY);
+      if (clickStart === null) {
+        clickStart = minutes;
+        const overlayEl =
+          state.selectionStep === "default"
+            ? selectionOverlayDefault
+            : selectionOverlaySchedulable;
+        const endMin = Math.min(trackMinutes, minutes + minuteGranularity);
+        updateSelectionOverlay(overlayEl, minutes, endMin);
+      } else {
+        const startMin = Math.min(clickStart, minutes);
+        const endMin = Math.min(
+          trackMinutes,
+          Math.max(clickStart + minuteGranularity, minutes)
+        );
+        const overlayEl =
+          state.selectionStep === "default"
+            ? selectionOverlayDefault
+            : selectionOverlaySchedulable;
+        updateSelectionOverlay(overlayEl, startMin, endMin);
+        finalizeRange(startMin, endMin);
+        clickStart = null;
+      }
+    };
+
+    const onMouseMove = (event) => {
+      if (clickStart === null) return;
+      if (state.selectionStep === null) return;
+      const minutes = toMinutes(event.clientY);
+      const startMin = Math.min(clickStart, minutes);
+      const endMin = Math.min(
+        trackMinutes,
+        Math.max(clickStart + minuteGranularity, minutes)
+      );
+      const overlayEl =
+        state.selectionStep === "default"
+          ? selectionOverlayDefault
+          : selectionOverlaySchedulable;
+      updateSelectionOverlay(overlayEl, startMin, endMin);
+    };
+
+    dayTrack.addEventListener("click", onClick);
+    dayTrack.addEventListener("mousemove", onMouseMove);
+  }
 
   setDateLabel(formatDayLabel(state.anchorDate));
 }
@@ -572,6 +693,15 @@ function toggleForm(show) {
   formPanel.classList.toggle("active", isActive);
 }
 
+function startInteractiveCreate() {
+  state.selectionMode = true;
+  state.selectionStep = "default";
+  state.pendingDefaultRange = null;
+  state.pendingSchedulableRange = null;
+  formStatus.textContent = "Click start/end for default range.";
+  renderDay();
+}
+
 function setFormMode(mode) {
   if (mode === "edit") {
     formTitle.textContent = "Edit blob";
@@ -583,6 +713,10 @@ function setFormMode(mode) {
 }
 
 function openEditForm(blob) {
+  state.selectionMode = false;
+  state.selectionStep = null;
+  state.pendingDefaultRange = null;
+  state.pendingSchedulableRange = null;
   blobForm.name.value = blob.name || "";
   blobForm.description.value = blob.description || "";
   blobForm.defaultStart.value = toLocalInputValue(blob.default_scheduled_timerange?.start);
@@ -597,9 +731,25 @@ function openEditForm(blob) {
 
 function resetFormMode() {
   state.editingBlobId = null;
+  state.selectionMode = false;
+  state.selectionStep = null;
+  state.pendingDefaultRange = null;
+  state.pendingSchedulableRange = null;
   blobForm.reset();
   setFormMode("create");
   formStatus.textContent = "";
+  const defaultOverlay = document.getElementById("selectionOverlayDefault");
+  const schedOverlay = document.getElementById("selectionOverlaySchedulable");
+  if (defaultOverlay) {
+    defaultOverlay.classList.remove("active");
+    defaultOverlay.style.top = "";
+    defaultOverlay.style.height = "";
+  }
+  if (schedOverlay) {
+    schedOverlay.classList.remove("active");
+    schedOverlay.style.top = "";
+    schedOverlay.style.height = "";
+  }
 }
 
 function goToDate(dateIso) {
@@ -687,6 +837,8 @@ document.addEventListener("click", (event) => {
 toggleFormBtn.addEventListener("click", () => {
   resetFormMode();
   toggleForm(true);
+  setActive("day");
+  startInteractiveCreate();
 });
 closeFormBtn.addEventListener("click", () => {
   toggleForm(false);
