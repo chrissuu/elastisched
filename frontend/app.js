@@ -26,10 +26,11 @@ const formTitle = document.getElementById("formTitle");
 const formSubmitBtn = document.getElementById("formSubmitBtn");
 const settingsBtn = document.getElementById("settingsBtn");
 const settingsPanel = document.getElementById("settingsPanel");
+const settingsModal = document.getElementById("settingsModal");
+const settingsBackdrop = document.getElementById("settingsBackdrop");
 const closeSettingsBtn = document.getElementById("closeSettingsBtn");
 const settingsForm = document.getElementById("settingsForm");
 const settingsStatus = document.getElementById("settingsStatus");
-const todayBtn = document.getElementById("todayBtn");
 const prevDayBtn = document.getElementById("prevDayBtn");
 const nextDayBtn = document.getElementById("nextDayBtn");
 const goTodayBtn = document.getElementById("goTodayBtn");
@@ -719,8 +720,10 @@ function toggleForm(show) {
 }
 
 function toggleSettings(show) {
-  const isActive = typeof show === "boolean" ? show : !settingsPanel.classList.contains("active");
+  const isActive = typeof show === "boolean" ? show : !settingsModal.classList.contains("active");
+  settingsModal.classList.toggle("active", isActive);
   settingsPanel.classList.toggle("active", isActive);
+  settingsModal.setAttribute("aria-hidden", (!isActive).toString());
 }
 
 function hydrateSettingsForm() {
@@ -886,6 +889,11 @@ closeSettingsBtn.addEventListener("click", () => {
   toggleSettings(false);
   settingsStatus.textContent = "";
 });
+
+settingsBackdrop.addEventListener("click", () => {
+  toggleSettings(false);
+  settingsStatus.textContent = "";
+});
 closeFormBtn.addEventListener("click", () => {
   toggleForm(false);
   resetFormMode();
@@ -909,12 +917,6 @@ settingsForm.addEventListener("submit", (event) => {
     // Ignore storage errors.
   }
 });
-todayBtn.addEventListener("click", () => {
-  state.anchorDate = new Date();
-  renderAll();
-  setActive("day");
-});
-
 function moveDay(offset) {
   state.anchorDate = addDays(state.anchorDate, offset);
   renderAll();

@@ -97,6 +97,33 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  z-index: 20;
+}
+
+.modal.active {
+  display: grid;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(244, 233, 218, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+.modal-panel {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 92vw);
+  max-height: 85vh;
+  overflow: auto;
+}
+
 .form-header {
   display: flex;
   justify-content: space-between;
@@ -191,6 +218,10 @@ body {
   place-items: center;
   padding: 0;
   font-size: 16px;
+}
+
+.ghost.icon.settings {
+  margin-left: 8px;
 }
 
 .tab {

@@ -17,39 +17,40 @@
           </div>
         </div>
         <div class="controls">
-          <button class="ghost" id="todayBtn">Today</button>
-          <button class="ghost" id="toggleFormBtn">Add</button>
-          <button class="ghost" id="settingsBtn">Settings</button>
+          <button class="ghost icon settings" id="settingsBtn" title="Settings">⚙</button>
         </div>
       </header>
 
-      <section class="panel form-panel" id="settingsPanel">
-        <div class="form-header">
-          <div>
-            <div class="form-title">Settings</div>
-            <div class="form-subtitle">Customize labels and granularity</div>
+      <div class="modal" id="settingsModal" aria-hidden="true">
+        <div class="modal-backdrop" id="settingsBackdrop"></div>
+        <section class="panel form-panel modal-panel" id="settingsPanel">
+          <div class="form-header">
+            <div>
+              <div class="form-title">Settings</div>
+              <div class="form-subtitle">Customize labels and granularity</div>
+            </div>
+            <button class="ghost small" id="closeSettingsBtn">Close</button>
           </div>
-          <button class="ghost small" id="closeSettingsBtn">Close</button>
-        </div>
-        <form id="settingsForm" class="blob-form">
-          <label>
-            Schedule name
-            <input type="text" name="scheduleName" placeholder="Elastisched" />
-          </label>
-          <label>
-            Subtitle
-            <input type="text" name="subtitle" placeholder="Schedule at a glance" />
-          </label>
-          <label>
-            Minute granularity
-            <input type="number" name="minuteGranularity" min="1" step="1" />
-          </label>
-          <div class="form-actions">
-            <button type="submit" class="primary">Save</button>
-            <span class="form-status" id="settingsStatus"></span>
-          </div>
-        </form>
-      </section>
+          <form id="settingsForm" class="blob-form">
+            <label>
+              Schedule name
+              <input type="text" name="scheduleName" placeholder="Elastisched" />
+            </label>
+            <label>
+              Subtitle
+              <input type="text" name="subtitle" placeholder="Schedule at a glance" />
+            </label>
+            <label>
+              Minute granularity
+              <input type="number" name="minuteGranularity" min="1" step="1" />
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="primary">Save</button>
+              <span class="form-status" id="settingsStatus"></span>
+            </div>
+          </form>
+        </section>
+      </div>
 
       <section class="panel form-panel" id="formPanel">
         <div class="form-header">
@@ -111,6 +112,7 @@
             <span class="legend-dot focus"></span> Focus
             <span class="legend-dot deep"></span> Deep Work
             <span class="legend-dot admin"></span> Admin
+            <button class="ghost" id="toggleFormBtn">Add</button>
           </div>
         </div>
 
