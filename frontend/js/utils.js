@@ -36,6 +36,19 @@ function getTimeZoneParts(date, timeZone) {
   };
 }
 
+function toZonedDate(date, timeZone) {
+  if (!date) return null;
+  const parts = getTimeZoneParts(date, timeZone);
+  return new Date(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+}
+
 function getTimeZoneOffsetMinutes(date, timeZone) {
   const parts = getTimeZoneParts(date, timeZone);
   const asUtc = Date.UTC(
@@ -184,6 +197,21 @@ function formatTimeRange(start, end) {
   return `${startLabel} - ${endLabel}`;
 }
 
+function formatTimeRangeInTimeZone(start, end, timeZone) {
+  const startDate = toDate(start);
+  const endDate = toDate(end);
+  if (!startDate || !endDate) {
+    return "";
+  }
+  const formatter = new Intl.DateTimeFormat(undefined, {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`;
+}
+
 function startOfDay(date) {
   const copy = new Date(date);
   copy.setHours(0, 0, 0, 0);
@@ -283,6 +311,8 @@ export {
   toProjectIsoFromLocalInput,
   toProjectIsoFromDate,
   toLocalInputValueInTimeZone,
+  toZonedDate,
+  formatTimeRangeInTimeZone,
   layoutBlocks,
   overlaps,
   startOfDay,

@@ -1,14 +1,15 @@
-import { minuteGranularity, saveView, state } from "./core.js";
+import { appConfig, minuteGranularity, saveView, state } from "./core.js";
 import { dom } from "./dom.js";
 import {
   addDays,
   clampToGranularity,
-  formatTimeRange,
+  formatTimeRangeInTimeZone,
   getTagType,
   layoutBlocks,
   overlaps,
   startOfDay,
   toDate,
+  toZonedDate,
   toLocalInputFromDate,
 } from "./utils.js";
 
@@ -64,14 +65,26 @@ function renderDay() {
 
   const blocks = state.blobs
     .map((blob) => {
-      const start = toDate(
+      const start = toZonedDate(
+        toDate(
         blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
+      ),
+        appConfig.userTimeZone
       );
-      const end = toDate(
+      const end = toZonedDate(
+        toDate(
         blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
+      ),
+        appConfig.userTimeZone
       );
-      const schedStart = toDate(blob.schedulable_timerange?.start);
-      const schedEnd = toDate(blob.schedulable_timerange?.end);
+      const schedStart = toZonedDate(
+        toDate(blob.schedulable_timerange?.start),
+        appConfig.userTimeZone
+      );
+      const schedEnd = toZonedDate(
+        toDate(blob.schedulable_timerange?.end),
+        appConfig.userTimeZone
+      );
       if (!start || !end) return null;
       if (!overlaps(dayStart, dayEnd, start, end)) return null;
       const clampedStart = start < dayStart ? dayStart : start;
@@ -83,9 +96,10 @@ function renderDay() {
       return {
         id: blob.id,
         title: blob.name,
-        time: formatTimeRange(
+        time: formatTimeRangeInTimeZone(
           blob.realized_timerange?.start || blob.default_scheduled_timerange.start,
-          blob.realized_timerange?.end || blob.default_scheduled_timerange.end
+          blob.realized_timerange?.end || blob.default_scheduled_timerange.end,
+          appConfig.userTimeZone
         ),
         type: getTagType(blob.tags),
         top: (startMin / 60) * hourHeight,
@@ -142,8 +156,14 @@ function renderDay() {
   blocksEls.forEach((blockEl) => {
     blockEl.addEventListener("mouseenter", () => {
       blockEl.classList.add("hovered");
-      const schedStart = toDate(blockEl.getAttribute("data-sched-start"));
-      const schedEnd = toDate(blockEl.getAttribute("data-sched-end"));
+      const schedStart = toZonedDate(
+        toDate(blockEl.getAttribute("data-sched-start")),
+        appConfig.userTimeZone
+      );
+      const schedEnd = toZonedDate(
+        toDate(blockEl.getAttribute("data-sched-end")),
+        appConfig.userTimeZone
+      );
       if (!schedStart || !schedEnd) return;
       const overlayStart = schedStart < dayStart ? dayStart : schedStart;
       const overlayEnd = schedEnd > dayEnd ? dayEnd : schedEnd;
@@ -313,14 +333,26 @@ function renderWeek() {
       const dayEnd = addDays(dayStart, 1);
       const blocks = state.blobs
         .map((blob) => {
-          const start = toDate(
+          const start = toZonedDate(
+            toDate(
             blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
+          ),
+            appConfig.userTimeZone
           );
-          const end = toDate(
+          const end = toZonedDate(
+            toDate(
             blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
+          ),
+            appConfig.userTimeZone
           );
-          const schedStart = toDate(blob.schedulable_timerange?.start);
-          const schedEnd = toDate(blob.schedulable_timerange?.end);
+          const schedStart = toZonedDate(
+            toDate(blob.schedulable_timerange?.start),
+            appConfig.userTimeZone
+          );
+          const schedEnd = toZonedDate(
+            toDate(blob.schedulable_timerange?.end),
+            appConfig.userTimeZone
+          );
           if (!start || !end) return null;
           if (!overlaps(dayStart, dayEnd, start, end)) return null;
           const clampedStart = start < dayStart ? dayStart : start;
@@ -332,9 +364,10 @@ function renderWeek() {
           return {
             id: blob.id,
             title: blob.name,
-            time: formatTimeRange(
+            time: formatTimeRangeInTimeZone(
               blob.realized_timerange?.start || blob.default_scheduled_timerange.start,
-              blob.realized_timerange?.end || blob.default_scheduled_timerange.end
+              blob.realized_timerange?.end || blob.default_scheduled_timerange.end,
+              appConfig.userTimeZone
             ),
             type: getTagType(blob.tags),
             top: (startMin / 60) * hourHeight,
@@ -421,8 +454,14 @@ function renderWeek() {
     column.querySelectorAll(".day-block").forEach((blockEl) => {
       blockEl.addEventListener("mouseenter", () => {
         blockEl.classList.add("hovered");
-        const schedStart = toDate(blockEl.getAttribute("data-sched-start"));
-        const schedEnd = toDate(blockEl.getAttribute("data-sched-end"));
+        const schedStart = toZonedDate(
+          toDate(blockEl.getAttribute("data-sched-start")),
+          appConfig.userTimeZone
+        );
+        const schedEnd = toZonedDate(
+          toDate(blockEl.getAttribute("data-sched-end")),
+          appConfig.userTimeZone
+        );
         if (!schedStart || !schedEnd) return;
         dayTracks.forEach(({ overlay, dayStart, dayEnd }) => {
           const overlapStart = schedStart < dayStart ? dayStart : schedStart;
@@ -679,11 +718,17 @@ function renderMonth() {
         )
         .join("");
       const events = state.blobs.filter((blob) => {
-        const start = toDate(
+        const start = toZonedDate(
+          toDate(
           blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
+        ),
+          appConfig.userTimeZone
         );
-        const end = toDate(
+        const end = toZonedDate(
+          toDate(
           blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
+        ),
+          appConfig.userTimeZone
         );
         return start && end && overlaps(weekStart, weekEnd, start, end);
       });
@@ -713,11 +758,17 @@ function renderYear() {
     .map((quarterStart, idx) => {
       const quarterEnd = new Date(year, quarterStart.getMonth() + 3, 1);
       const events = state.blobs.filter((blob) => {
-        const start = toDate(
+        const start = toZonedDate(
+          toDate(
           blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
+        ),
+          appConfig.userTimeZone
         );
-        const end = toDate(
+        const end = toZonedDate(
+          toDate(
           blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
+        ),
+          appConfig.userTimeZone
         );
         return start && end && overlaps(quarterStart, quarterEnd, start, end);
       });

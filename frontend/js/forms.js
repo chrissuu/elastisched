@@ -405,7 +405,7 @@ async function handleBlobSubmit(event) {
   const baseBlob = {
     name: formData.get("name"),
     description: formData.get("description") || null,
-    tz: appConfig.projectTimeZone,
+    tz: appConfig.userTimeZone,
     default_scheduled_timerange: {
       start: toProjectIsoFromLocalInput(
         formData.get("defaultStart"),
@@ -477,7 +477,7 @@ async function handleBlobSubmit(event) {
       return {
         name: perSlot && slot.name ? slot.name : sharedName,
         description: perSlot ? slot.description || null : sharedDescription,
-        tz: appConfig.projectTimeZone,
+        tz: appConfig.userTimeZone,
         default_scheduled_timerange: {
           start: defaultStart,
           end: defaultEnd,
