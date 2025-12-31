@@ -93,6 +93,10 @@ body {
   animation: fadeIn 0.45s ease;
 }
 
+#settingsPanel .blob-form {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
 .form-header {
   display: flex;
   justify-content: space-between;

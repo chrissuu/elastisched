@@ -24,18 +24,38 @@ const formStatus = document.getElementById("formStatus");
 const blobForm = document.getElementById("blobForm");
 const formTitle = document.getElementById("formTitle");
 const formSubmitBtn = document.getElementById("formSubmitBtn");
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsPanel = document.getElementById("settingsPanel");
+const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+const settingsForm = document.getElementById("settingsForm");
+const settingsStatus = document.getElementById("settingsStatus");
 const todayBtn = document.getElementById("todayBtn");
 const prevDayBtn = document.getElementById("prevDayBtn");
 const nextDayBtn = document.getElementById("nextDayBtn");
 const goTodayBtn = document.getElementById("goTodayBtn");
 const brandTitle = document.getElementById("brandTitle");
 const brandSubtitle = document.getElementById("brandSubtitle");
-const minuteGranularity = Math.max(1, Number(window.APP_CONFIG?.minuteGranularity || 5));
+const defaultConfig = {
+  scheduleName: window.APP_CONFIG?.scheduleName || "Elastisched",
+  subtitle: window.APP_CONFIG?.subtitle || "Schedule at a glance",
+  minuteGranularity: Math.max(1, Number(window.APP_CONFIG?.minuteGranularity || 5)),
+};
+const storedConfig = (() => {
+  try {
+    const raw = window.localStorage.getItem("elastisched:settings");
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+})();
+const appConfig = {
+  ...defaultConfig,
+  ...(storedConfig || {}),
+};
+const minuteGranularity = Math.max(1, Number(appConfig.minuteGranularity || 5));
 
-if (window.APP_CONFIG) {
-  brandTitle.textContent = window.APP_CONFIG.scheduleName || brandTitle.textContent;
-  brandSubtitle.textContent = window.APP_CONFIG.subtitle || brandSubtitle.textContent;
-}
+brandTitle.textContent = appConfig.scheduleName || brandTitle.textContent;
+brandSubtitle.textContent = appConfig.subtitle || brandSubtitle.textContent;
 
 const demoBlobs = [
   {
@@ -655,6 +675,11 @@ function renderAll() {
 
 function setActive(view) {
   state.view = view;
+  try {
+    window.localStorage.setItem("elastisched:view", view);
+  } catch (error) {
+    // Ignore storage errors (private mode, etc.).
+  }
   tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
   Object.entries(views).forEach(([key, el]) => {
     el.classList.toggle("active", key === view);
@@ -691,6 +716,17 @@ async function fetchBlobs() {
 function toggleForm(show) {
   const isActive = typeof show === "boolean" ? show : !formPanel.classList.contains("active");
   formPanel.classList.toggle("active", isActive);
+}
+
+function toggleSettings(show) {
+  const isActive = typeof show === "boolean" ? show : !settingsPanel.classList.contains("active");
+  settingsPanel.classList.toggle("active", isActive);
+}
+
+function hydrateSettingsForm() {
+  settingsForm.scheduleName.value = appConfig.scheduleName || "";
+  settingsForm.subtitle.value = appConfig.subtitle || "";
+  settingsForm.minuteGranularity.value = appConfig.minuteGranularity || 5;
 }
 
 function startInteractiveCreate() {
@@ -840,9 +876,38 @@ toggleFormBtn.addEventListener("click", () => {
   setActive("day");
   startInteractiveCreate();
 });
+
+settingsBtn.addEventListener("click", () => {
+  toggleSettings(true);
+  hydrateSettingsForm();
+});
+
+closeSettingsBtn.addEventListener("click", () => {
+  toggleSettings(false);
+  settingsStatus.textContent = "";
+});
 closeFormBtn.addEventListener("click", () => {
   toggleForm(false);
   resetFormMode();
+});
+
+settingsForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const formData = new FormData(settingsForm);
+  const scheduleName = formData.get("scheduleName")?.toString().trim() || "";
+  const subtitle = formData.get("subtitle")?.toString().trim() || "";
+  const granularity = Math.max(1, Number(formData.get("minuteGranularity") || 1));
+  appConfig.scheduleName = scheduleName || appConfig.scheduleName;
+  appConfig.subtitle = subtitle || appConfig.subtitle;
+  appConfig.minuteGranularity = granularity;
+  brandTitle.textContent = appConfig.scheduleName;
+  brandSubtitle.textContent = appConfig.subtitle;
+  settingsStatus.textContent = "Saved. Refresh to apply granularity.";
+  try {
+    window.localStorage.setItem("elastisched:settings", JSON.stringify(appConfig));
+  } catch (error) {
+    // Ignore storage errors.
+  }
 });
 todayBtn.addEventListener("click", () => {
   state.anchorDate = new Date();
@@ -865,5 +930,12 @@ goTodayBtn.addEventListener("click", () => {
 });
 
 resetFormMode();
-setActive("day");
+const savedView = (() => {
+  try {
+    return window.localStorage.getItem("elastisched:view");
+  } catch (error) {
+    return null;
+  }
+})();
+setActive(savedView || "day");
 fetchBlobs();
