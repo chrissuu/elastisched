@@ -7,6 +7,8 @@ const state = {
   selectionStep: null,
   pendingDefaultRange: null,
   pendingSchedulableRange: null,
+  selectionPointer: null,
+  selectionScrollHandler: null,
 };
 
 const dateLabel = document.getElementById("dateLabel");
@@ -353,17 +355,13 @@ function renderDay() {
 
   if (state.selectionMode) {
     let clickStart = null;
-    const padding = 8;
     const trackMinutes = 24 * 60;
     const trackHeight = hourHeight * 24;
 
     const toMinutes = (clientY) => {
       const rect = dayTrack.getBoundingClientRect();
-      const y = Math.min(
-        Math.max(clientY - rect.top - padding, 0),
-        trackHeight
-      );
-      return clampToGranularity(Math.round((y / trackHeight) * trackMinutes));
+      const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+      return clampToGranularity(Math.round((y / rect.height) * trackMinutes));
     };
 
     const updateSelectionOverlay = (overlayEl, startMin, endMin) => {
@@ -442,10 +440,32 @@ function renderDay() {
           ? selectionOverlayDefault
           : selectionOverlaySchedulable;
       updateSelectionOverlay(overlayEl, startMin, endMin);
+      state.selectionPointer = { y: event.clientY };
     };
 
     dayTrack.addEventListener("click", onClick);
     dayTrack.addEventListener("mousemove", onMouseMove);
+    if (state.selectionScrollHandler) {
+      window.removeEventListener("scroll", state.selectionScrollHandler);
+      window.removeEventListener("resize", state.selectionScrollHandler);
+    }
+    state.selectionScrollHandler = () => {
+      if (clickStart === null || state.selectionStep === null) return;
+      if (!state.selectionPointer) return;
+      const minutes = toMinutes(state.selectionPointer.y);
+      const startMin = Math.min(clickStart, minutes);
+      const endMin = Math.min(
+        trackMinutes,
+        Math.max(clickStart + minuteGranularity, minutes)
+      );
+      const overlayEl =
+        state.selectionStep === "default"
+          ? selectionOverlayDefault
+          : selectionOverlaySchedulable;
+      updateSelectionOverlay(overlayEl, startMin, endMin);
+    };
+    window.addEventListener("scroll", state.selectionScrollHandler, { passive: true });
+    window.addEventListener("resize", state.selectionScrollHandler);
   }
 
   setDateLabel(formatDayLabel(state.anchorDate));
@@ -529,6 +549,8 @@ function renderWeek() {
           </div>
           <div class="week-day-track">
             <div class="schedulable-overlay"></div>
+            <div class="selection-overlay default-range"></div>
+            <div class="selection-overlay schedulable-range"></div>
             ${blockHtml || "<div class='day-empty'>No events yet</div>"}
           </div>
         </div>
@@ -589,6 +611,166 @@ function renderWeek() {
       });
     });
   });
+
+  if (state.selectionMode) {
+    let clickStart = null;
+    let activeColumnIndex = null;
+    const trackMinutes = 24 * 60;
+    const trackHeight = hourHeight * 24;
+
+    const toMinutes = (clientY, track) => {
+      const rect = track.getBoundingClientRect();
+      const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+      return clampToGranularity(Math.round((y / rect.height) * trackMinutes));
+    };
+
+    const updateSelectionOverlay = (overlayEl, startMin, endMin) => {
+      const top = (startMin / 60) * hourHeight;
+      const height = Math.max(12, ((endMin - startMin) / 60) * hourHeight);
+      overlayEl.style.top = `${top}px`;
+      overlayEl.style.height = `${height}px`;
+      overlayEl.classList.add("active");
+    };
+
+    const clearSelectionOverlays = (overlaySelector) => {
+      dayColumns.forEach((column) => {
+        const overlay = column.querySelector(overlaySelector);
+        overlay.classList.remove("active");
+      });
+    };
+
+    const updateSelectionRange = (startCol, startMin, endCol, endMin, overlaySelector) => {
+      const rangeStart = Math.min(startCol, endCol);
+      const rangeEnd = Math.max(startCol, endCol);
+      clearSelectionOverlays(overlaySelector);
+      for (let index = rangeStart; index <= rangeEnd; index += 1) {
+        const overlay = dayColumns[index].querySelector(overlaySelector);
+        const isStart = index === startCol;
+        const isEnd = index === endCol;
+        const rangeStartMin = isStart ? startMin : 0;
+        const rangeEndMin = isEnd ? endMin : trackMinutes;
+        const normalizedStart = Math.min(rangeStartMin, rangeEndMin);
+        const normalizedEnd = Math.max(
+          normalizedStart + minuteGranularity,
+          rangeEndMin
+        );
+        updateSelectionOverlay(
+          overlay,
+          Math.min(normalizedStart, trackMinutes - minuteGranularity),
+          Math.min(normalizedEnd, trackMinutes)
+        );
+      }
+    };
+
+    const finalizeRange = (startCol, startMin, endCol, endMin) => {
+      const rangeStartCol = Math.min(startCol, endCol);
+      const rangeEndCol = Math.max(startCol, endCol);
+      const rangeStartMin = startCol <= endCol ? startMin : endMin;
+      const rangeEndMin = startCol <= endCol ? endMin : startMin;
+      const startDay = startOfDay(days[rangeStartCol]);
+      const endDay = startOfDay(days[rangeEndCol]);
+      const startDate = new Date(startDay.getTime() + rangeStartMin * 60000);
+      const endDate = new Date(endDay.getTime() + rangeEndMin * 60000);
+      if (state.selectionStep === "default") {
+        state.pendingDefaultRange = { start: startDate, end: endDate };
+        state.selectionStep = "schedulable";
+        formStatus.textContent = "Click start/end for schedulable range.";
+      } else if (state.selectionStep === "schedulable") {
+        state.pendingSchedulableRange = { start: startDate, end: endDate };
+        state.selectionMode = false;
+        state.selectionStep = null;
+        const defaultRange = state.pendingDefaultRange;
+        const schedRange = state.pendingSchedulableRange;
+        if (defaultRange && schedRange) {
+          blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
+          blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
+          blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
+          blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
+        }
+        formStatus.textContent = "Ranges captured. Fill details and create.";
+      }
+    };
+
+    dayColumns.forEach((column, columnIndex) => {
+      const track = column.querySelector(".week-day-track");
+      const onClick = (event) => {
+        if (event.button !== 0) return;
+        if (event.target.closest(".day-block")) return;
+        if (state.selectionStep === null) return;
+        const minutes = toMinutes(event.clientY, track);
+        if (clickStart === null) {
+          clickStart = minutes;
+          activeColumnIndex = columnIndex;
+          const endMin = Math.min(trackMinutes, minutes + minuteGranularity);
+          const overlaySelector =
+            state.selectionStep === "default"
+              ? ".selection-overlay.default-range"
+              : ".selection-overlay.schedulable-range";
+          updateSelectionRange(columnIndex, minutes, columnIndex, endMin, overlaySelector);
+        } else {
+          const sameDay = activeColumnIndex === columnIndex;
+          const startMin = Math.min(clickStart, minutes);
+          const endMin = sameDay
+            ? Math.min(
+                trackMinutes,
+                Math.max(clickStart + minuteGranularity, minutes)
+              )
+            : Math.min(trackMinutes, minutes);
+          const overlaySelector =
+            state.selectionStep === "default"
+              ? ".selection-overlay.default-range"
+              : ".selection-overlay.schedulable-range";
+          updateSelectionRange(activeColumnIndex, clickStart, columnIndex, endMin, overlaySelector);
+          finalizeRange(activeColumnIndex, clickStart, columnIndex, endMin);
+          clickStart = null;
+          activeColumnIndex = null;
+        }
+      };
+
+      const onMouseMove = (event) => {
+        if (clickStart === null) return;
+        if (state.selectionStep === null) return;
+        const minutes = toMinutes(event.clientY, track);
+        const sameDay = activeColumnIndex === columnIndex;
+        const endMin = sameDay
+          ? Math.min(trackMinutes, Math.max(clickStart + minuteGranularity, minutes))
+          : Math.min(trackMinutes, minutes);
+        const overlaySelector =
+          state.selectionStep === "default"
+            ? ".selection-overlay.default-range"
+            : ".selection-overlay.schedulable-range";
+        updateSelectionRange(activeColumnIndex, clickStart, columnIndex, endMin, overlaySelector);
+        state.selectionPointer = { y: event.clientY, columnIndex };
+      };
+
+      track.addEventListener("click", onClick);
+      track.addEventListener("mousemove", onMouseMove);
+    });
+
+    if (state.selectionScrollHandler) {
+      window.removeEventListener("scroll", state.selectionScrollHandler);
+      window.removeEventListener("resize", state.selectionScrollHandler);
+    }
+    state.selectionScrollHandler = () => {
+      if (clickStart === null || state.selectionStep === null) return;
+      if (!state.selectionPointer) return;
+      const columnIndex = state.selectionPointer.columnIndex ?? activeColumnIndex;
+      if (columnIndex === null || columnIndex === undefined) return;
+      const track = dayColumns[columnIndex].querySelector(".week-day-track");
+      const minutes = toMinutes(state.selectionPointer.y, track);
+      const sameDay = activeColumnIndex === columnIndex;
+      const endMin = sameDay
+        ? Math.min(trackMinutes, Math.max(clickStart + minuteGranularity, minutes))
+        : Math.min(trackMinutes, minutes);
+      const overlaySelector =
+        state.selectionStep === "default"
+          ? ".selection-overlay.default-range"
+          : ".selection-overlay.schedulable-range";
+      updateSelectionRange(activeColumnIndex, clickStart, columnIndex, endMin, overlaySelector);
+    };
+    window.addEventListener("scroll", state.selectionScrollHandler, { passive: true });
+    window.addEventListener("resize", state.selectionScrollHandler);
+  }
   setDateLabel(formatWeekLabel(monday));
 }
 
@@ -738,7 +920,11 @@ function startInteractiveCreate() {
   state.pendingDefaultRange = null;
   state.pendingSchedulableRange = null;
   formStatus.textContent = "Click start/end for default range.";
-  renderDay();
+  if (state.view !== "day" && state.view !== "week") {
+    setActive("day");
+  }
+  renderAll();
+  setActive(state.view);
 }
 
 function setFormMode(mode) {
@@ -774,21 +960,20 @@ function resetFormMode() {
   state.selectionStep = null;
   state.pendingDefaultRange = null;
   state.pendingSchedulableRange = null;
+  state.selectionPointer = null;
+  if (state.selectionScrollHandler) {
+    window.removeEventListener("scroll", state.selectionScrollHandler);
+    window.removeEventListener("resize", state.selectionScrollHandler);
+    state.selectionScrollHandler = null;
+  }
   blobForm.reset();
   setFormMode("create");
   formStatus.textContent = "";
-  const defaultOverlay = document.getElementById("selectionOverlayDefault");
-  const schedOverlay = document.getElementById("selectionOverlaySchedulable");
-  if (defaultOverlay) {
-    defaultOverlay.classList.remove("active");
-    defaultOverlay.style.top = "";
-    defaultOverlay.style.height = "";
-  }
-  if (schedOverlay) {
-    schedOverlay.classList.remove("active");
-    schedOverlay.style.top = "";
-    schedOverlay.style.height = "";
-  }
+  document.querySelectorAll(".selection-overlay").forEach((overlay) => {
+    overlay.classList.remove("active");
+    overlay.style.top = "";
+    overlay.style.height = "";
+  });
 }
 
 function goToDate(dateIso) {
@@ -876,7 +1061,6 @@ document.addEventListener("click", (event) => {
 toggleFormBtn.addEventListener("click", () => {
   resetFormMode();
   toggleForm(true);
-  setActive("day");
   startInteractiveCreate();
 });
 
@@ -915,6 +1099,36 @@ settingsForm.addEventListener("submit", (event) => {
     window.localStorage.setItem("elastisched:settings", JSON.stringify(appConfig));
   } catch (error) {
     // Ignore storage errors.
+  }
+});
+
+function isTypingInField(target) {
+  return (
+    target &&
+    (target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable)
+  );
+}
+
+window.addEventListener("keydown", (event) => {
+  if (isTypingInField(event.target)) return;
+  if (event.key === "Escape") {
+    if (settingsModal.classList.contains("active")) {
+      toggleSettings(false);
+      settingsStatus.textContent = "";
+    }
+    if (formPanel.classList.contains("active")) {
+      toggleForm(false);
+      resetFormMode();
+    }
+    return;
+  }
+  if (event.key.toLowerCase() === "n") {
+    event.preventDefault();
+    resetFormMode();
+    toggleForm(true);
+    startInteractiveCreate();
   }
 });
 function moveDay(offset) {
