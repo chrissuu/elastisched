@@ -224,6 +224,27 @@ function addDays(date, count) {
   return copy;
 }
 
+function shiftAnchorDate(view, anchorDate, direction) {
+  if (!anchorDate || !Number.isFinite(direction)) return null;
+  if (view === "day") {
+    return addDays(anchorDate, direction);
+  }
+  if (view === "week") {
+    return addDays(anchorDate, direction * 7);
+  }
+  if (view === "month") {
+    const next = new Date(anchorDate);
+    next.setMonth(next.getMonth() + direction);
+    return next;
+  }
+  if (view === "year") {
+    const next = new Date(anchorDate);
+    next.setFullYear(next.getFullYear() + direction);
+    return next;
+  }
+  return null;
+}
+
 function getWeekStart(date) {
   const dayOfWeek = date.getDay();
   return addDays(startOfDay(date), dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
@@ -315,6 +336,7 @@ export {
   formatTimeRangeInTimeZone,
   layoutBlocks,
   overlaps,
+  shiftAnchorDate,
   startOfDay,
   toDate,
   toIso,

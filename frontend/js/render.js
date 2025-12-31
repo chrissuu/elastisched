@@ -803,6 +803,12 @@ function setActive(view) {
   Object.entries(dom.views).forEach(([key, el]) => {
     el.classList.toggle("active", key === view);
   });
+  if (dom.prevDayBtn && dom.nextDayBtn) {
+    const labelMap = { day: "day", week: "week", month: "month", year: "year" };
+    const label = labelMap[view] || "day";
+    dom.prevDayBtn.title = `Previous ${label}`;
+    dom.nextDayBtn.title = `Next ${label}`;
+  }
 
   if (view === "day") {
     renderDay();

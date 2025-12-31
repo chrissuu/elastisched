@@ -4,6 +4,7 @@ import {
   addDays,
   formatDateTimeLocalInTimeZone,
   getWeekStart,
+  shiftAnchorDate,
   toLocalInputValueInTimeZone,
   toProjectIsoFromLocalInput,
 } from "./utils.js";
@@ -596,24 +597,43 @@ function handleCloseForm() {
   resetFormMode();
 }
 
+function getActiveView() {
+  const activeViewEntry = Object.entries(dom.views).find(([, el]) => el.classList.contains("active"));
+  if (activeViewEntry) {
+    return activeViewEntry[0];
+  }
+  const activeTab = Array.from(dom.tabs).find((tab) => tab.classList.contains("active"));
+  return activeTab?.dataset.view || state.view;
+}
+
 function handlePrevDay() {
-  state.anchorDate = addDays(state.anchorDate, -1);
+  const view = getActiveView();
+  console.error("[nav] prev click", { activeView: view, stateView: state.view });
+  const next = shiftAnchorDate(view, state.anchorDate, -1);
+  if (!next) return;
+  state.anchorDate = next;
   if (refreshView) {
-    refreshView("day");
+    refreshView(view);
   }
 }
 
 function handleNextDay() {
-  state.anchorDate = addDays(state.anchorDate, 1);
+  const view = getActiveView();
+  console.error("[nav] next click", { activeView: view, stateView: state.view });
+  const next = shiftAnchorDate(view, state.anchorDate, 1);
+  if (!next) return;
+  state.anchorDate = next;
   if (refreshView) {
-    refreshView("day");
+    refreshView(view);
   }
 }
 
 function handleToday() {
+  const view = getActiveView();
+  console.error("[nav] today click", { activeView: view, stateView: state.view });
   state.anchorDate = new Date();
   if (refreshView) {
-    refreshView("day");
+    refreshView(view);
   }
 }
 

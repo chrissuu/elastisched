@@ -3,7 +3,9 @@ import { dom } from "./dom.js";
 import { ensureOccurrences } from "./api.js";
 import { bindFormHandlers, openEditForm, resetFormMode, toggleForm, toggleSettings } from "./forms.js";
 import { setActive, startInteractiveCreate } from "./render.js";
-import { addDays, getViewRange } from "./utils.js";
+import { getViewRange, shiftAnchorDate } from "./utils.js";
+
+console.error("[nav] app.js loaded");
 
 dom.brandTitle.textContent = appConfig.scheduleName || dom.brandTitle.textContent;
 dom.brandSubtitle.textContent = appConfig.subtitle || dom.brandSubtitle.textContent;
@@ -12,6 +14,8 @@ bindFormHandlers(refreshView);
 
 async function refreshView(nextView = state.view) {
   const view = nextView || state.view;
+  console.error("[nav] refreshView", { requestedView: nextView, stateView: state.view, view });
+  setActive(view);
   const range = getViewRange(view, state.anchorDate);
   await ensureOccurrences(range.start, range.end);
   setActive(view);
@@ -73,21 +77,11 @@ window.addEventListener("keydown", (event) => {
   if (isArrowLeft || isArrowRight) {
     const direction = isArrowLeft ? -1 : 1;
     const view = state.view;
-    if (view === "day") {
-      state.anchorDate = addDays(state.anchorDate, direction);
-    } else if (view === "week") {
-      state.anchorDate = addDays(state.anchorDate, direction * 7);
-    } else if (view === "month") {
-      const next = new Date(state.anchorDate);
-      next.setMonth(next.getMonth() + direction);
-      state.anchorDate = next;
-    } else if (view === "year") {
-      const next = new Date(state.anchorDate);
-      next.setFullYear(next.getFullYear() + direction);
-      state.anchorDate = next;
-    } else {
+    const next = shiftAnchorDate(view, state.anchorDate, direction);
+    if (!next) {
       return;
     }
+    state.anchorDate = next;
     event.preventDefault();
     refreshView(view);
   }
