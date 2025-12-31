@@ -392,6 +392,16 @@ function renderWeek() {
     </div>
   `;
 
+  const weekTimeline = dom.views.week.querySelector(".week-timeline");
+  const weekColumn = dom.views.week.querySelector(".week-day-column");
+  const weekLabel = dom.views.week.querySelector(".week-day-label");
+  if (weekTimeline && weekColumn && weekLabel) {
+    const labelHeight = weekLabel.getBoundingClientRect().height;
+    const style = getComputedStyle(weekColumn);
+    const gap = parseFloat(style.rowGap || style.gap || "0");
+    weekTimeline.style.setProperty("--week-label-offset", `${labelHeight + gap}px`);
+  }
+
   const weekStart = startOfDay(monday);
   const weekEnd = addDays(weekStart, 7);
   const dayColumns = Array.from(dom.views.week.querySelectorAll(".week-day-column"));

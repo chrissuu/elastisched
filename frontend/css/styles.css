@@ -545,6 +545,8 @@ body {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  padding-top: var(--week-label-offset, 0px);
+  box-sizing: border-box;
 }
 
 .week-days {
