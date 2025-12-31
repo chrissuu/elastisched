@@ -8,3 +8,5 @@
 src/elastisched/engine/bin
 
 offline-packages
+
+elastisched.db

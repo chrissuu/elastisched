@@ -22,6 +22,17 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = ["pytest", "black"]
+api = [
+    "fastapi",
+    "uvicorn",
+    "SQLAlchemy",
+    "asyncpg",
+    "pydantic",
+    "httpx",
+    "pytest-asyncio",
+    "aiosqlite",
+    "greenlet",
+]
 
 [project.urls]
 Homepage = "https://github.com/chrissuu/elastisched"
