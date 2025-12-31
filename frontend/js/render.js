@@ -193,6 +193,7 @@ function renderDay() {
           dom.blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
           dom.blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
           dom.blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
+          dom.blobForm.defaultStart.dispatchEvent(new Event("change", { bubbles: true }));
         }
         dom.formStatus.textContent = "Ranges captured. Fill details and create.";
       }
@@ -528,6 +529,7 @@ function renderWeek() {
           dom.blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
           dom.blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
           dom.blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
+          dom.blobForm.defaultStart.dispatchEvent(new Event("change", { bubbles: true }));
         }
         dom.formStatus.textContent = "Ranges captured. Fill details and create.";
         clearSelectionCarets(".selection-caret.schedulable-range");

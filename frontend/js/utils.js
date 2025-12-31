@@ -4,6 +4,10 @@ function toDate(value) {
   return value ? new Date(value) : null;
 }
 
+function getLocalTimeZone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
 function formatOffset(minutes) {
   const sign = minutes <= 0 ? "+" : "-";
   const abs = Math.abs(minutes);
@@ -77,6 +81,32 @@ function addDays(date, count) {
   return copy;
 }
 
+function getWeekStart(date) {
+  const dayOfWeek = date.getDay();
+  return addDays(startOfDay(date), dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+}
+
+function getViewRange(view, anchorDate) {
+  if (view === "day") {
+    const start = startOfDay(anchorDate);
+    return { start, end: addDays(start, 1) };
+  }
+  if (view === "week") {
+    const dayOfWeek = anchorDate.getDay();
+    const monday = addDays(anchorDate, dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+    const start = startOfDay(monday);
+    return { start, end: addDays(start, 7) };
+  }
+  if (view === "month") {
+    const start = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1);
+    const end = new Date(anchorDate.getFullYear(), anchorDate.getMonth() + 1, 1);
+    return { start, end };
+  }
+  const start = new Date(anchorDate.getFullYear(), 0, 1);
+  const end = new Date(anchorDate.getFullYear() + 1, 0, 1);
+  return { start, end };
+}
+
 function getTagType(tags) {
   if (tags?.includes("deep")) return "deep";
   if (tags?.includes("admin")) return "admin";
@@ -130,6 +160,9 @@ export {
   clampToGranularity,
   formatTimeRange,
   getTagType,
+  getViewRange,
+  getWeekStart,
+  getLocalTimeZone,
   layoutBlocks,
   overlaps,
   startOfDay,

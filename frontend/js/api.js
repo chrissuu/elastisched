@@ -1,19 +1,35 @@
 import { API_BASE, demoBlobs, state } from "./core.js";
-import { renderAll, setActive } from "./render.js";
+import { toIso } from "./utils.js";
 
-async function fetchBlobs() {
+async function fetchOccurrences(start, end) {
   try {
-    const response = await fetch(`${API_BASE}/blobs`);
+    const query = new URLSearchParams({
+      start: toIso(start),
+      end: toIso(end),
+    });
+    const response = await fetch(`${API_BASE}/occurrences?${query.toString()}`);
     if (!response.ok) {
-      throw new Error("Failed to fetch blobs");
+      throw new Error("Failed to fetch occurrences");
     }
     const data = await response.json();
     state.blobs = data;
+    state.loadedRange = { start, end };
   } catch (error) {
     state.blobs = demoBlobs;
+    state.loadedRange = null;
   }
-  renderAll();
-  setActive(state.view);
 }
 
-export { fetchBlobs };
+function rangeCovers(loadedRange, start, end) {
+  if (!loadedRange) return false;
+  return start >= loadedRange.start && end <= loadedRange.end;
+}
+
+async function ensureOccurrences(start, end) {
+  if (rangeCovers(state.loadedRange, start, end)) {
+    return;
+  }
+  await fetchOccurrences(start, end);
+}
+
+export { ensureOccurrences, fetchOccurrences };

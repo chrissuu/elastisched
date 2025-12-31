@@ -55,8 +55,8 @@
       <section class="panel form-panel" id="formPanel">
         <div class="form-header">
           <div>
-            <div class="form-title" id="formTitle">Create a blob</div>
-            <div class="form-subtitle">Quick entry for schedules</div>
+            <div class="form-title" id="formTitle">Create a recurrence</div>
+            <div class="form-subtitle">Set a one-time or repeating session</div>
           </div>
           <button class="ghost small" id="closeFormBtn">Close</button>
         </div>
@@ -70,18 +70,71 @@
             <input type="text" name="description" placeholder="Optional details" />
           </label>
           <label>
+            Recurrence
+            <select name="recurrenceType" id="recurrenceType">
+              <option value="single">Single occurrence</option>
+              <option value="weekly">Weekly cadence</option>
+              <option value="delta">Fixed interval</option>
+              <option value="date">Annual date</option>
+            </select>
+          </label>
+          <div class="recurrence-note" id="recurrenceSummary">
+            One-time event. Switch to create repeats.
+          </div>
+          <div class="recurrence-fields" data-recurrence="weekly">
+            <div class="weekly-controls">
+              <label>
+                Repeat every (weeks)
+                <input type="number" name="weeklyInterval" min="1" step="1" value="1" />
+              </label>
+              <label class="weekly-toggle">
+                Customize each slot
+                <input type="checkbox" name="weeklyPerSlot" id="weeklyPerSlot" />
+              </label>
+            </div>
+            <div class="weekly-slots">
+              <div class="weekly-slots-header">
+                <span>Weekly slots</span>
+                <button type="button" class="ghost small" id="addWeeklySlotBtn">
+                  Add slot
+                </button>
+              </div>
+              <div class="weekly-slot-status" id="weeklySlotStatus"></div>
+              <div id="weeklySlots"></div>
+            </div>
+          </div>
+          <div class="recurrence-fields" data-recurrence="delta">
+            <label>
+              Repeat every
+              <div class="field-row">
+                <input type="number" name="deltaValue" min="1" step="1" value="1" />
+                <select name="deltaUnit">
+                  <option value="minutes">Minutes</option>
+                  <option value="hours">Hours</option>
+                  <option value="days" selected>Days</option>
+                  <option value="weeks">Weeks</option>
+                </select>
+              </div>
+            </label>
+          </div>
+          <div class="recurrence-fields" data-recurrence="date">
+            <div class="recurrence-note subtle">
+              Repeats annually on the default start date.
+            </div>
+          </div>
+          <label class="non-weekly-field">
             Default start
             <input type="datetime-local" name="defaultStart" required />
           </label>
-          <label>
+          <label class="non-weekly-field">
             Default end
             <input type="datetime-local" name="defaultEnd" required />
           </label>
-          <label>
+          <label class="non-weekly-field">
             Schedulable start
             <input type="datetime-local" name="schedulableStart" required />
           </label>
-          <label>
+          <label class="non-weekly-field">
             Schedulable end
             <input type="datetime-local" name="schedulableEnd" required />
           </label>
@@ -112,7 +165,7 @@
             <span class="legend-dot focus"></span> Focus
             <span class="legend-dot deep"></span> Deep Work
             <span class="legend-dot admin"></span> Admin
-            <button class="ghost" id="toggleFormBtn">Add</button>
+            <button class="ghost" id="toggleFormBtn">Add recurrence</button>
           </div>
         </div>
 

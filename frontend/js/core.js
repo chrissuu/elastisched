@@ -2,7 +2,9 @@ const state = {
   blobs: [],
   view: "day",
   anchorDate: new Date(),
-  editingBlobId: null,
+  editingRecurrenceId: null,
+  editingRecurrenceType: null,
+  loadedRange: null,
   selectionMode: false,
   selectionStep: null,
   pendingDefaultRange: null,
@@ -37,6 +39,8 @@ const API_BASE = window.location.origin;
 const demoBlobs = [
   {
     id: "demo-1",
+    recurrence_id: "demo-1",
+    recurrence_type: "single",
     name: "Daily Review",
     default_scheduled_timerange: {
       start: "2024-05-21T08:00:00Z",
@@ -50,6 +54,8 @@ const demoBlobs = [
   },
   {
     id: "demo-2",
+    recurrence_id: "demo-2",
+    recurrence_type: "single",
     name: "Roadmap Deep Dive",
     default_scheduled_timerange: {
       start: "2024-05-21T10:00:00Z",
@@ -63,6 +69,8 @@ const demoBlobs = [
   },
   {
     id: "demo-3",
+    recurrence_id: "demo-3",
+    recurrence_type: "single",
     name: "Prototype Build",
     default_scheduled_timerange: {
       start: "2024-05-21T13:00:00Z",

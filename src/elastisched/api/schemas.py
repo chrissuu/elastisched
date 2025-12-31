@@ -40,3 +40,28 @@ class BlobRead(BlobBase):
     id: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RecurrenceBase(BaseModel):
+    type: str = Field(min_length=1, max_length=32)
+    payload: dict = Field(default_factory=dict)
+
+
+class RecurrenceCreate(RecurrenceBase):
+    pass
+
+
+class RecurrenceUpdate(BaseModel):
+    type: str | None = Field(default=None, min_length=1, max_length=32)
+    payload: dict | None = None
+
+
+class RecurrenceRead(RecurrenceBase):
+    id: str
+
+
+class OccurrenceRead(BlobBase):
+    id: str
+    recurrence_id: str
+    recurrence_type: str
+    recurrence_payload: dict | None = None

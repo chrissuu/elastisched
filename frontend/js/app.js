@@ -1,17 +1,24 @@
 import { appConfig, isTypingInField, loadView, state } from "./core.js";
 import { dom } from "./dom.js";
-import { fetchBlobs } from "./api.js";
+import { ensureOccurrences } from "./api.js";
 import { bindFormHandlers, openEditForm, resetFormMode, toggleForm, toggleSettings } from "./forms.js";
-import { renderAll, setActive, startInteractiveCreate } from "./render.js";
-import { addDays } from "./utils.js";
+import { setActive, startInteractiveCreate } from "./render.js";
+import { addDays, getViewRange } from "./utils.js";
 
 dom.brandTitle.textContent = appConfig.scheduleName || dom.brandTitle.textContent;
 dom.brandSubtitle.textContent = appConfig.subtitle || dom.brandSubtitle.textContent;
 
-bindFormHandlers();
+bindFormHandlers(refreshView);
+
+async function refreshView(nextView = state.view) {
+  const view = nextView || state.view;
+  const range = getViewRange(view, state.anchorDate);
+  await ensureOccurrences(range.start, range.end);
+  setActive(view);
+}
 
 dom.tabs.forEach((tab) => {
-  tab.addEventListener("click", () => setActive(tab.dataset.view));
+  tab.addEventListener("click", () => refreshView(tab.dataset.view));
 });
 
 document.addEventListener("click", (event) => {
@@ -20,8 +27,7 @@ document.addEventListener("click", (event) => {
   const dateIso = target.getAttribute("data-date");
   if (dateIso) {
     state.anchorDate = new Date(dateIso);
-    renderAll();
-    setActive("day");
+    refreshView("day");
   }
 });
 
@@ -83,12 +89,10 @@ window.addEventListener("keydown", (event) => {
       return;
     }
     event.preventDefault();
-    renderAll();
-    setActive(view);
+    refreshView(view);
   }
 });
 
 resetFormMode();
 const savedView = loadView();
-setActive(savedView || "day");
-fetchBlobs();
+refreshView(savedView || "day");

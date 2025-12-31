@@ -5,6 +5,10 @@ from fastapi.staticfiles import StaticFiles
 
 from elastisched.api.db import init_db
 from elastisched.api.router import router as blob_router
+from elastisched.api.recurrence_router import (
+    occurrence_router,
+    recurrence_router,
+)
 
 
 app = FastAPI(title="Elastisched API")
@@ -24,3 +28,5 @@ async def health() -> dict:
 
 
 app.include_router(blob_router)
+app.include_router(recurrence_router)
+app.include_router(occurrence_router)

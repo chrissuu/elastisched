@@ -22,3 +22,11 @@ class BlobModel(Base):
     policy: Mapped[dict] = mapped_column(JSON, default=dict)
     dependencies: Mapped[list] = mapped_column(JSON, default=list)
     tags: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class RecurrenceModel(Base):
+    __tablename__ = "recurrences"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    type: Mapped[str] = mapped_column(String(32))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)

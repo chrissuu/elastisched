@@ -109,6 +109,7 @@ class WeeklyBlobRecurrence(BlobRecurrence):
 
         for blob, day in zip(self.blobs_of_week, self.__days_of_week):
             base_start = blob.get_schedulable_timerange().start
+            tzinfo = base_start.tzinfo
 
             total_days = (current - base_start).days
             weeks_since_start = max(0, total_days // 7)  # clamp to 0 if before start
@@ -123,7 +124,9 @@ class WeeklyBlobRecurrence(BlobRecurrence):
                     day.day_of_week - base_start.weekday()
                 )
                 occurrence_date = base_start + timedelta(days=days_since_base)
-                occurrence_datetime = datetime.combine(occurrence_date.date(), day.time)
+                occurrence_datetime = datetime.combine(
+                    occurrence_date.date(), day.time, tzinfo=tzinfo
+                )
 
                 if occurrence_datetime < base_start:
                     continue
@@ -248,6 +251,7 @@ class DateBlobRecurrence(BlobRecurrence):
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
         schedulable_timerange = self.blob.get_schedulable_timerange()
         start = schedulable_timerange.start
+        tzinfo = start.tzinfo
         dt: datetime = schedulable_timerange.start
         date = dt.date()
         time = dt.time()
@@ -264,6 +268,7 @@ class DateBlobRecurrence(BlobRecurrence):
                 minute=time.minute,
                 second=time.second,
                 microsecond=time.microsecond,
+                tzinfo=tzinfo,
             )
 
             if target_this_year > current:
@@ -277,6 +282,7 @@ class DateBlobRecurrence(BlobRecurrence):
                         minute=time.minute,
                         second=time.second,
                         microsecond=time.microsecond,
+                        tzinfo=tzinfo,
                     )
                     delta_to_occurrence = actual_target - start
                     return blob_copy_with_delta_future(self.blob, delta_to_occurrence)
@@ -300,6 +306,7 @@ class DateBlobRecurrence(BlobRecurrence):
             minute=time.minute,
             second=time.second,
             microsecond=time.microsecond,
+            tzinfo=tzinfo,
         )
 
         delta_to_occurrence = target_next_year - start
@@ -309,6 +316,7 @@ class DateBlobRecurrence(BlobRecurrence):
         """Find the next Feb 29 after the current datetime"""
         schedulable_timerange = self.blob.get_schedulable_timerange()
         start = schedulable_timerange.start
+        tzinfo = start.tzinfo
         dt = schedulable_timerange.start
         date = dt.date()
         time = dt.time()
@@ -326,6 +334,7 @@ class DateBlobRecurrence(BlobRecurrence):
                 minute=time.minute,
                 second=time.second,
                 microsecond=time.microsecond,
+                tzinfo=tzinfo,
             )
             if feb29_this_year > current:
                 if current.year >= start.year:
@@ -339,6 +348,7 @@ class DateBlobRecurrence(BlobRecurrence):
                         minute=time.minute,
                         second=time.second,
                         microsecond=time.microsecond,
+                        tzinfo=tzinfo,
                     )
                     delta_to_occurrence = actual_target - start
                     return blob_copy_with_delta_future(self.blob, delta_to_occurrence)
@@ -365,6 +375,7 @@ class DateBlobRecurrence(BlobRecurrence):
             minute=time.minute,
             second=time.second,
             microsecond=time.microsecond,
+            tzinfo=tzinfo,
         )
         delta_to_occurrence = feb29_next - start
         return blob_copy_with_delta_future(self.blob, delta_to_occurrence)
@@ -375,6 +386,7 @@ class DateBlobRecurrence(BlobRecurrence):
         end = timerange.end
         schedulable_timerange = self.blob.get_schedulable_timerange()
         schedulable_timerange_start = schedulable_timerange.start
+        tzinfo = schedulable_timerange_start.tzinfo
 
         dt = schedulable_timerange_start
         date = dt.date()
@@ -395,6 +407,7 @@ class DateBlobRecurrence(BlobRecurrence):
                     minute=time.minute,
                     second=time.second,
                     microsecond=time.microsecond,
+                    tzinfo=tzinfo,
                 )
             except ValueError:
                 current_year += 1
@@ -426,6 +439,7 @@ class DateBlobRecurrence(BlobRecurrence):
         start = timerange.start
         end = timerange.end
         schedulable_timerange = self.blob.get_schedulable_timerange()
+        tzinfo = schedulable_timerange.start.tzinfo
 
         dt = schedulable_timerange.start
         date = dt.date()
@@ -443,6 +457,7 @@ class DateBlobRecurrence(BlobRecurrence):
                     minute=time.minute,
                     second=time.second,
                     microsecond=time.microsecond,
+                    tzinfo=tzinfo,
                 )
 
                 delta_to_occurrence = target_date - schedulable_timerange.start
