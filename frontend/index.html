@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Elastisched</title>
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="brand">
+          <div class="logo">E</div>
+          <div>
+            <div class="title" id="brandTitle">Elastisched</div>
+            <div class="subtitle" id="brandSubtitle">Schedule at a glance</div>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="ghost icon settings" id="settingsBtn" title="Settings">⚙</button>
+        </div>
+      </header>
+
+      <div class="modal" id="settingsModal" aria-hidden="true">
+        <div class="modal-backdrop" id="settingsBackdrop"></div>
+        <section class="panel form-panel modal-panel" id="settingsPanel">
+          <div class="form-header">
+            <div>
+              <div class="form-title">Settings</div>
+              <div class="form-subtitle">Customize labels and granularity</div>
+            </div>
+            <button class="ghost small" id="closeSettingsBtn">Close</button>
+          </div>
+          <form id="settingsForm" class="blob-form">
+            <label>
+              Schedule name
+              <input type="text" name="scheduleName" placeholder="Elastisched" />
+            </label>
+            <label>
+              Subtitle
+              <input type="text" name="subtitle" placeholder="Schedule at a glance" />
+            </label>
+            <label>
+              Minute granularity
+              <input type="number" name="minuteGranularity" min="1" step="1" />
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="primary">Save</button>
+              <span class="form-status" id="settingsStatus"></span>
+            </div>
+          </form>
+        </section>
+      </div>
+
+      <section class="panel form-panel" id="formPanel">
+        <div class="form-header">
+          <div>
+            <div class="form-title" id="formTitle">Create a blob</div>
+            <div class="form-subtitle">Quick entry for schedules</div>
+          </div>
+          <button class="ghost small" id="closeFormBtn">Close</button>
+        </div>
+        <form id="blobForm" class="blob-form">
+          <label>
+            Name
+            <input type="text" name="name" placeholder="Focus Sprint" required />
+          </label>
+          <label>
+            Description
+            <input type="text" name="description" placeholder="Optional details" />
+          </label>
+          <label>
+            Default start
+            <input type="datetime-local" name="defaultStart" required />
+          </label>
+          <label>
+            Default end
+            <input type="datetime-local" name="defaultEnd" required />
+          </label>
+          <label>
+            Schedulable start
+            <input type="datetime-local" name="schedulableStart" required />
+          </label>
+          <label>
+            Schedulable end
+            <input type="datetime-local" name="schedulableEnd" required />
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="primary" id="formSubmitBtn">Create</button>
+            <span class="form-status" id="formStatus"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="tab-row">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-view="day">Day</button>
+            <button class="tab" data-view="week">Week</button>
+            <button class="tab" data-view="month">Month</button>
+            <button class="tab" data-view="year">Year</button>
+          </div>
+          <div class="nav-actions">
+            <button class="ghost icon" id="prevDayBtn" title="Previous day">&#8592;</button>
+            <button class="ghost" id="goTodayBtn">Today</button>
+            <button class="ghost icon" id="nextDayBtn" title="Next day">&#8594;</button>
+          </div>
+        </div>
+        <div class="view-header">
+          <div class="date-label" id="dateLabel">Tuesday, May 21</div>
+          <div class="legend">
+            <span class="legend-dot focus"></span> Focus
+            <span class="legend-dot deep"></span> Deep Work
+            <span class="legend-dot admin"></span> Admin
+            <button class="ghost" id="toggleFormBtn">Add</button>
+          </div>
+        </div>
+
+        <div class="views">
+          <div id="viewDay" class="view active"></div>
+          <div id="viewWeek" class="view"></div>
+          <div id="viewMonth" class="view"></div>
+          <div id="viewYear" class="view"></div>
+        </div>
+      </section>
+    </div>
+
+    <script src="./js/constants.js"></script>
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>
