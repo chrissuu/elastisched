@@ -1,234 +1,19 @@
-const state = {
-  blobs: [],
-  view: "day",
-  anchorDate: new Date(),
-  editingBlobId: null,
-  selectionMode: false,
-  selectionStep: null,
-  pendingDefaultRange: null,
-  pendingSchedulableRange: null,
-  selectionPointer: null,
-  selectionScrollHandler: null,
-};
-
-const dateLabel = document.getElementById("dateLabel");
-const tabs = document.querySelectorAll(".tab");
-const views = {
-  day: document.getElementById("viewDay"),
-  week: document.getElementById("viewWeek"),
-  month: document.getElementById("viewMonth"),
-  year: document.getElementById("viewYear"),
-};
-const formPanel = document.getElementById("formPanel");
-const toggleFormBtn = document.getElementById("toggleFormBtn");
-const closeFormBtn = document.getElementById("closeFormBtn");
-const formStatus = document.getElementById("formStatus");
-const blobForm = document.getElementById("blobForm");
-const formTitle = document.getElementById("formTitle");
-const formSubmitBtn = document.getElementById("formSubmitBtn");
-const settingsBtn = document.getElementById("settingsBtn");
-const settingsPanel = document.getElementById("settingsPanel");
-const settingsModal = document.getElementById("settingsModal");
-const settingsBackdrop = document.getElementById("settingsBackdrop");
-const closeSettingsBtn = document.getElementById("closeSettingsBtn");
-const settingsForm = document.getElementById("settingsForm");
-const settingsStatus = document.getElementById("settingsStatus");
-const prevDayBtn = document.getElementById("prevDayBtn");
-const nextDayBtn = document.getElementById("nextDayBtn");
-const goTodayBtn = document.getElementById("goTodayBtn");
-const brandTitle = document.getElementById("brandTitle");
-const brandSubtitle = document.getElementById("brandSubtitle");
-const defaultConfig = {
-  scheduleName: window.APP_CONFIG?.scheduleName || "Elastisched",
-  subtitle: window.APP_CONFIG?.subtitle || "Schedule at a glance",
-  minuteGranularity: Math.max(1, Number(window.APP_CONFIG?.minuteGranularity || 5)),
-};
-const storedConfig = (() => {
-  try {
-    const raw = window.localStorage.getItem("elastisched:settings");
-    return raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    return null;
-  }
-})();
-const appConfig = {
-  ...defaultConfig,
-  ...(storedConfig || {}),
-};
-const minuteGranularity = Math.max(1, Number(appConfig.minuteGranularity || 5));
-
-brandTitle.textContent = appConfig.scheduleName || brandTitle.textContent;
-brandSubtitle.textContent = appConfig.subtitle || brandSubtitle.textContent;
-
-const demoBlobs = [
-  {
-    id: "demo-1",
-    name: "Daily Review",
-    default_scheduled_timerange: {
-      start: "2024-05-21T08:00:00Z",
-      end: "2024-05-21T08:20:00Z",
-    },
-    schedulable_timerange: {
-      start: "2024-05-21T07:30:00Z",
-      end: "2024-05-21T09:00:00Z",
-    },
-    tags: ["admin"],
-  },
-  {
-    id: "demo-2",
-    name: "Roadmap Deep Dive",
-    default_scheduled_timerange: {
-      start: "2024-05-21T10:00:00Z",
-      end: "2024-05-21T11:15:00Z",
-    },
-    schedulable_timerange: {
-      start: "2024-05-21T09:00:00Z",
-      end: "2024-05-21T12:00:00Z",
-    },
-    tags: ["deep"],
-  },
-  {
-    id: "demo-3",
-    name: "Prototype Build",
-    default_scheduled_timerange: {
-      start: "2024-05-21T13:00:00Z",
-      end: "2024-05-21T14:20:00Z",
-    },
-    schedulable_timerange: {
-      start: "2024-05-21T12:00:00Z",
-      end: "2024-05-21T15:00:00Z",
-    },
-    tags: ["focus"],
-  },
-];
-
-function toDate(value) {
-  return value ? new Date(value) : null;
-}
-
-function formatOffset(minutes) {
-  const sign = minutes <= 0 ? "+" : "-";
-  const abs = Math.abs(minutes);
-  const hours = `${Math.floor(abs / 60)}`.padStart(2, "0");
-  const mins = `${abs % 60}`.padStart(2, "0");
-  return `${sign}${hours}:${mins}`;
-}
-
-function toIso(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const hours = `${date.getHours()}`.padStart(2, "0");
-  const minutes = `${date.getMinutes()}`.padStart(2, "0");
-  const seconds = `${date.getSeconds()}`.padStart(2, "0");
-  const offset = formatOffset(date.getTimezoneOffset());
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offset}`;
-}
-
-function toLocalInputValue(isoString) {
-  const date = toDate(isoString);
-  if (!date) return "";
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const hours = `${date.getHours()}`.padStart(2, "0");
-  const minutes = `${date.getMinutes()}`.padStart(2, "0");
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-function toLocalInputFromDate(date) {
-  if (!date) return "";
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const hours = `${date.getHours()}`.padStart(2, "0");
-  const minutes = `${date.getMinutes()}`.padStart(2, "0");
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-function clampToGranularity(minutes) {
-  return Math.round(minutes / minuteGranularity) * minuteGranularity;
-}
-
-function pad(num) {
-  return num.toString().padStart(2, "0");
-}
-
-function formatTimeRange(start, end) {
-  const startDate = toDate(start);
-  const endDate = toDate(end);
-  if (!startDate || !endDate) {
-    return "";
-  }
-  const startLabel = `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`;
-  const endLabel = `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
-  return `${startLabel} - ${endLabel}`;
-}
-
-function startOfDay(date) {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function addDays(date, count) {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + count);
-  return copy;
-}
-
-function getTagType(tags) {
-  if (tags?.includes("deep")) return "deep";
-  if (tags?.includes("admin")) return "admin";
-  return "focus";
-}
-
-function overlaps(rangeStart, rangeEnd, eventStart, eventEnd) {
-  return eventStart < rangeEnd && eventEnd > rangeStart;
-}
-
-function layoutBlocks(blocks) {
-  const sorted = [...blocks].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
-  const active = [];
-  let cluster = null;
-  let clusterId = 0;
-
-  sorted.forEach((block) => {
-    for (let i = active.length - 1; i >= 0; i -= 1) {
-      if (active[i].endMin <= block.startMin) {
-        active.splice(i, 1);
-      }
-    }
-
-    if (active.length === 0) {
-      clusterId += 1;
-      cluster = { id: clusterId, maxColumns: 0, events: [] };
-    }
-
-    const used = new Set(active.map((item) => item.column));
-    let column = 0;
-    while (used.has(column)) {
-      column += 1;
-    }
-
-    block.column = column;
-    block.cluster = cluster;
-    cluster.events.push(block);
-    active.push(block);
-
-    const activeColumns = new Set(active.map((item) => item.column));
-    cluster.maxColumns = Math.max(cluster.maxColumns, activeColumns.size);
-  });
-
-  blocks.forEach((block) => {
-    block.columns = block.cluster?.maxColumns || 1;
-  });
-}
+import { minuteGranularity, saveView, state } from "./core.js";
+import { dom } from "./dom.js";
+import {
+  addDays,
+  clampToGranularity,
+  formatTimeRange,
+  getTagType,
+  layoutBlocks,
+  overlaps,
+  startOfDay,
+  toDate,
+  toLocalInputFromDate,
+} from "./utils.js";
 
 function setDateLabel(text) {
-  dateLabel.textContent = text;
+  dom.dateLabel.textContent = text;
 }
 
 function formatDayLabel(date) {
@@ -250,6 +35,20 @@ function formatWeekLabel(date) {
 
 function formatMonthLabel(date) {
   return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
+function updateSelectionOverlay(overlayEl, startMin, endMin, hourHeight) {
+  const top = (startMin / 60) * hourHeight;
+  const height = Math.max(12, ((endMin - startMin) / 60) * hourHeight);
+  overlayEl.style.top = `${top}px`;
+  overlayEl.style.height = `${height}px`;
+  overlayEl.classList.add("active");
+}
+
+function updateCaret(caretEl, minutes, hourHeight) {
+  const top = (minutes / 60) * hourHeight;
+  caretEl.style.top = `${top}px`;
+  caretEl.classList.add("active");
 }
 
 function renderDay() {
@@ -314,7 +113,7 @@ function renderDay() {
     )
     .join("");
 
-  views.day.innerHTML = `
+  dom.views.day.innerHTML = `
     <div class="day-grid" style="--hour-height: ${hourHeight}px;">
       <div class="hours">${hoursHtml}</div>
       <div class="day-track">
@@ -328,13 +127,18 @@ function renderDay() {
     </div>
   `;
 
-  const overlay = views.day.querySelector("#schedulableOverlay");
-  const dayTrack = views.day.querySelector(".day-track");
-  const selectionOverlayDefault = views.day.querySelector("#selectionOverlayDefault");
-  const selectionOverlaySchedulable = views.day.querySelector("#selectionOverlaySchedulable");
-  const selectionCaretDefault = views.day.querySelector("#selectionCaretDefault");
-  const selectionCaretSchedulable = views.day.querySelector("#selectionCaretSchedulable");
-  const blocksEls = views.day.querySelectorAll(".day-block");
+  const overlay = dom.views.day.querySelector("#schedulableOverlay");
+  const dayTrack = dom.views.day.querySelector(".day-track");
+  const selectionOverlayDefault = dom.views.day.querySelector("#selectionOverlayDefault");
+  const selectionOverlaySchedulable = dom.views.day.querySelector(
+    "#selectionOverlaySchedulable"
+  );
+  const selectionCaretDefault = dom.views.day.querySelector("#selectionCaretDefault");
+  const selectionCaretSchedulable = dom.views.day.querySelector(
+    "#selectionCaretSchedulable"
+  );
+  const blocksEls = dom.views.day.querySelectorAll(".day-block");
+
   blocksEls.forEach((blockEl) => {
     blockEl.addEventListener("mouseenter", () => {
       blockEl.classList.add("hovered");
@@ -360,26 +164,11 @@ function renderDay() {
   if (state.selectionMode) {
     let clickStart = null;
     const trackMinutes = 24 * 60;
-    const trackHeight = hourHeight * 24;
 
     const toMinutes = (clientY) => {
       const rect = dayTrack.getBoundingClientRect();
       const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
       return clampToGranularity(Math.round((y / rect.height) * trackMinutes));
-    };
-
-    const updateSelectionOverlay = (overlayEl, startMin, endMin) => {
-      const top = (startMin / 60) * hourHeight;
-      const height = Math.max(12, ((endMin - startMin) / 60) * hourHeight);
-      overlayEl.style.top = `${top}px`;
-      overlayEl.style.height = `${height}px`;
-      overlayEl.classList.add("active");
-    };
-
-    const updateCaret = (caretEl, minutes) => {
-      const top = (minutes / 60) * hourHeight;
-      caretEl.style.top = `${top}px`;
-      caretEl.classList.add("active");
     };
 
     const finalizeRange = (startMin, endMin) => {
@@ -388,7 +177,7 @@ function renderDay() {
       if (state.selectionStep === "default") {
         state.pendingDefaultRange = { start: startDate, end: endDate };
         state.selectionStep = "schedulable";
-        formStatus.textContent = "Click start/end for schedulable range.";
+        dom.formStatus.textContent = "Click start/end for schedulable range.";
         selectionCaretDefault.classList.remove("active");
       } else if (state.selectionStep === "schedulable") {
         state.pendingSchedulableRange = { start: startDate, end: endDate };
@@ -400,12 +189,12 @@ function renderDay() {
         const defaultRange = state.pendingDefaultRange;
         const schedRange = state.pendingSchedulableRange;
         if (defaultRange && schedRange) {
-          blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
-          blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
-          blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
-          blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
+          dom.blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
+          dom.blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
+          dom.blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
+          dom.blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
         }
-        formStatus.textContent = "Ranges captured. Fill details and create.";
+        dom.formStatus.textContent = "Ranges captured. Fill details and create.";
       }
     };
 
@@ -425,8 +214,8 @@ function renderDay() {
             ? selectionCaretDefault
             : selectionCaretSchedulable;
         const endMin = Math.min(trackMinutes, minutes + minuteGranularity);
-        updateSelectionOverlay(overlayEl, minutes, endMin);
-        updateCaret(caretEl, minutes);
+        updateSelectionOverlay(overlayEl, minutes, endMin, hourHeight);
+        updateCaret(caretEl, minutes, hourHeight);
       } else {
         const startMin = Math.min(clickStart, minutes);
         const endMin = Math.min(
@@ -437,7 +226,7 @@ function renderDay() {
           state.selectionStep === "default"
             ? selectionOverlayDefault
             : selectionOverlaySchedulable;
-        updateSelectionOverlay(overlayEl, startMin, endMin);
+        updateSelectionOverlay(overlayEl, startMin, endMin, hourHeight);
         finalizeRange(startMin, endMin);
         clickStart = null;
       }
@@ -455,15 +244,15 @@ function renderDay() {
           ? selectionCaretDefault
           : selectionCaretSchedulable;
       if (clickStart === null) {
-        updateCaret(caretEl, minutes);
+        updateCaret(caretEl, minutes, hourHeight);
       } else {
         const startMin = Math.min(clickStart, minutes);
         const endMin = Math.min(
           trackMinutes,
           Math.max(clickStart + minuteGranularity, minutes)
         );
-        updateSelectionOverlay(overlayEl, startMin, endMin);
-        updateCaret(caretEl, clickStart);
+        updateSelectionOverlay(overlayEl, startMin, endMin, hourHeight);
+        updateCaret(caretEl, clickStart, hourHeight);
       }
       state.selectionPointer = { x: event.clientX, y: event.clientY };
     };
@@ -487,15 +276,15 @@ function renderDay() {
           ? selectionCaretDefault
           : selectionCaretSchedulable;
       if (clickStart === null) {
-        updateCaret(caretEl, minutes);
+        updateCaret(caretEl, minutes, hourHeight);
       } else {
         const startMin = Math.min(clickStart, minutes);
         const endMin = Math.min(
           trackMinutes,
           Math.max(clickStart + minuteGranularity, minutes)
         );
-        updateSelectionOverlay(overlayEl, startMin, endMin);
-        updateCaret(caretEl, clickStart);
+        updateSelectionOverlay(overlayEl, startMin, endMin, hourHeight);
+        updateCaret(caretEl, clickStart, hourHeight);
       }
     };
     window.addEventListener("scroll", state.selectionScrollHandler, { passive: true });
@@ -570,6 +359,7 @@ function renderWeek() {
           `
         )
         .join("");
+
       return `
         <div class="week-day-column" style="--hour-height: ${hourHeight}px;">
           <div class="week-day-label">
@@ -581,21 +371,21 @@ function renderWeek() {
               })}
             </button>
           </div>
-        <div class="week-day-track">
-          <div class="schedulable-overlay"></div>
-          <div class="selection-overlay default-range"></div>
-          <div class="selection-overlay schedulable-range"></div>
-          <div class="selection-caret default-range"></div>
-          <div class="selection-caret schedulable-range"></div>
-          ${blockHtml || "<div class='day-empty'>No events yet</div>"}
+          <div class="week-day-track">
+            <div class="schedulable-overlay"></div>
+            <div class="selection-overlay default-range"></div>
+            <div class="selection-overlay schedulable-range"></div>
+            <div class="selection-caret default-range"></div>
+            <div class="selection-caret schedulable-range"></div>
+            ${blockHtml || "<div class='day-empty'>No events yet</div>"}
+          </div>
         </div>
-      </div>
       `;
     })
     .join("");
 
   const hoursHtml = hours.map((hour) => `<div class="hour">${hour}</div>`).join("");
-  views.week.innerHTML = `
+  dom.views.week.innerHTML = `
     <div class="week-timeline" style="--hour-height: ${hourHeight}px;">
       <div class="week-hours">${hoursHtml}</div>
       <div class="week-days">${columns}</div>
@@ -604,7 +394,7 @@ function renderWeek() {
 
   const weekStart = startOfDay(monday);
   const weekEnd = addDays(weekStart, 7);
-  const dayColumns = Array.from(views.week.querySelectorAll(".week-day-column"));
+  const dayColumns = Array.from(dom.views.week.querySelectorAll(".week-day-column"));
   const dayTracks = dayColumns.map((column, index) => {
     const dayStart = startOfDay(days[index]);
     const dayEnd = addDays(dayStart, 1);
@@ -634,8 +424,14 @@ function renderWeek() {
           const top = (overlapStart - dayStart) / 60000;
           overlay.style.top = `${(top / 60) * hourHeight}px`;
           overlay.style.height = `${Math.max(18, (minutes / 60) * hourHeight)}px`;
-          overlay.classList.toggle("overflow-top", schedStart < weekStart && dayStart.getTime() === weekStart.getTime());
-          overlay.classList.toggle("overflow-bottom", schedEnd > weekEnd && dayEnd.getTime() === weekEnd.getTime());
+          overlay.classList.toggle(
+            "overflow-top",
+            schedStart < weekStart && dayStart.getTime() === weekStart.getTime()
+          );
+          overlay.classList.toggle(
+            "overflow-bottom",
+            schedEnd > weekEnd && dayEnd.getTime() === weekEnd.getTime()
+          );
           overlay.classList.add("active");
         });
       });
@@ -652,26 +448,11 @@ function renderWeek() {
     let clickStart = null;
     let activeColumnIndex = null;
     const trackMinutes = 24 * 60;
-    const trackHeight = hourHeight * 24;
 
     const toMinutes = (clientY, track) => {
       const rect = track.getBoundingClientRect();
       const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
       return clampToGranularity(Math.round((y / rect.height) * trackMinutes));
-    };
-
-    const updateSelectionOverlay = (overlayEl, startMin, endMin) => {
-      const top = (startMin / 60) * hourHeight;
-      const height = Math.max(12, ((endMin - startMin) / 60) * hourHeight);
-      overlayEl.style.top = `${top}px`;
-      overlayEl.style.height = `${height}px`;
-      overlayEl.classList.add("active");
-    };
-
-    const updateCaret = (caretEl, minutes) => {
-      const top = (minutes / 60) * hourHeight;
-      caretEl.style.top = `${top}px`;
-      caretEl.classList.add("active");
     };
 
     const clearSelectionOverlays = (overlaySelector) => {
@@ -706,7 +487,8 @@ function renderWeek() {
         updateSelectionOverlay(
           overlay,
           Math.min(normalizedStart, trackMinutes - minuteGranularity),
-          Math.min(normalizedEnd, trackMinutes)
+          Math.min(normalizedEnd, trackMinutes),
+          hourHeight
         );
       }
     };
@@ -723,7 +505,7 @@ function renderWeek() {
       if (state.selectionStep === "default") {
         state.pendingDefaultRange = { start: startDate, end: endDate };
         state.selectionStep = "schedulable";
-        formStatus.textContent = "Click start/end for schedulable range.";
+        dom.formStatus.textContent = "Click start/end for schedulable range.";
         clearSelectionCarets(".selection-caret.default-range");
       } else if (state.selectionStep === "schedulable") {
         state.pendingSchedulableRange = { start: startDate, end: endDate };
@@ -732,12 +514,12 @@ function renderWeek() {
         const defaultRange = state.pendingDefaultRange;
         const schedRange = state.pendingSchedulableRange;
         if (defaultRange && schedRange) {
-          blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
-          blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
-          blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
-          blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
+          dom.blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
+          dom.blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
+          dom.blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
+          dom.blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
         }
-        formStatus.textContent = "Ranges captured. Fill details and create.";
+        dom.formStatus.textContent = "Ranges captured. Fill details and create.";
         clearSelectionCarets(".selection-caret.schedulable-range");
       }
     };
@@ -763,7 +545,7 @@ function renderWeek() {
               : ".selection-caret.schedulable-range";
           updateSelectionRange(columnIndex, minutes, columnIndex, endMin, overlaySelector);
           clearSelectionCarets(caretSelector);
-          updateCaret(column.querySelector(caretSelector), minutes);
+          updateCaret(column.querySelector(caretSelector), minutes, hourHeight);
         } else {
           const sameDay = activeColumnIndex === columnIndex;
           const startMin = Math.min(clickStart, minutes);
@@ -801,11 +583,11 @@ function renderWeek() {
             : ".selection-caret.schedulable-range";
         if (clickStart === null) {
           clearSelectionCarets(caretSelector);
-          updateCaret(column.querySelector(caretSelector), minutes);
+          updateCaret(column.querySelector(caretSelector), minutes, hourHeight);
         } else {
           updateSelectionRange(activeColumnIndex, clickStart, columnIndex, endMin, overlaySelector);
           clearSelectionCarets(caretSelector);
-          updateCaret(dayColumns[activeColumnIndex].querySelector(caretSelector), clickStart);
+          updateCaret(dayColumns[activeColumnIndex].querySelector(caretSelector), clickStart, hourHeight);
         }
         state.selectionPointer = { x: event.clientX, y: event.clientY, columnIndex };
       };
@@ -847,16 +629,17 @@ function renderWeek() {
           : ".selection-caret.schedulable-range";
       if (clickStart === null) {
         clearSelectionCarets(caretSelector);
-        updateCaret(dayColumns[columnIndex].querySelector(caretSelector), minutes);
+        updateCaret(dayColumns[columnIndex].querySelector(caretSelector), minutes, hourHeight);
       } else {
         updateSelectionRange(activeColumnIndex, clickStart, columnIndex, endMin, overlaySelector);
         clearSelectionCarets(caretSelector);
-        updateCaret(dayColumns[activeColumnIndex].querySelector(caretSelector), clickStart);
+        updateCaret(dayColumns[activeColumnIndex].querySelector(caretSelector), clickStart, hourHeight);
       }
     };
     window.addEventListener("scroll", state.selectionScrollHandler, { passive: true });
     window.addEventListener("resize", state.selectionScrollHandler);
   }
+
   setDateLabel(formatWeekLabel(monday));
 }
 
@@ -884,8 +667,12 @@ function renderMonth() {
         )
         .join("");
       const events = state.blobs.filter((blob) => {
-        const start = toDate(blob.default_scheduled_timerange?.start);
-        const end = toDate(blob.default_scheduled_timerange?.end);
+        const start = toDate(
+          blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
+        );
+        const end = toDate(
+          blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
+        );
         return start && end && overlaps(weekStart, weekEnd, start, end);
       });
       return `
@@ -903,7 +690,7 @@ function renderMonth() {
     })
     .join("");
 
-  views.month.innerHTML = `<div class="month-grid">${cards}</div>`;
+  dom.views.month.innerHTML = `<div class="month-grid">${cards}</div>`;
   setDateLabel(formatMonthLabel(state.anchorDate));
 }
 
@@ -914,8 +701,12 @@ function renderYear() {
     .map((quarterStart, idx) => {
       const quarterEnd = new Date(year, quarterStart.getMonth() + 3, 1);
       const events = state.blobs.filter((blob) => {
-        const start = toDate(blob.default_scheduled_timerange?.start);
-        const end = toDate(blob.default_scheduled_timerange?.end);
+        const start = toDate(
+          blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
+        );
+        const end = toDate(
+          blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
+        );
         return start && end && overlaps(quarterStart, quarterEnd, start, end);
       });
       return `
@@ -931,7 +722,7 @@ function renderYear() {
     })
     .join("");
 
-  views.year.innerHTML = `<div class="year-grid">${cards}</div>`;
+  dom.views.year.innerHTML = `<div class="year-grid">${cards}</div>`;
   setDateLabel(`Year ${year}`);
 }
 
@@ -944,13 +735,9 @@ function renderAll() {
 
 function setActive(view) {
   state.view = view;
-  try {
-    window.localStorage.setItem("elastisched:view", view);
-  } catch (error) {
-    // Ignore storage errors (private mode, etc.).
-  }
-  tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
-  Object.entries(views).forEach(([key, el]) => {
+  saveView(view);
+  dom.tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
+  Object.entries(dom.views).forEach(([key, el]) => {
     el.classList.toggle("active", key === view);
   });
 
@@ -965,47 +752,12 @@ function setActive(view) {
   }
 }
 
-const API_BASE = window.location.origin;
-
-async function fetchBlobs() {
-  try {
-    const response = await fetch(`${API_BASE}/blobs`);
-    if (!response.ok) {
-      throw new Error("Failed to fetch blobs");
-    }
-    const data = await response.json();
-    state.blobs = data;
-  } catch (error) {
-    state.blobs = demoBlobs;
-  }
-  renderAll();
-  setActive(state.view);
-}
-
-function toggleForm(show) {
-  const isActive = typeof show === "boolean" ? show : !formPanel.classList.contains("active");
-  formPanel.classList.toggle("active", isActive);
-}
-
-function toggleSettings(show) {
-  const isActive = typeof show === "boolean" ? show : !settingsModal.classList.contains("active");
-  settingsModal.classList.toggle("active", isActive);
-  settingsPanel.classList.toggle("active", isActive);
-  settingsModal.setAttribute("aria-hidden", (!isActive).toString());
-}
-
-function hydrateSettingsForm() {
-  settingsForm.scheduleName.value = appConfig.scheduleName || "";
-  settingsForm.subtitle.value = appConfig.subtitle || "";
-  settingsForm.minuteGranularity.value = appConfig.minuteGranularity || 5;
-}
-
 function startInteractiveCreate() {
   state.selectionMode = true;
   state.selectionStep = "default";
   state.pendingDefaultRange = null;
   state.pendingSchedulableRange = null;
-  formStatus.textContent = "Click start/end for default range.";
+  dom.formStatus.textContent = "Click start/end for default range.";
   if (state.view !== "day" && state.view !== "week") {
     setActive("day");
   }
@@ -1013,235 +765,4 @@ function startInteractiveCreate() {
   setActive(state.view);
 }
 
-function setFormMode(mode) {
-  if (mode === "edit") {
-    formTitle.textContent = "Edit blob";
-    formSubmitBtn.textContent = "Update";
-  } else {
-    formTitle.textContent = "Create a blob";
-    formSubmitBtn.textContent = "Create";
-  }
-}
-
-function openEditForm(blob) {
-  state.selectionMode = false;
-  state.selectionStep = null;
-  state.pendingDefaultRange = null;
-  state.pendingSchedulableRange = null;
-  blobForm.name.value = blob.name || "";
-  blobForm.description.value = blob.description || "";
-  blobForm.defaultStart.value = toLocalInputValue(blob.default_scheduled_timerange?.start);
-  blobForm.defaultEnd.value = toLocalInputValue(blob.default_scheduled_timerange?.end);
-  blobForm.schedulableStart.value = toLocalInputValue(blob.schedulable_timerange?.start);
-  blobForm.schedulableEnd.value = toLocalInputValue(blob.schedulable_timerange?.end);
-  state.editingBlobId = blob.id;
-  setFormMode("edit");
-  formStatus.textContent = "";
-  toggleForm(true);
-}
-
-function resetFormMode() {
-  state.editingBlobId = null;
-  state.selectionMode = false;
-  state.selectionStep = null;
-  state.pendingDefaultRange = null;
-  state.pendingSchedulableRange = null;
-  state.selectionPointer = null;
-  if (state.selectionScrollHandler) {
-    window.removeEventListener("scroll", state.selectionScrollHandler);
-    window.removeEventListener("resize", state.selectionScrollHandler);
-    state.selectionScrollHandler = null;
-  }
-  blobForm.reset();
-  setFormMode("create");
-  formStatus.textContent = "";
-  document.querySelectorAll(".selection-overlay").forEach((overlay) => {
-    overlay.classList.remove("active");
-    overlay.style.top = "";
-    overlay.style.height = "";
-  });
-  document.querySelectorAll(".selection-caret").forEach((caret) => {
-    caret.classList.remove("active");
-    caret.style.top = "";
-  });
-}
-
-function goToDate(dateIso) {
-  const parsed = new Date(dateIso);
-  if (!Number.isNaN(parsed.getTime())) {
-    state.anchorDate = parsed;
-    renderAll();
-    setActive("day");
-  }
-}
-
-blobForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  formStatus.textContent = "Saving...";
-  const formData = new FormData(blobForm);
-  const payload = {
-    name: formData.get("name"),
-    description: formData.get("description") || null,
-    tz: "UTC",
-    default_scheduled_timerange: {
-      start: toIso(formData.get("defaultStart")),
-      end: toIso(formData.get("defaultEnd")),
-    },
-    schedulable_timerange: {
-      start: toIso(formData.get("schedulableStart")),
-      end: toIso(formData.get("schedulableEnd")),
-    },
-    policy: {},
-    dependencies: [],
-    tags: [],
-  };
-
-  try {
-    const isEditing = Boolean(state.editingBlobId);
-    const endpoint = isEditing ? `${API_BASE}/blobs/${state.editingBlobId}` : `${API_BASE}/blobs`;
-    const response = await fetch(endpoint, {
-      method: isEditing ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      let detail = "Failed to create blob";
-      const contentType = response.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        const data = await response.json();
-        detail = data.detail || detail;
-      } else {
-        detail = (await response.text()) || detail;
-      }
-      throw new Error(detail);
-    }
-    blobForm.reset();
-    formStatus.textContent = isEditing ? "Updated." : "Created.";
-    toggleForm(false);
-    resetFormMode();
-    await fetchBlobs();
-  } catch (error) {
-    formStatus.textContent = error?.message || "Error saving blob.";
-  }
-});
-
-tabs.forEach((tab) => {
-  tab.addEventListener("click", () => setActive(tab.dataset.view));
-});
-
-document.addEventListener("click", (event) => {
-  const target = event.target.closest("[data-date]");
-  if (!target) return;
-  const dateIso = target.getAttribute("data-date");
-  if (dateIso) {
-    goToDate(dateIso);
-  }
-});
-
-document.addEventListener("click", (event) => {
-  const target = event.target.closest("[data-blob-id]");
-  if (!target) return;
-  const blobId = target.getAttribute("data-blob-id");
-  const blob = state.blobs.find((item) => item.id === blobId);
-  if (blob) {
-    openEditForm(blob);
-  }
-});
-
-toggleFormBtn.addEventListener("click", () => {
-  resetFormMode();
-  toggleForm(true);
-  startInteractiveCreate();
-});
-
-settingsBtn.addEventListener("click", () => {
-  toggleSettings(true);
-  hydrateSettingsForm();
-});
-
-closeSettingsBtn.addEventListener("click", () => {
-  toggleSettings(false);
-  settingsStatus.textContent = "";
-});
-
-settingsBackdrop.addEventListener("click", () => {
-  toggleSettings(false);
-  settingsStatus.textContent = "";
-});
-closeFormBtn.addEventListener("click", () => {
-  toggleForm(false);
-  resetFormMode();
-});
-
-settingsForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const formData = new FormData(settingsForm);
-  const scheduleName = formData.get("scheduleName")?.toString().trim() || "";
-  const subtitle = formData.get("subtitle")?.toString().trim() || "";
-  const granularity = Math.max(1, Number(formData.get("minuteGranularity") || 1));
-  appConfig.scheduleName = scheduleName || appConfig.scheduleName;
-  appConfig.subtitle = subtitle || appConfig.subtitle;
-  appConfig.minuteGranularity = granularity;
-  brandTitle.textContent = appConfig.scheduleName;
-  brandSubtitle.textContent = appConfig.subtitle;
-  settingsStatus.textContent = "Saved. Refresh to apply granularity.";
-  try {
-    window.localStorage.setItem("elastisched:settings", JSON.stringify(appConfig));
-  } catch (error) {
-    // Ignore storage errors.
-  }
-});
-
-function isTypingInField(target) {
-  return (
-    target &&
-    (target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
-      target.isContentEditable)
-  );
-}
-
-window.addEventListener("keydown", (event) => {
-  if (isTypingInField(event.target)) return;
-  if (event.key === "Escape") {
-    if (settingsModal.classList.contains("active")) {
-      toggleSettings(false);
-      settingsStatus.textContent = "";
-    }
-    if (formPanel.classList.contains("active")) {
-      toggleForm(false);
-      resetFormMode();
-    }
-    return;
-  }
-  if (event.key.toLowerCase() === "n") {
-    event.preventDefault();
-    resetFormMode();
-    toggleForm(true);
-    startInteractiveCreate();
-  }
-});
-function moveDay(offset) {
-  state.anchorDate = addDays(state.anchorDate, offset);
-  renderAll();
-  setActive("day");
-}
-
-prevDayBtn.addEventListener("click", () => moveDay(-1));
-nextDayBtn.addEventListener("click", () => moveDay(1));
-goTodayBtn.addEventListener("click", () => {
-  state.anchorDate = new Date();
-  renderAll();
-  setActive("day");
-});
-
-resetFormMode();
-const savedView = (() => {
-  try {
-    return window.localStorage.getItem("elastisched:view");
-  } catch (error) {
-    return null;
-  }
-})();
-setActive(savedView || "day");
-fetchBlobs();
+export { renderAll, renderDay, renderMonth, renderWeek, renderYear, setActive, startInteractiveCreate };

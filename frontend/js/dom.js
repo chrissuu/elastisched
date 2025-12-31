@@ -1,0 +1,31 @@
+const dom = {
+  dateLabel: document.getElementById("dateLabel"),
+  tabs: document.querySelectorAll(".tab"),
+  views: {
+    day: document.getElementById("viewDay"),
+    week: document.getElementById("viewWeek"),
+    month: document.getElementById("viewMonth"),
+    year: document.getElementById("viewYear"),
+  },
+  formPanel: document.getElementById("formPanel"),
+  toggleFormBtn: document.getElementById("toggleFormBtn"),
+  closeFormBtn: document.getElementById("closeFormBtn"),
+  formStatus: document.getElementById("formStatus"),
+  blobForm: document.getElementById("blobForm"),
+  formTitle: document.getElementById("formTitle"),
+  formSubmitBtn: document.getElementById("formSubmitBtn"),
+  settingsBtn: document.getElementById("settingsBtn"),
+  settingsPanel: document.getElementById("settingsPanel"),
+  settingsModal: document.getElementById("settingsModal"),
+  settingsBackdrop: document.getElementById("settingsBackdrop"),
+  closeSettingsBtn: document.getElementById("closeSettingsBtn"),
+  settingsForm: document.getElementById("settingsForm"),
+  settingsStatus: document.getElementById("settingsStatus"),
+  prevDayBtn: document.getElementById("prevDayBtn"),
+  nextDayBtn: document.getElementById("nextDayBtn"),
+  goTodayBtn: document.getElementById("goTodayBtn"),
+  brandTitle: document.getElementById("brandTitle"),
+  brandSubtitle: document.getElementById("brandSubtitle"),
+};
+
+export { dom };
