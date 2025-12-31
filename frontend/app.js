@@ -21,6 +21,13 @@ const todayBtn = document.getElementById("todayBtn");
 const prevDayBtn = document.getElementById("prevDayBtn");
 const nextDayBtn = document.getElementById("nextDayBtn");
 const goTodayBtn = document.getElementById("goTodayBtn");
+const brandTitle = document.getElementById("brandTitle");
+const brandSubtitle = document.getElementById("brandSubtitle");
+
+if (window.APP_CONFIG) {
+  brandTitle.textContent = window.APP_CONFIG.scheduleName || brandTitle.textContent;
+  brandSubtitle.textContent = window.APP_CONFIG.subtitle || brandSubtitle.textContent;
+}
 
 const demoBlobs = [
   {
@@ -149,6 +156,8 @@ function renderDay() {
     .map((blob) => {
       const start = toDate(blob.default_scheduled_timerange?.start);
       const end = toDate(blob.default_scheduled_timerange?.end);
+      const schedStart = toDate(blob.schedulable_timerange?.start);
+      const schedEnd = toDate(blob.schedulable_timerange?.end);
       if (!start || !end) return null;
       if (!overlaps(dayStart, dayEnd, start, end)) return null;
       const clampedStart = start < dayStart ? dayStart : start;
@@ -162,6 +171,8 @@ function renderDay() {
         type: getTagType(blob.tags),
         top: (top / 60) * hourHeight,
         height: Math.max(18, (minutes / 60) * hourHeight),
+        schedStart,
+        schedEnd,
       };
     })
     .filter(Boolean)
@@ -171,7 +182,7 @@ function renderDay() {
   const blockHtml = blocks
     .map(
       (block) => `
-        <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;">
+        <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
           <span>${block.title}</span>
           <span class="event-time">${block.time}</span>
         </div>
@@ -183,10 +194,33 @@ function renderDay() {
     <div class="day-grid" style="--hour-height: ${hourHeight}px;">
       <div class="hours">${hoursHtml}</div>
       <div class="day-track">
+        <div class="schedulable-overlay" id="schedulableOverlay"></div>
         ${blockHtml || "<div class='day-empty'>No events yet</div>"}
       </div>
     </div>
   `;
+
+  const overlay = views.day.querySelector("#schedulableOverlay");
+  const blocksEls = views.day.querySelectorAll(".day-block");
+  blocksEls.forEach((blockEl) => {
+    blockEl.addEventListener("mouseenter", () => {
+      const schedStart = toDate(blockEl.getAttribute("data-sched-start"));
+      const schedEnd = toDate(blockEl.getAttribute("data-sched-end"));
+      if (!schedStart || !schedEnd) return;
+      const overlayStart = schedStart < dayStart ? dayStart : schedStart;
+      const overlayEnd = schedEnd > dayEnd ? dayEnd : schedEnd;
+      const minutes = (overlayEnd - overlayStart) / 60000;
+      const top = (overlayStart - dayStart) / 60000;
+      overlay.style.top = `${(top / 60) * hourHeight}px`;
+      overlay.style.height = `${Math.max(18, (minutes / 60) * hourHeight)}px`;
+      overlay.classList.toggle("overflow-top", schedStart < dayStart);
+      overlay.classList.toggle("overflow-bottom", schedEnd > dayEnd);
+      overlay.classList.add("active");
+    });
+    blockEl.addEventListener("mouseleave", () => {
+      overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+    });
+  });
 
   setDateLabel(formatDayLabel(state.anchorDate));
 }
@@ -211,6 +245,8 @@ function renderWeek() {
         .map((blob) => {
           const start = toDate(blob.default_scheduled_timerange?.start);
           const end = toDate(blob.default_scheduled_timerange?.end);
+          const schedStart = toDate(blob.schedulable_timerange?.start);
+          const schedEnd = toDate(blob.schedulable_timerange?.end);
           if (!start || !end) return null;
           if (!overlaps(dayStart, dayEnd, start, end)) return null;
           const clampedStart = start < dayStart ? dayStart : start;
@@ -227,6 +263,8 @@ function renderWeek() {
             type: getTagType(blob.tags),
             top: (top / 60) * hourHeight,
             height: Math.max(18, (minutes / 60) * hourHeight),
+            schedStart,
+            schedEnd,
           };
         })
         .filter(Boolean)
@@ -234,7 +272,7 @@ function renderWeek() {
       const blockHtml = blocks
         .map(
           (block) => `
-            <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;">
+            <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
               <span>${block.title}</span>
               <span class="event-time">${block.time}</span>
             </div>
@@ -253,6 +291,7 @@ function renderWeek() {
             </button>
           </div>
           <div class="week-day-track">
+            <div class="schedulable-overlay"></div>
             ${blockHtml || "<div class='day-empty'>No events yet</div>"}
           </div>
         </div>
@@ -267,6 +306,50 @@ function renderWeek() {
       <div class="week-days">${columns}</div>
     </div>
   `;
+
+  const weekStart = startOfDay(monday);
+  const weekEnd = addDays(weekStart, 7);
+  const dayColumns = Array.from(views.week.querySelectorAll(".week-day-column"));
+  const dayTracks = dayColumns.map((column, index) => {
+    const dayStart = startOfDay(days[index]);
+    const dayEnd = addDays(dayStart, 1);
+    return {
+      track: column.querySelector(".week-day-track"),
+      overlay: column.querySelector(".schedulable-overlay"),
+      dayStart,
+      dayEnd,
+    };
+  });
+
+  dayColumns.forEach((column) => {
+    column.querySelectorAll(".day-block").forEach((blockEl) => {
+      blockEl.addEventListener("mouseenter", () => {
+        const schedStart = toDate(blockEl.getAttribute("data-sched-start"));
+        const schedEnd = toDate(blockEl.getAttribute("data-sched-end"));
+        if (!schedStart || !schedEnd) return;
+        dayTracks.forEach(({ overlay, dayStart, dayEnd }) => {
+          const overlapStart = schedStart < dayStart ? dayStart : schedStart;
+          const overlapEnd = schedEnd > dayEnd ? dayEnd : schedEnd;
+          if (overlapEnd <= overlapStart) {
+            overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+            return;
+          }
+          const minutes = (overlapEnd - overlapStart) / 60000;
+          const top = (overlapStart - dayStart) / 60000;
+          overlay.style.top = `${(top / 60) * hourHeight}px`;
+          overlay.style.height = `${Math.max(18, (minutes / 60) * hourHeight)}px`;
+          overlay.classList.toggle("overflow-top", schedStart < weekStart && dayStart.getTime() === weekStart.getTime());
+          overlay.classList.toggle("overflow-bottom", schedEnd > weekEnd && dayEnd.getTime() === weekEnd.getTime());
+          overlay.classList.add("active");
+        });
+      });
+      blockEl.addEventListener("mouseleave", () => {
+        dayTracks.forEach(({ overlay }) => {
+          overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+        });
+      });
+    });
+  });
   setDateLabel(formatWeekLabel(monday));
 }
 

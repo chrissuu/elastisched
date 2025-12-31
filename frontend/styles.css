@@ -311,6 +311,46 @@ body {
   background-size: 100% var(--hour-height);
 }
 
+.schedulable-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 12px;
+  border: 1px dashed rgba(27, 26, 22, 0.35);
+  background: rgba(27, 26, 22, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.schedulable-overlay.active {
+  opacity: 1;
+}
+
+.schedulable-overlay.overflow-top::before,
+.schedulable-overlay.overflow-bottom::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to bottom,
+    rgba(27, 26, 22, 0.25),
+    transparent
+  );
+}
+
+.schedulable-overlay.overflow-bottom::after {
+  bottom: -10px;
+  transform: rotate(180deg);
+}
+
+.schedulable-overlay.overflow-top::before {
+  top: -10px;
+}
+
 .day-block {
   position: absolute;
   left: 8px;
@@ -429,6 +469,7 @@ body {
   );
   background-size: 100% var(--hour-height);
 }
+
 
 .month-grid {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
