@@ -99,12 +99,6 @@ function addDays(date, count) {
   return copy;
 }
 
-function addHours(date, count) {
-  const copy = new Date(date);
-  copy.setHours(copy.getHours() + count);
-  return copy;
-}
-
 function getTagType(tags) {
   if (tags?.includes("deep")) return "deep";
   if (tags?.includes("admin")) return "admin";
@@ -142,6 +136,8 @@ function formatMonthLabel(date) {
 
 function renderDay() {
   const dayStart = startOfDay(state.anchorDate);
+  const dayEnd = addDays(dayStart, 1);
+  const hourHeight = 44;
   const hours = Array.from({ length: 24 }, (_, idx) => {
     const hour = idx % 24;
     const labelHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
@@ -149,51 +145,46 @@ function renderDay() {
     return `${labelHour} ${suffix}`;
   });
 
-  const slotEvents = hours.map((_, idx) => {
-    const slotStart = addHours(dayStart, idx);
-    const slotEnd = addHours(slotStart, 1);
-    const events = state.blobs
-      .map((blob) => {
-        const start = toDate(blob.default_scheduled_timerange?.start);
-        const end = toDate(blob.default_scheduled_timerange?.end);
-        if (!start || !end) return null;
-        if (!overlaps(slotStart, slotEnd, start, end)) return null;
-        return {
-          title: blob.name,
-          time: formatTimeRange(blob.default_scheduled_timerange.start, blob.default_scheduled_timerange.end),
-          type: getTagType(blob.tags),
-          start,
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => a.start - b.start);
-    return events;
-  });
+  const blocks = state.blobs
+    .map((blob) => {
+      const start = toDate(blob.default_scheduled_timerange?.start);
+      const end = toDate(blob.default_scheduled_timerange?.end);
+      if (!start || !end) return null;
+      if (!overlaps(dayStart, dayEnd, start, end)) return null;
+      const clampedStart = start < dayStart ? dayStart : start;
+      const clampedEnd = end > dayEnd ? dayEnd : end;
+      const minutes = (clampedEnd - clampedStart) / 60000;
+      if (minutes <= 0) return null;
+      const top = (clampedStart - dayStart) / 60000;
+      return {
+        title: blob.name,
+        time: formatTimeRange(blob.default_scheduled_timerange.start, blob.default_scheduled_timerange.end),
+        type: getTagType(blob.tags),
+        top: (top / 60) * hourHeight,
+        height: Math.max(18, (minutes / 60) * hourHeight),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.top - b.top);
 
   const hoursHtml = hours.map((hour) => `<div class="hour">${hour}</div>`).join("");
-  const slotHtml = slotEvents
-    .map((events) => {
-      const visible = events.slice(0, 2);
-      const remaining = events.length - visible.length;
-      const eventsHtml = visible
-        .map(
-          (event) => `
-          <div class="event ${event.type}">
-            <span>${event.title}</span>
-            <span class="event-time">${event.time}</span>
-          </div>
-        `
-        )
-        .join("");
-      const moreHtml = remaining > 0 ? `<div class="more">+${remaining} more</div>` : "";
-      return `<div class="slot">${eventsHtml || "<div class='more'>No events</div>"}${moreHtml}</div>`;
-    })
+  const blockHtml = blocks
+    .map(
+      (block) => `
+        <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;">
+          <span>${block.title}</span>
+          <span class="event-time">${block.time}</span>
+        </div>
+      `
+    )
     .join("");
 
   views.day.innerHTML = `
-    <div class="day-grid">
-      <div class="hours" style="grid-template-rows: repeat(${hours.length}, 1fr);">${hoursHtml}</div>
-      <div class="slots" style="grid-template-rows: repeat(${hours.length}, 1fr);">${slotHtml}</div>
+    <div class="day-grid" style="--hour-height: ${hourHeight}px;">
+      <div class="hours">${hoursHtml}</div>
+      <div class="day-track">
+        ${blockHtml || "<div class='day-empty'>No events yet</div>"}
+      </div>
     </div>
   `;
 
@@ -204,53 +195,78 @@ function renderWeek() {
   const dayOfWeek = state.anchorDate.getDay();
   const monday = addDays(state.anchorDate, dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
   const days = Array.from({ length: 7 }, (_, idx) => addDays(monday, idx));
+  const hourHeight = 44;
+  const hours = Array.from({ length: 24 }, (_, idx) => {
+    const hour = idx % 24;
+    const labelHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    const suffix = hour < 12 ? "AM" : "PM";
+    return `${labelHour} ${suffix}`;
+  });
 
-  const cards = days
+  const columns = days
     .map((date) => {
       const dayStart = startOfDay(date);
       const dayEnd = addDays(dayStart, 1);
-      const events = state.blobs.filter((blob) => {
-        const start = toDate(blob.default_scheduled_timerange?.start);
-        const end = toDate(blob.default_scheduled_timerange?.end);
-        return start && end && overlaps(dayStart, dayEnd, start, end);
-      });
-      const list = events.slice(0, 3);
-      const overflow = events.length > 3 ? `${events.length - 3} more` : "Balanced day";
-      const eventHtml = list
+      const blocks = state.blobs
+        .map((blob) => {
+          const start = toDate(blob.default_scheduled_timerange?.start);
+          const end = toDate(blob.default_scheduled_timerange?.end);
+          if (!start || !end) return null;
+          if (!overlaps(dayStart, dayEnd, start, end)) return null;
+          const clampedStart = start < dayStart ? dayStart : start;
+          const clampedEnd = end > dayEnd ? dayEnd : end;
+          const minutes = (clampedEnd - clampedStart) / 60000;
+          if (minutes <= 0) return null;
+          const top = (clampedStart - dayStart) / 60000;
+          return {
+            title: blob.name,
+            time: formatTimeRange(
+              blob.default_scheduled_timerange.start,
+              blob.default_scheduled_timerange.end
+            ),
+            type: getTagType(blob.tags),
+            top: (top / 60) * hourHeight,
+            height: Math.max(18, (minutes / 60) * hourHeight),
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.top - b.top);
+      const blockHtml = blocks
         .map(
-          (event) => `<div class="card-event"><span>${event.name}</span><span>${formatTimeRange(
-            event.default_scheduled_timerange.start,
-            event.default_scheduled_timerange.end
-          )}</span></div>`
+          (block) => `
+            <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px;">
+              <span>${block.title}</span>
+              <span class="event-time">${block.time}</span>
+            </div>
+          `
         )
         .join("");
-      const chips = days
-        .map((chipDate) => {
-          const isSameWeekDay = chipDate.toDateString() === date.toDateString();
-          if (!isSameWeekDay) return "";
-          return `
-            <button class="day-chip" data-date="${chipDate.toISOString()}">
-              ${chipDate.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
-            </button>
-          `;
-        })
-        .join("");
       return `
-        <div class="card">
-          <div class="card-title">${date.toLocaleDateString(undefined, {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-          })}</div>
-          <div class="day-chips">${chips}</div>
-          ${eventHtml || "<div class='card-summary'>No events yet</div>"}
-          <div class="card-summary">${overflow}</div>
+        <div class="week-day-column" style="--hour-height: ${hourHeight}px;">
+          <div class="week-day-label">
+            <button data-date="${date.toISOString()}">
+              ${date.toLocaleDateString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })}
+            </button>
+          </div>
+          <div class="week-day-track">
+            ${blockHtml || "<div class='day-empty'>No events yet</div>"}
+          </div>
         </div>
       `;
     })
     .join("");
 
-  views.week.innerHTML = `<div class="week-grid">${cards}</div>`;
+  const hoursHtml = hours.map((hour) => `<div class="hour">${hour}</div>`).join("");
+  views.week.innerHTML = `
+    <div class="week-timeline" style="--hour-height: ${hourHeight}px;">
+      <div class="week-hours">${hoursHtml}</div>
+      <div class="week-days">${columns}</div>
+    </div>
+  `;
   setDateLabel(formatWeekLabel(monday));
 }
 
