@@ -166,6 +166,29 @@ body {
   gap: 4px;
 }
 
+.tab-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.nav-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ghost.icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: 16px;
+}
+
 .tab {
   border: none;
   background: transparent;
@@ -355,6 +378,26 @@ body {
   display: grid;
   gap: 10px;
   min-height: 140px;
+}
+
+.day-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.day-chip {
+  border: 1px solid #e0d3c1;
+  background: #f7efe4;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.day-chip:hover {
+  background: #efe2d4;
 }
 
 .card-title {

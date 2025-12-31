@@ -18,6 +18,9 @@ const closeFormBtn = document.getElementById("closeFormBtn");
 const formStatus = document.getElementById("formStatus");
 const blobForm = document.getElementById("blobForm");
 const todayBtn = document.getElementById("todayBtn");
+const prevDayBtn = document.getElementById("prevDayBtn");
+const nextDayBtn = document.getElementById("nextDayBtn");
+const goTodayBtn = document.getElementById("goTodayBtn");
 
 const demoBlobs = [
   {
@@ -116,6 +119,27 @@ function setDateLabel(text) {
   dateLabel.textContent = text;
 }
 
+function formatDayLabel(date) {
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatWeekLabel(date) {
+  return `Week of ${date.toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  })}`;
+}
+
+function formatMonthLabel(date) {
+  return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
 function renderDay() {
   const dayStart = startOfDay(state.anchorDate);
   const hours = Array.from({ length: 24 }, (_, idx) => {
@@ -173,13 +197,7 @@ function renderDay() {
     </div>
   `;
 
-  setDateLabel(
-    state.anchorDate.toLocaleDateString(undefined, {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-    })
-  );
+  setDateLabel(formatDayLabel(state.anchorDate));
 }
 
 function renderWeek() {
@@ -206,6 +224,17 @@ function renderWeek() {
           )}</span></div>`
         )
         .join("");
+      const chips = days
+        .map((chipDate) => {
+          const isSameWeekDay = chipDate.toDateString() === date.toDateString();
+          if (!isSameWeekDay) return "";
+          return `
+            <button class="day-chip" data-date="${chipDate.toISOString()}">
+              ${chipDate.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}
+            </button>
+          `;
+        })
+        .join("");
       return `
         <div class="card">
           <div class="card-title">${date.toLocaleDateString(undefined, {
@@ -213,6 +242,7 @@ function renderWeek() {
             month: "short",
             day: "numeric",
           })}</div>
+          <div class="day-chips">${chips}</div>
           ${eventHtml || "<div class='card-summary'>No events yet</div>"}
           <div class="card-summary">${overflow}</div>
         </div>
@@ -221,9 +251,7 @@ function renderWeek() {
     .join("");
 
   views.week.innerHTML = `<div class="week-grid">${cards}</div>`;
-  setDateLabel(
-    `Week of ${monday.toLocaleDateString(undefined, { month: "long", day: "numeric" })}`
-  );
+  setDateLabel(formatWeekLabel(monday));
 }
 
 function renderMonth() {
@@ -239,6 +267,16 @@ function renderMonth() {
   const cards = weeks
     .map((weekStart, idx) => {
       const weekEnd = addDays(weekStart, 7);
+      const chips = Array.from({ length: 7 }, (_, offset) => addDays(weekStart, offset))
+        .filter((date) => date.getMonth() === monthStart.getMonth())
+        .map(
+          (date) => `
+          <button class="day-chip" data-date="${date.toISOString()}">
+            ${date.getDate()}
+          </button>
+        `
+        )
+        .join("");
       const events = state.blobs.filter((blob) => {
         const start = toDate(blob.default_scheduled_timerange?.start);
         const end = toDate(blob.default_scheduled_timerange?.end);
@@ -247,6 +285,7 @@ function renderMonth() {
       return `
         <div class="card">
           <div class="card-title">Week ${idx + 1}</div>
+          <div class="day-chips">${chips || "<span class='card-summary'>No days</span>"}</div>
           <div class="card-summary">${events.length} sessions</div>
           <div class="card-event"><span>Focus blocks</span><span>${Math.max(
             0,
@@ -259,9 +298,7 @@ function renderMonth() {
     .join("");
 
   views.month.innerHTML = `<div class="month-grid">${cards}</div>`;
-  setDateLabel(
-    state.anchorDate.toLocaleDateString(undefined, { month: "long", year: "numeric" })
-  );
+  setDateLabel(formatMonthLabel(state.anchorDate));
 }
 
 function renderYear() {
@@ -289,7 +326,7 @@ function renderYear() {
     .join("");
 
   views.year.innerHTML = `<div class="year-grid">${cards}</div>`;
-  setDateLabel(`${year}`);
+  setDateLabel(`Year ${year}`);
 }
 
 function renderAll() {
@@ -305,6 +342,16 @@ function setActive(view) {
   Object.entries(views).forEach(([key, el]) => {
     el.classList.toggle("active", key === view);
   });
+
+  if (view === "day") {
+    renderDay();
+  } else if (view === "week") {
+    renderWeek();
+  } else if (view === "month") {
+    renderMonth();
+  } else if (view === "year") {
+    renderYear();
+  }
 }
 
 const API_BASE = window.location.origin;
@@ -321,11 +368,21 @@ async function fetchBlobs() {
     state.blobs = demoBlobs;
   }
   renderAll();
+  setActive(state.view);
 }
 
 function toggleForm(show) {
   const isActive = typeof show === "boolean" ? show : !formPanel.classList.contains("active");
   formPanel.classList.toggle("active", isActive);
+}
+
+function goToDate(dateIso) {
+  const parsed = new Date(dateIso);
+  if (!Number.isNaN(parsed.getTime())) {
+    state.anchorDate = parsed;
+    renderAll();
+    setActive("day");
+  }
 }
 
 blobForm.addEventListener("submit", async (event) => {
@@ -379,6 +436,15 @@ tabs.forEach((tab) => {
   tab.addEventListener("click", () => setActive(tab.dataset.view));
 });
 
+document.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-date]");
+  if (!target) return;
+  const dateIso = target.getAttribute("data-date");
+  if (dateIso) {
+    goToDate(dateIso);
+  }
+});
+
 toggleFormBtn.addEventListener("click", () => toggleForm());
 closeFormBtn.addEventListener("click", () => toggleForm(false));
 todayBtn.addEventListener("click", () => {
@@ -387,5 +453,19 @@ todayBtn.addEventListener("click", () => {
   setActive("day");
 });
 
-fetchBlobs();
+function moveDay(offset) {
+  state.anchorDate = addDays(state.anchorDate, offset);
+  renderAll();
+  setActive("day");
+}
+
+prevDayBtn.addEventListener("click", () => moveDay(-1));
+nextDayBtn.addEventListener("click", () => moveDay(1));
+goTodayBtn.addEventListener("click", () => {
+  state.anchorDate = new Date();
+  renderAll();
+  setActive("day");
+});
+
 setActive("day");
+fetchBlobs();

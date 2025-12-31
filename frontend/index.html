@@ -63,11 +63,18 @@
       </section>
 
       <section class="panel">
-        <div class="tabs" role="tablist">
-          <button class="tab active" data-view="day">Day</button>
-          <button class="tab" data-view="week">Week</button>
-          <button class="tab" data-view="month">Month</button>
-          <button class="tab" data-view="year">Year</button>
+        <div class="tab-row">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-view="day">Day</button>
+            <button class="tab" data-view="week">Week</button>
+            <button class="tab" data-view="month">Month</button>
+            <button class="tab" data-view="year">Year</button>
+          </div>
+          <div class="nav-actions">
+            <button class="ghost icon" id="prevDayBtn" title="Previous day">&#8592;</button>
+            <button class="ghost" id="goTodayBtn">Today</button>
+            <button class="ghost icon" id="nextDayBtn" title="Next day">&#8594;</button>
+          </div>
         </div>
         <div class="view-header">
           <div class="date-label" id="dateLabel">Tuesday, May 21</div>
