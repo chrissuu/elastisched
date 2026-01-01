@@ -1,4 +1,4 @@
-import { API_BASE, appConfig, demoBlobs, state } from "./core.js";
+import { API_BASE, appConfig, state } from "./core.js";
 import { toProjectIsoFromDate } from "./utils.js";
 
 async function fetchOccurrences(start, end) {
@@ -15,7 +15,7 @@ async function fetchOccurrences(start, end) {
     state.blobs = data;
     state.loadedRange = { start, end };
   } catch (error) {
-    state.blobs = demoBlobs;
+    state.blobs = [];
     state.loadedRange = null;
   }
 }

@@ -26,10 +26,13 @@ document.addEventListener("click", (event) => {
   const target = event.target.closest("[data-date]");
   if (!target) return;
   const dateIso = target.getAttribute("data-date");
-  if (dateIso) {
-    state.anchorDate = new Date(dateIso);
-    refreshView("day");
+  if (!dateIso) return;
+  state.anchorDate = new Date(dateIso);
+  if (target.classList.contains("year-month")) {
+    refreshView("month");
+    return;
   }
+  refreshView("day");
 });
 
 document.addEventListener("click", (event) => {

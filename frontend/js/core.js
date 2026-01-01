@@ -51,53 +51,6 @@ try {
 const minuteGranularity = Math.max(1, Number(appConfig.minuteGranularity || 5));
 const API_BASE = window.location.origin;
 
-const demoBlobs = [
-  {
-    id: "demo-1",
-    recurrence_id: "demo-1",
-    recurrence_type: "single",
-    name: "Daily Review",
-    default_scheduled_timerange: {
-      start: "2024-05-21T08:00:00Z",
-      end: "2024-05-21T08:20:00Z",
-    },
-    schedulable_timerange: {
-      start: "2024-05-21T07:30:00Z",
-      end: "2024-05-21T09:00:00Z",
-    },
-    tags: ["admin"],
-  },
-  {
-    id: "demo-2",
-    recurrence_id: "demo-2",
-    recurrence_type: "single",
-    name: "Roadmap Deep Dive",
-    default_scheduled_timerange: {
-      start: "2024-05-21T10:00:00Z",
-      end: "2024-05-21T11:15:00Z",
-    },
-    schedulable_timerange: {
-      start: "2024-05-21T09:00:00Z",
-      end: "2024-05-21T12:00:00Z",
-    },
-    tags: ["deep"],
-  },
-  {
-    id: "demo-3",
-    recurrence_id: "demo-3",
-    recurrence_type: "single",
-    name: "Prototype Build",
-    default_scheduled_timerange: {
-      start: "2024-05-21T13:00:00Z",
-      end: "2024-05-21T14:20:00Z",
-    },
-    schedulable_timerange: {
-      start: "2024-05-21T12:00:00Z",
-      end: "2024-05-21T15:00:00Z",
-    },
-    tags: ["focus"],
-  },
-];
 
 function saveView(view) {
   try {
@@ -135,7 +88,6 @@ function isTypingInField(target) {
 export {
   API_BASE,
   appConfig,
-  demoBlobs,
   isTypingInField,
   loadView,
   minuteGranularity,

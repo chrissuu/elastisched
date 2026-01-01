@@ -824,66 +824,73 @@ function renderWeek() {
 function renderMonth() {
   const monthStart = new Date(state.anchorDate.getFullYear(), state.anchorDate.getMonth(), 1);
   const monthEnd = new Date(state.anchorDate.getFullYear(), state.anchorDate.getMonth() + 1, 1);
-  const weeks = [];
-  let cursor = monthStart;
-  while (cursor < monthEnd) {
-    weeks.push(cursor);
-    cursor = addDays(cursor, 7);
-  }
+  const dayOfWeek = monthStart.getDay();
+  const gridStart = addDays(monthStart, -dayOfWeek);
+  const gridEnd = addDays(gridStart, 42);
+  const days = Array.from({ length: 42 }, (_, idx) => addDays(gridStart, idx));
+  const weekdayLabels = Array.from({ length: 7 }, (_, idx) =>
+    new Date(2024, 0, 7 + idx).toLocaleDateString(undefined, { weekday: "short" })
+  );
 
-  const cards = weeks
-    .map((weekStart, idx) => {
-      const weekEnd = addDays(weekStart, 7);
-      const chips = Array.from({ length: 7 }, (_, offset) => addDays(weekStart, offset))
-        .filter((date) => date.getMonth() === monthStart.getMonth())
-        .map(
-          (date) => `
-          <button class="day-chip" data-date="${date.toISOString()}">
-            ${date.getDate()}
-          </button>
-        `
-        )
-        .join("");
-      const events = state.blobs.filter((blob) => {
-        const start = toZonedDate(
-          toDate(
-          blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
-        ),
-          appConfig.userTimeZone
-        );
-        const end = toZonedDate(
-          toDate(
-          blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
-        ),
-          appConfig.userTimeZone
-        );
-        return start && end && overlaps(weekStart, weekEnd, start, end);
-      });
+  const counts = new Map();
+  const toKey = (date) => {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, "0");
+    const day = `${date.getDate()}`.padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  state.blobs.forEach((blob) => {
+    const start = toZonedDate(
+      toDate(blob.realized_timerange?.start || blob.default_scheduled_timerange?.start),
+      appConfig.userTimeZone
+    );
+    const end = toZonedDate(
+      toDate(blob.realized_timerange?.end || blob.default_scheduled_timerange?.end),
+      appConfig.userTimeZone
+    );
+    if (!start || !end) return;
+    if (!overlaps(gridStart, gridEnd, start, end)) return;
+    let cursor = startOfDay(start < gridStart ? gridStart : start);
+    while (cursor < gridEnd && cursor < end) {
+      const key = toKey(cursor);
+      counts.set(key, (counts.get(key) || 0) + 1);
+      cursor = addDays(cursor, 1);
+    }
+  });
+
+  const dayCells = days
+    .map((date) => {
+      const count = counts.get(toKey(date)) || 0;
+      const countHtml = count > 0 ? `<span class="month-day-count">${count}</span>` : "";
       return `
-        <div class="card">
-          <div class="card-title">Week ${idx + 1}</div>
-          <div class="day-chips">${chips || "<span class='card-summary'>No days</span>"}</div>
-          <div class="card-summary">${events.length} sessions</div>
-          <div class="card-event"><span>Focus blocks</span><span>${Math.max(
-            0,
-            events.length - 2
-          )}</span></div>
-          <div class="card-event"><span>Compression</span><span>${events.length > 6 ? "High" : "Low"}</span></div>
-        </div>
+        <button class="month-day ${date.getMonth() === monthStart.getMonth() ? "" : "other"}" data-date="${date.toISOString()}">
+          <span class="month-day-number">${date.getDate()}</span>
+          <span class="month-day-events">${countHtml}</span>
+        </button>
       `;
     })
     .join("");
 
-  dom.views.month.innerHTML = `<div class="month-grid">${cards}</div>`;
+  dom.views.month.innerHTML = `
+    <div class="month-calendar">
+      <div class="month-weekdays">
+        ${weekdayLabels.map((label) => `<div>${label}</div>`).join("")}
+      </div>
+      <div class="month-grid-days">
+        ${dayCells}
+      </div>
+    </div>
+  `;
   setDateLabel(formatMonthLabel(state.anchorDate));
 }
 
 function renderYear() {
   const year = state.anchorDate.getFullYear();
-  const quarters = [0, 3, 6, 9].map((month) => new Date(year, month, 1));
-  const cards = quarters
-    .map((quarterStart, idx) => {
-      const quarterEnd = new Date(year, quarterStart.getMonth() + 3, 1);
+  const months = Array.from({ length: 12 }, (_, idx) => new Date(year, idx, 1));
+  const cards = months
+    .map((monthStart) => {
+      const monthEnd = new Date(year, monthStart.getMonth() + 1, 1);
       const events = state.blobs.filter((blob) => {
         const start = toZonedDate(
           toDate(
@@ -897,17 +904,15 @@ function renderYear() {
         ),
           appConfig.userTimeZone
         );
-        return start && end && overlaps(quarterStart, quarterEnd, start, end);
+        return start && end && overlaps(monthStart, monthEnd, start, end);
       });
       return `
-        <div class="card">
-          <div class="card-title">Q${idx + 1}</div>
+        <button class="card year-month" data-date="${monthStart.toISOString()}">
+          <div class="card-title">${monthStart.toLocaleDateString(undefined, {
+            month: "long",
+          })}</div>
           <div class="card-summary">${events.length} sessions</div>
-          <div class="card-event"><span>Peak month</span><span>${quarterStart.toLocaleDateString(undefined, {
-            month: "short",
-          })}</span></div>
-          <div class="card-event"><span>Flow score</span><span>${(0.6 + events.length / 100).toFixed(2)}</span></div>
-        </div>
+        </button>
       `;
     })
     .join("");
