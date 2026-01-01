@@ -152,6 +152,20 @@ def _coerce_timerange(timerange: TimeRange, tzinfo) -> TimeRange:
     return TimeRange(start=start, end=end)
 
 
+def _exclusion_set(payload: dict) -> set[int]:
+    raw = payload.get("exclusions") or []
+    exclusions = set()
+    for item in raw:
+        try:
+            value = _parse_datetime(item)
+        except HTTPException:
+            continue
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        exclusions.add(int(value.timestamp()))
+    return exclusions
+
+
 def _to_occurrence_schema(
     recurrence_id: str, recurrence_type: str, payload: dict, blob: Blob
 ) -> OccurrenceRead:
@@ -269,10 +283,16 @@ async def list_occurrences(
     result = await session.execute(select(RecurrenceModel))
     occurrences: list[OccurrenceRead] = []
     for recurrence in result.scalars().all():
+        exclusions = _exclusion_set(recurrence.payload or {})
         recurrence_obj = _recurrence_from_payload(recurrence.type, recurrence.payload)
         recurrence_tz = _recurrence_tzinfo(recurrence_obj)
         recurrence_range = _coerce_timerange(timerange, recurrence_tz)
         for blob in recurrence_obj.all_occurrences(recurrence_range):
+            start = blob.get_schedulable_timerange().start
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            if int(start.timestamp()) in exclusions:
+                continue
             occurrences.append(
                 _to_occurrence_schema(
                     recurrence.id, recurrence.type, recurrence.payload, blob

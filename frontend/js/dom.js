@@ -33,6 +33,8 @@ const dom = {
   brandTitle: document.getElementById("brandTitle"),
   brandSubtitle: document.getElementById("brandSubtitle"),
   infoCard: document.getElementById("infoCard"),
+  deleteRecurrenceBtn: document.getElementById("deleteRecurrenceBtn"),
+  deleteOccurrenceBtn: document.getElementById("deleteOccurrenceBtn"),
 };
 
 export { dom };

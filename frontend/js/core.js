@@ -6,6 +6,8 @@ const state = {
   anchorDate: new Date(),
   editingRecurrenceId: null,
   editingRecurrenceType: null,
+  editingRecurrencePayload: null,
+  editingOccurrenceStart: null,
   loadedRange: null,
   selectionMode: false,
   selectionStep: null,

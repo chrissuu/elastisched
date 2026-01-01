@@ -13,6 +13,7 @@ import { startInteractiveCreate } from "./render.js";
 let refreshView = null;
 const recurrenceFieldGroups = document.querySelectorAll(".recurrence-fields");
 const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const editOnlyElements = document.querySelectorAll(".edit-only");
 
 function setRefreshHandler(handler) {
   refreshView = handler;
@@ -41,9 +42,15 @@ function setFormMode(mode) {
   if (mode === "edit") {
     dom.formTitle.textContent = "Edit recurrence";
     dom.formSubmitBtn.textContent = "Update";
+    editOnlyElements.forEach((el) => {
+      el.classList.add("active");
+    });
   } else {
     dom.formTitle.textContent = "Create a recurrence";
     dom.formSubmitBtn.textContent = "Create";
+    editOnlyElements.forEach((el) => {
+      el.classList.remove("active");
+    });
   }
 }
 
@@ -364,6 +371,8 @@ function validateWeeklySlots() {
 function resetFormMode() {
   state.editingRecurrenceId = null;
   state.editingRecurrenceType = null;
+  state.editingRecurrencePayload = null;
+  state.editingOccurrenceStart = null;
   state.selectionMode = false;
   state.selectionStep = null;
   state.pendingDefaultRange = null;
@@ -490,10 +499,77 @@ function openEditForm(blob) {
   }
   state.editingRecurrenceId = blob.recurrence_id || null;
   state.editingRecurrenceType = recurrenceType;
+  state.editingRecurrencePayload = blob.recurrence_payload || {};
+  state.editingOccurrenceStart = blob.schedulable_timerange?.start || null;
   updateRecurrenceUI();
   setFormMode("edit");
   dom.formStatus.textContent = "";
   toggleForm(true);
+}
+
+async function deleteRecurrence() {
+  if (!state.editingRecurrenceId) return;
+  const confirmed = window.confirm("Delete this entire recurrence?");
+  if (!confirmed) return;
+  dom.formStatus.textContent = "Deleting recurrence...";
+  try {
+    const response = await fetch(`${API_BASE}/recurrences/${state.editingRecurrenceId}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete recurrence");
+    }
+    dom.formStatus.textContent = "Deleted.";
+    toggleForm(false);
+    resetFormMode();
+    if (refreshView) {
+      await refreshView(state.view);
+    }
+  } catch (error) {
+    dom.formStatus.textContent = error?.message || "Error deleting recurrence.";
+  }
+}
+
+async function deleteOccurrence() {
+  if (!state.editingRecurrenceId) return;
+  if (state.editingRecurrenceType === "single") {
+    await deleteRecurrence();
+    return;
+  }
+  const occurrenceStart = state.editingOccurrenceStart;
+  if (!occurrenceStart) {
+    dom.formStatus.textContent = "Missing occurrence start.";
+    return;
+  }
+  const confirmed = window.confirm("Delete only this occurrence?");
+  if (!confirmed) return;
+  const existing = Array.isArray(state.editingRecurrencePayload?.exclusions)
+    ? state.editingRecurrencePayload.exclusions
+    : [];
+  const nextExclusions = Array.from(new Set([...existing, occurrenceStart]));
+  const payload = {
+    type: state.editingRecurrenceType,
+    payload: { ...state.editingRecurrencePayload, exclusions: nextExclusions },
+  };
+  dom.formStatus.textContent = "Deleting occurrence...";
+  try {
+    const response = await fetch(`${API_BASE}/recurrences/${state.editingRecurrenceId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete occurrence");
+    }
+    dom.formStatus.textContent = "Deleted.";
+    toggleForm(false);
+    resetFormMode();
+    if (refreshView) {
+      await refreshView(state.view);
+    }
+  } catch (error) {
+    dom.formStatus.textContent = error?.message || "Error deleting occurrence.";
+  }
 }
 
 async function handleBlobSubmit(event) {
@@ -749,6 +825,12 @@ function bindFormHandlers(onRefresh) {
   setRefreshHandler(onRefresh);
   dom.blobForm.addEventListener("submit", handleBlobSubmit);
   dom.settingsForm.addEventListener("submit", handleSettingsSubmit);
+  if (dom.deleteRecurrenceBtn) {
+    dom.deleteRecurrenceBtn.addEventListener("click", deleteRecurrence);
+  }
+  if (dom.deleteOccurrenceBtn) {
+    dom.deleteOccurrenceBtn.addEventListener("click", deleteOccurrence);
+  }
   dom.toggleFormBtn.addEventListener("click", handleAddClick);
   dom.settingsBtn.addEventListener("click", handleSettingsClick);
   dom.closeSettingsBtn.addEventListener("click", handleCloseSettings);

@@ -363,6 +363,23 @@ body {
   font-size: 12px;
 }
 
+.edit-only {
+  display: none;
+}
+
+.edit-only.active {
+  display: inline-flex;
+}
+
+.ghost.danger {
+  border-color: rgba(180, 73, 63, 0.5);
+  color: #b4493f;
+}
+
+.ghost.danger:hover {
+  background: rgba(180, 73, 63, 0.08);
+}
+
 .tabs {
   display: inline-flex;
   background: #e9dfd0;
