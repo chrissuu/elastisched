@@ -160,6 +160,10 @@ double ScheduleCostFunction::illegal_schedule_cost() const {
     for (size_t i = 0; i < scheduledJobs.size(); ++i) {
         const Job& curr = scheduledJobs[i];
         Policy currPolicy = curr.policy;
+
+        if (!curr.schedulableTimeRange.contains(curr.scheduledTimeRange)) {
+            return constants::ILLEGAL_SCHEDULE_COST;
+        }
         
         if (!currPolicy.isOverlappable()) {
             auto overlappingInterval = nonOverlappableJobs.searchOverlap(

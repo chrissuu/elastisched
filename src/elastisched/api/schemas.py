@@ -65,3 +65,17 @@ class OccurrenceRead(BlobBase):
     recurrence_id: str
     recurrence_type: str
     recurrence_payload: dict | None = None
+
+
+class ScheduleStatus(BaseModel):
+    dirty: bool
+    last_run: datetime | None = None
+
+
+class ScheduleRequest(BaseModel):
+    granularity_minutes: int | None = Field(default=None, ge=1)
+    lookahead_seconds: int | None = Field(default=None, ge=1)
+
+
+class ScheduleResponse(ScheduleStatus):
+    occurrences: list[OccurrenceRead]

@@ -1,6 +1,6 @@
 import { appConfig, isTypingInField, loadView, state } from "./core.js";
 import { dom } from "./dom.js";
-import { ensureOccurrences } from "./api.js";
+import { ensureOccurrences, fetchScheduleStatus, runSchedule } from "./api.js";
 import { bindFormHandlers, openEditForm, resetFormMode, toggleForm, toggleSettings } from "./forms.js";
 import { clearInfoCardLock, setActive, startInteractiveCreate } from "./render.js";
 import { getViewRange, shiftAnchorDate } from "./utils.js";
@@ -16,11 +16,64 @@ async function refreshView(nextView = state.view) {
   const range = getViewRange(view, state.anchorDate);
   await ensureOccurrences(range.start, range.end);
   setActive(view);
+  await refreshScheduleStatus();
+}
+
+function setScheduleStatusState(mode, message) {
+  if (!dom.scheduleStatus || !dom.scheduleStatusText) return;
+  dom.scheduleStatus.classList.remove("clean", "dirty", "running", "error");
+  if (mode) {
+    dom.scheduleStatus.classList.add(mode);
+  }
+  dom.scheduleStatusText.textContent = message;
+}
+
+async function refreshScheduleStatus() {
+  if (!dom.scheduleStatus || !dom.scheduleStatusText) return;
+  try {
+    const status = await fetchScheduleStatus();
+    state.scheduleDirty = Boolean(status.dirty);
+    state.scheduleLastRun = status.last_run || null;
+    const label = state.scheduleDirty ? "Schedule out of date" : "Schedule up to date";
+    setScheduleStatusState(state.scheduleDirty ? "dirty" : "clean", label);
+    if (state.scheduleLastRun) {
+      const lastRun = new Date(state.scheduleLastRun);
+      if (!Number.isNaN(lastRun.getTime())) {
+        dom.scheduleStatus.title = `Last run: ${lastRun.toLocaleString()}`;
+      }
+    }
+  } catch (error) {
+    setScheduleStatusState("error", "Schedule status unavailable");
+  }
+}
+
+async function handleRunSchedule() {
+  if (state.scheduleRunning) return;
+  state.scheduleRunning = true;
+  if (dom.runScheduleBtn) {
+    dom.runScheduleBtn.disabled = true;
+  }
+  setScheduleStatusState("running", "Scheduling...");
+  try {
+    await runSchedule(appConfig.minuteGranularity, appConfig.lookaheadSeconds);
+    await refreshView(state.view);
+  } catch (error) {
+    setScheduleStatusState("error", error?.message || "Scheduler failed");
+  } finally {
+    state.scheduleRunning = false;
+    if (dom.runScheduleBtn) {
+      dom.runScheduleBtn.disabled = false;
+    }
+  }
 }
 
 dom.tabs.forEach((tab) => {
   tab.addEventListener("click", () => refreshView(tab.dataset.view));
 });
+
+if (dom.runScheduleBtn) {
+  dom.runScheduleBtn.addEventListener("click", handleRunSchedule);
+}
 
 document.addEventListener("click", (event) => {
   const target = event.target.closest("[data-date]");

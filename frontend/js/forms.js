@@ -37,6 +37,8 @@ function hydrateSettingsForm() {
   dom.settingsForm.scheduleName.value = appConfig.scheduleName || "";
   dom.settingsForm.subtitle.value = appConfig.subtitle || "";
   dom.settingsForm.minuteGranularity.value = appConfig.minuteGranularity || 5;
+  dom.settingsForm.lookaheadSeconds.value =
+    appConfig.lookaheadSeconds || 14 * 24 * 60 * 60;
   dom.settingsForm.userTimeZone.value = appConfig.userTimeZone || "";
 }
 
@@ -1112,6 +1114,7 @@ function handleSettingsSubmit(event) {
   const scheduleName = formData.get("scheduleName")?.toString().trim() || "";
   const subtitle = formData.get("subtitle")?.toString().trim() || "";
   const granularity = Math.max(1, Number(formData.get("minuteGranularity") || 1));
+  const lookaheadSeconds = Math.max(1, Number(formData.get("lookaheadSeconds") || 1));
   const userTimeZone = formData.get("userTimeZone")?.toString().trim() || "";
   if (userTimeZone) {
     try {
@@ -1124,6 +1127,7 @@ function handleSettingsSubmit(event) {
   appConfig.scheduleName = scheduleName || appConfig.scheduleName;
   appConfig.subtitle = subtitle || appConfig.subtitle;
   appConfig.minuteGranularity = granularity;
+  appConfig.lookaheadSeconds = lookaheadSeconds;
   if (userTimeZone) {
     appConfig.userTimeZone = userTimeZone;
   }

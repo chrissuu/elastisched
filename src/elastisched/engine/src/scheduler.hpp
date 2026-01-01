@@ -170,6 +170,11 @@ std::pair<Schedule, std::vector<double>> scheduleJobs(
         return std::make_pair<Schedule, std::vector<double>>(Schedule(), {});
     };
 
+    for (auto& job : jobs) {
+        if (job.isRigid()) {
+            job.scheduledTimeRange = job.schedulableTimeRange;
+        }
+    }
 
     std::vector<std::vector<Job>> disjointJobs = getDisjointIntervals(jobs);
     std::random_device rd;

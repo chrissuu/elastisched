@@ -32,4 +32,36 @@ async function ensureOccurrences(start, end) {
   await fetchOccurrences(start, end);
 }
 
-export { ensureOccurrences, fetchOccurrences };
+async function fetchScheduleStatus() {
+  const response = await fetch(`${API_BASE}/schedule/status`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch schedule status");
+  }
+  return response.json();
+}
+
+async function runSchedule(granularityMinutes, lookaheadSeconds) {
+  const payload = {
+    granularity_minutes: granularityMinutes,
+    lookahead_seconds: lookaheadSeconds,
+  };
+  const response = await fetch(`${API_BASE}/schedule`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let detail = "Failed to run scheduler";
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      detail = data.detail || detail;
+    } else {
+      detail = (await response.text()) || detail;
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+export { ensureOccurrences, fetchOccurrences, fetchScheduleStatus, runSchedule };

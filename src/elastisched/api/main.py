@@ -9,6 +9,7 @@ from elastisched.api.recurrence_router import (
     occurrence_router,
     recurrence_router,
 )
+from elastisched.api.schedule_router import schedule_router
 
 
 app = FastAPI(title="Elastisched API")
@@ -30,3 +31,4 @@ async def health() -> dict:
 app.include_router(blob_router)
 app.include_router(recurrence_router)
 app.include_router(occurrence_router)
+app.include_router(schedule_router)

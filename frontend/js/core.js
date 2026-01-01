@@ -18,6 +18,9 @@ const state = {
   activeBlockClickHandler: null,
   infoCardLocked: false,
   lockedBlobId: null,
+  scheduleDirty: true,
+  scheduleLastRun: null,
+  scheduleRunning: false,
 };
 
 const defaultConfig = {
@@ -25,6 +28,10 @@ const defaultConfig = {
   subtitle: window.APP_CONFIG?.subtitle || "Schedule at a glance",
   minuteGranularity: Math.max(1, Number(window.APP_CONFIG?.minuteGranularity || 5)),
   projectTimeZone: window.APP_CONFIG?.projectTimeZone || "UTC",
+  lookaheadSeconds: Math.max(
+    1,
+    Number(window.APP_CONFIG?.lookaheadSeconds || 14 * 24 * 60 * 60)
+  ),
   userTimeZone: window.APP_CONFIG?.userTimeZone || null,
 };
 

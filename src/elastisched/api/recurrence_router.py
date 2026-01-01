@@ -3,11 +3,15 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from elastisched.api.db import get_session
-from elastisched.api.models import RecurrenceModel
+from elastisched.api.models import (
+    RecurrenceModel,
+    ScheduledOccurrenceModel,
+    ScheduleStateModel,
+)
 from elastisched.api.schemas import (
     OccurrenceRead,
     RecurrenceCreate,
@@ -28,6 +32,18 @@ from engine import Tag
 
 recurrence_router = APIRouter(prefix="/recurrences", tags=["recurrences"])
 occurrence_router = APIRouter(prefix="/occurrences", tags=["occurrences"])
+
+
+async def _mark_schedule_dirty(session: AsyncSession) -> None:
+    result = await session.execute(select(ScheduleStateModel))
+    state = result.scalar_one_or_none()
+    if state is None:
+        state = ScheduleStateModel(dirty=True)
+        session.add(state)
+    else:
+        state.dirty = True
+    await session.execute(delete(ScheduledOccurrenceModel))
+    await session.commit()
 
 
 def _parse_datetime(value: str) -> datetime:
@@ -226,6 +242,7 @@ async def create_recurrence(
     session.add(recurrence)
     await session.commit()
     await session.refresh(recurrence)
+    await _mark_schedule_dirty(session)
     return RecurrenceRead(id=recurrence.id, type=recurrence.type, payload=recurrence.payload)
 
 
@@ -271,6 +288,7 @@ async def update_recurrence(
     recurrence.payload = new_payload
     await session.commit()
     await session.refresh(recurrence)
+    await _mark_schedule_dirty(session)
     return RecurrenceRead(id=recurrence.id, type=recurrence.type, payload=recurrence.payload)
 
 
@@ -286,6 +304,7 @@ async def delete_recurrence(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recurrence not found")
     await session.delete(recurrence)
     await session.commit()
+    await _mark_schedule_dirty(session)
 
 
 @occurrence_router.get("", response_model=list[OccurrenceRead])
@@ -319,5 +338,38 @@ async def list_occurrences(
                     recurrence.id, recurrence.type, recurrence.payload, blob
                 )
             )
+    if occurrences:
+        occurrence_ids = [occurrence.id for occurrence in occurrences]
+        scheduled_result = await session.execute(
+            select(ScheduledOccurrenceModel).where(
+                ScheduledOccurrenceModel.id.in_(occurrence_ids)
+            )
+        )
+        scheduled = {
+            item.id: item for item in scheduled_result.scalars().all()
+        }
+        if scheduled:
+            def _coerce_aware(value: datetime) -> datetime:
+                if value.tzinfo is None:
+                    return value.replace(tzinfo=timezone.utc)
+                return value
+
+            occurrences = [
+                occurrence.model_copy(
+                    update={
+                        "realized_timerange": TimeRangeSchema(
+                            start=scheduled[occurrence.id].realized_start,
+                            end=scheduled[occurrence.id].realized_end,
+                        )
+                    }
+                )
+                if occurrence.id in scheduled
+                and _coerce_aware(occurrence.schedulable_timerange.start)
+                <= _coerce_aware(scheduled[occurrence.id].realized_start)
+                <= _coerce_aware(scheduled[occurrence.id].realized_end)
+                <= _coerce_aware(occurrence.schedulable_timerange.end)
+                else occurrence
+                for occurrence in occurrences
+            ]
     occurrences.sort(key=lambda item: item.default_scheduled_timerange.start)
     return occurrences

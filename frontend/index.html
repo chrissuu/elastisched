@@ -45,6 +45,10 @@
               <input type="number" name="minuteGranularity" min="1" step="1" />
             </label>
             <label>
+              Lookahead seconds
+              <input type="number" name="lookaheadSeconds" min="1" step="1" />
+            </label>
+            <label>
               User timezone (IANA)
               <input type="text" name="userTimeZone" placeholder="America/New_York" />
             </label>
@@ -252,7 +256,16 @@
         <div class="view-header">
           <div class="date-label" id="dateLabel">Tuesday, May 21</div>
           <div class="legend">
-            <button class="ghost" id="toggleFormBtn">Add recurrence</button>
+            <div class="schedule-controls">
+              <button class="ghost" id="toggleFormBtn">Add recurrence</button>
+              <button class="primary schedule-btn" id="runScheduleBtn">Run schedule</button>
+              <div class="schedule-status" id="scheduleStatus" role="status" aria-live="polite">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span class="status-text" id="scheduleStatusText">
+                  Schedule status unknown
+                </span>
+              </div>
+            </div>
           </div>
         </div>
         <div class="info-card" id="infoCard" aria-hidden="true"></div>

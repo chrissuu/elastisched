@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, JSON, String
+from sqlalchemy import Boolean, DateTime, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from elastisched.api.db import Base
@@ -30,3 +30,19 @@ class RecurrenceModel(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     type: Mapped[str] = mapped_column(String(32))
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class ScheduledOccurrenceModel(Base):
+    __tablename__ = "scheduled_occurrences"
+
+    id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    realized_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    realized_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ScheduleStateModel(Base):
+    __tablename__ = "schedule_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    dirty: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_run: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
