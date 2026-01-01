@@ -317,6 +317,14 @@ function layoutBlocks(blocks) {
   blocks.forEach((block) => {
     block.columns = block.cluster?.maxColumns || 1;
   });
+
+  const maxStack = 4;
+  blocks.forEach((block) => {
+    const stackCount = Math.min(block.columns, maxStack);
+    block.stackCount = stackCount;
+    block.stackIndex = Math.min(block.column || 0, stackCount - 1);
+    block.stackStep = Math.max(6, 18 - stackCount * 2);
+  });
 }
 
 export {

@@ -1,4 +1,4 @@
-import { appConfig, minuteGranularity, saveView, state } from "./core.js";
+import { API_BASE, appConfig, minuteGranularity, saveView, state } from "./core.js";
 import { dom } from "./dom.js";
 import {
   addDays,
@@ -25,6 +25,28 @@ function getPolicyFlags(policy = {}) {
   const invisible =
     typeof policy.is_invisible === "boolean" ? policy.is_invisible : Boolean(mask & 4);
   return { splittable, overlappable, invisible };
+}
+
+function isOccurrenceStarred(blob) {
+  const payload = blob.recurrence_payload || {};
+  const occurrenceStart = blob.schedulable_timerange?.start;
+  const occurrenceDate = occurrenceStart ? new Date(occurrenceStart) : null;
+  if (!occurrenceDate || Number.isNaN(occurrenceDate.getTime())) return false;
+  const occurrenceKey = occurrenceDate.toISOString();
+  if (payload.starred) {
+    const unstarred = Array.isArray(payload.unstarred) ? payload.unstarred : [];
+    return !unstarred.some((item) => {
+      const itemDate = new Date(item);
+      if (Number.isNaN(itemDate.getTime())) return false;
+      return itemDate.toISOString() === occurrenceKey;
+    });
+  }
+  const stars = Array.isArray(payload.stars) ? payload.stars : [];
+  return stars.some((item) => {
+    const itemDate = new Date(item);
+    if (Number.isNaN(itemDate.getTime())) return false;
+    return itemDate.toISOString() === occurrenceKey;
+  });
 }
 
 function renderPolicyBadges(policy, { compact = false } = {}) {
@@ -67,11 +89,31 @@ function getInfoCard() {
   return card;
 }
 
-function showInfoCard(blob, anchorRect) {
+function showInfoCardHtml(html, anchorRect) {
   const card = getInfoCard();
+  if (!html || !anchorRect) return;
+  card.innerHTML = html;
+  card.classList.add("active");
+  card.setAttribute("aria-hidden", "false");
+  const padding = 12;
+  const cardWidth = card.offsetWidth;
+  const cardHeight = card.offsetHeight;
+  let left = anchorRect.right + padding;
+  if (left + cardWidth > window.innerWidth - padding) {
+    left = anchorRect.left - cardWidth - padding;
+  }
+  left = Math.max(padding, Math.min(left, window.innerWidth - cardWidth - padding));
+  let top = anchorRect.top;
+  top = Math.max(padding, Math.min(top, window.innerHeight - cardHeight - padding));
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+}
+
+function showInfoCard(blob, anchorRect) {
   if (!blob || !anchorRect) return;
   const recurrenceName = blob.recurrence_payload?.recurrence_name;
   const recurrenceDescription = blob.recurrence_payload?.recurrence_description;
+  const starred = isOccurrenceStarred(blob);
   const blobName = blob.name || "Untitled";
   const blobDescription = blob.description;
   const timeLabel = formatTimeRangeInTimeZone(
@@ -90,8 +132,11 @@ function showInfoCard(blob, anchorRect) {
       `
       : "";
 
-  card.innerHTML = `
-    <div class="info-title">${blobName}</div>
+  const html = `
+    <div class="info-title">
+      ${blobName}
+      <span class="info-star ${starred ? "active" : ""}" aria-hidden="true">★</span>
+    </div>
     ${blobDescription ? `<div class="info-text">${blobDescription}</div>` : ""}
     ${recurrenceBlock}
     <div class="info-divider"></div>
@@ -99,22 +144,7 @@ function showInfoCard(blob, anchorRect) {
     <div class="info-text">${timeLabel}</div>
     ${policyBadges ? `<div class="info-label">Policy</div><div class="policy-badges">${policyBadges}</div>` : ""}
   `;
-
-  card.classList.add("active");
-  card.setAttribute("aria-hidden", "false");
-
-  const padding = 12;
-  const cardWidth = card.offsetWidth;
-  const cardHeight = card.offsetHeight;
-  let left = anchorRect.right + padding;
-  if (left + cardWidth > window.innerWidth - padding) {
-    left = anchorRect.left - cardWidth - padding;
-  }
-  left = Math.max(padding, Math.min(left, window.innerWidth - cardWidth - padding));
-  let top = anchorRect.top;
-  top = Math.max(padding, Math.min(top, window.innerHeight - cardHeight - padding));
-  card.style.left = `${left}px`;
-  card.style.top = `${top}px`;
+  showInfoCardHtml(html, anchorRect);
 }
 
 function hideInfoCard() {
@@ -163,6 +193,61 @@ function updateCaret(caretEl, minutes, hourHeight) {
   caretEl.classList.add("active");
 }
 
+async function toggleStarFromCalendar(blob) {
+  if (!blob?.recurrence_id) return;
+  const occurrenceStart = blob.schedulable_timerange?.start;
+  const occurrenceDate = occurrenceStart ? new Date(occurrenceStart) : null;
+  if (!occurrenceDate || Number.isNaN(occurrenceDate.getTime())) return;
+  const occurrenceKey = occurrenceDate.toISOString();
+  const payload = blob.recurrence_payload || {};
+  let nextPayload = { ...payload };
+  if (payload.starred) {
+    const unstarred = Array.isArray(payload.unstarred) ? payload.unstarred : [];
+    const nextUnstarred = unstarred.some((item) => {
+      const itemDate = new Date(item);
+      return !Number.isNaN(itemDate.getTime()) && itemDate.toISOString() === occurrenceKey;
+    })
+      ? unstarred.filter((item) => {
+          const itemDate = new Date(item);
+          return Number.isNaN(itemDate.getTime()) || itemDate.toISOString() !== occurrenceKey;
+        })
+      : [...unstarred, occurrenceKey];
+    nextPayload = { ...payload, unstarred: nextUnstarred };
+  } else {
+    const stars = Array.isArray(payload.stars) ? payload.stars : [];
+    const nextStars = stars.some((item) => {
+      const itemDate = new Date(item);
+      return !Number.isNaN(itemDate.getTime()) && itemDate.toISOString() === occurrenceKey;
+    })
+      ? stars.filter((item) => {
+          const itemDate = new Date(item);
+          return Number.isNaN(itemDate.getTime()) || itemDate.toISOString() !== occurrenceKey;
+        })
+      : [...stars, occurrenceKey];
+    nextPayload = { ...payload, stars: nextStars };
+  }
+
+  state.blobs = state.blobs.map((item) =>
+    item.recurrence_id === blob.recurrence_id
+      ? { ...item, recurrence_payload: nextPayload }
+      : item
+  );
+  setActive(state.view);
+
+  try {
+    await fetch(`${API_BASE}/recurrences/${blob.recurrence_id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: blob.recurrence_type || "single",
+        payload: nextPayload,
+      }),
+    });
+  } catch (error) {
+    // Ignore network errors; state will resync on next refresh.
+  }
+}
+
 function renderDay() {
   const dayStart = startOfDay(state.anchorDate);
   const dayEnd = addDays(dayStart, 1);
@@ -204,6 +289,7 @@ function renderDay() {
       if (minutes <= 0) return null;
       const startMin = (clampedStart - dayStart) / 60000;
       const endMin = (clampedEnd - dayStart) / 60000;
+      const showContent = start >= dayStart;
       return {
         id: blob.id,
         title: blob.name,
@@ -214,12 +300,14 @@ function renderDay() {
         ),
         type: getTagType(blob.tags),
         policy: blob.policy,
+        starred: isOccurrenceStarred(blob),
         top: (startMin / 60) * hourHeight,
         height: Math.max(18, (minutes / 60) * hourHeight),
         startMin,
         endMin,
         schedStart,
         schedEnd,
+        showContent,
       };
     })
     .filter(Boolean)
@@ -233,10 +321,19 @@ function renderDay() {
       (block) => {
         const policyBadges = renderPolicyBadges(block.policy, { compact: true });
         return `
-        <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px; --column: ${block.column}; --columns: ${block.columns};" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
-          <span>${block.title}</span>
-          <span class="event-time">${block.time}</span>
-          ${policyBadges ? `<div class="policy-badges">${policyBadges}</div>` : ""}
+        <div class="day-block ${block.type} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
+          ${
+            block.showContent
+              ? `
+                <button class="star-toggle ${block.starred ? "active" : ""}" aria-pressed="${block.starred ? "true" : "false"}" title="${block.starred ? "Unstar" : "Star"}">★</button>
+                <div class="event-header">
+                  <span class="event-title">${block.title}</span>
+                  <span class="event-time">${block.time}</span>
+                </div>
+                ${policyBadges ? `<div class="policy-badges">${policyBadges}</div>` : ""}
+              `
+              : ""
+          }
         </div>
       `;
       }
@@ -269,9 +366,13 @@ function renderDay() {
   );
   const blocksEls = dom.views.day.querySelectorAll(".day-block");
 
+  const clearActiveBlocks = () => {
+    blocksEls.forEach((el) => el.classList.remove("active"));
+  };
+
   blocksEls.forEach((blockEl) => {
     blockEl.addEventListener("mouseenter", () => {
-      blockEl.classList.add("hovered");
+      if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
       const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
       showInfoCard(blob, blockEl.getBoundingClientRect());
       const schedStart = toZonedDate(
@@ -294,11 +395,32 @@ function renderDay() {
       overlay.classList.add("active");
     });
     blockEl.addEventListener("mouseleave", () => {
-      blockEl.classList.remove("hovered");
       overlay.classList.remove("active", "overflow-top", "overflow-bottom");
       hideInfoCard();
     });
+    blockEl.addEventListener("click", (event) => {
+      if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
+      if (event.target.closest(".star-toggle")) return;
+      clearActiveBlocks();
+      blockEl.classList.add("active");
+    });
+    const starBtn = blockEl.querySelector(".star-toggle");
+    if (starBtn) {
+      starBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
+        toggleStarFromCalendar(blob);
+      });
+    }
   });
+  if (state.activeBlockClickHandler) {
+    document.removeEventListener("click", state.activeBlockClickHandler);
+  }
+  state.activeBlockClickHandler = (event) => {
+    if (event.target.closest(".day-block")) return;
+    clearActiveBlocks();
+  };
+  document.addEventListener("click", state.activeBlockClickHandler);
 
   if (state.selectionMode) {
     let clickStart = null;
@@ -340,7 +462,7 @@ function renderDay() {
 
     const onClick = (event) => {
       if (event.button !== 0) return;
-      if (event.target.closest(".day-block")) return;
+      if (event.target.closest(".day-block") && !state.selectionMode) return;
       if (state.selectionStep === null) return;
       const minutes = toMinutes(event.clientY);
       if (clickStart === null) {
@@ -480,6 +602,7 @@ function renderWeek() {
           if (minutes <= 0) return null;
           const startMin = (clampedStart - dayStart) / 60000;
           const endMin = (clampedEnd - dayStart) / 60000;
+          const showContent = start >= dayStart;
           return {
             id: blob.id,
             title: blob.name,
@@ -490,12 +613,14 @@ function renderWeek() {
             ),
             type: getTagType(blob.tags),
             policy: blob.policy,
+            starred: isOccurrenceStarred(blob),
             top: (startMin / 60) * hourHeight,
             height: Math.max(18, (minutes / 60) * hourHeight),
             startMin,
             endMin,
             schedStart,
             schedEnd,
+            showContent,
           };
         })
         .filter(Boolean)
@@ -508,10 +633,19 @@ function renderWeek() {
           (block) => {
             const policyBadges = renderPolicyBadges(block.policy, { compact: true });
             return `
-            <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px; --column: ${block.column}; --columns: ${block.columns};" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
-              <span>${block.title}</span>
-              <span class="event-time">${block.time}</span>
-              ${policyBadges ? `<div class="policy-badges">${policyBadges}</div>` : ""}
+            <div class="day-block ${block.type} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
+              ${
+                block.showContent
+                  ? `
+                    <button class="star-toggle ${block.starred ? "active" : ""}" aria-pressed="${block.starred ? "true" : "false"}" title="${block.starred ? "Unstar" : "Star"}">★</button>
+                    <div class="event-header">
+                      <span class="event-title">${block.title}</span>
+                      <span class="event-time">${block.time}</span>
+                    </div>
+                    ${policyBadges ? `<div class="policy-badges">${policyBadges}</div>` : ""}
+                  `
+                  : ""
+              }
             </div>
           `;
           }
@@ -577,7 +711,7 @@ function renderWeek() {
   dayColumns.forEach((column) => {
     column.querySelectorAll(".day-block").forEach((blockEl) => {
       blockEl.addEventListener("mouseenter", () => {
-        blockEl.classList.add("hovered");
+        if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
         const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
         showInfoCard(blob, blockEl.getBoundingClientRect());
         const schedStart = toZonedDate(
@@ -612,14 +746,39 @@ function renderWeek() {
         });
       });
       blockEl.addEventListener("mouseleave", () => {
-        blockEl.classList.remove("hovered");
         dayTracks.forEach(({ overlay }) => {
           overlay.classList.remove("active", "overflow-top", "overflow-bottom");
         });
         hideInfoCard();
       });
+      blockEl.addEventListener("click", (event) => {
+        if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
+        if (event.target.closest(".star-toggle")) return;
+        dayColumns.forEach((col) =>
+          col.querySelectorAll(".day-block").forEach((el) => el.classList.remove("active"))
+        );
+        blockEl.classList.add("active");
+      });
+      const starBtn = blockEl.querySelector(".star-toggle");
+      if (starBtn) {
+        starBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
+          toggleStarFromCalendar(blob);
+        });
+      }
     });
   });
+  if (state.activeBlockClickHandler) {
+    document.removeEventListener("click", state.activeBlockClickHandler);
+  }
+  state.activeBlockClickHandler = (event) => {
+    if (event.target.closest(".day-block")) return;
+    dayColumns.forEach((col) =>
+      col.querySelectorAll(".day-block").forEach((el) => el.classList.remove("active"))
+    );
+  };
+  document.addEventListener("click", state.activeBlockClickHandler);
 
   if (state.selectionMode) {
     let clickStart = null;
@@ -706,7 +865,7 @@ function renderWeek() {
       const track = column.querySelector(".week-day-track");
       const onClick = (event) => {
         if (event.button !== 0) return;
-        if (event.target.closest(".day-block")) return;
+        if (event.target.closest(".day-block") && !state.selectionMode) return;
         if (state.selectionStep === null) return;
         const minutes = toMinutes(event.clientY, track);
         if (clickStart === null) {
@@ -833,6 +992,7 @@ function renderMonth() {
   );
 
   const counts = new Map();
+  const dayStars = new Map();
   const toKey = (date) => {
     const year = date.getFullYear();
     const month = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -840,7 +1000,9 @@ function renderMonth() {
     return `${year}-${month}-${day}`;
   };
 
+  const starredKeys = new Set();
   state.blobs.forEach((blob) => {
+    if (!isOccurrenceStarred(blob)) return;
     const start = toZonedDate(
       toDate(blob.realized_timerange?.start || blob.default_scheduled_timerange?.start),
       appConfig.userTimeZone
@@ -855,18 +1017,31 @@ function renderMonth() {
     while (cursor < gridEnd && cursor < end) {
       const key = toKey(cursor);
       counts.set(key, (counts.get(key) || 0) + 1);
+      const list = dayStars.get(key) || [];
+      list.push(blob.name || "Untitled");
+      dayStars.set(key, list);
+      if (cursor >= monthStart && cursor < monthEnd) {
+        starredKeys.add(key);
+      }
       cursor = addDays(cursor, 1);
     }
   });
+  const monthStarredCount = starredKeys.size;
 
   const dayCells = days
     .map((date) => {
-      const count = counts.get(toKey(date)) || 0;
+      const key = toKey(date);
+      const count = counts.get(key) || 0;
+      const stars = dayStars.get(key) || [];
+      const limited = stars.slice(0, 2);
+      const extra = Math.max(0, stars.length - limited.length);
+      const starsHtml = limited.map((name) => `<span class="month-day-star">${name}</span>`).join("");
+      const extraHtml = extra ? `<span class="month-day-more">+${extra}</span>` : "";
       const countHtml = count > 0 ? `<span class="month-day-count">${count}</span>` : "";
       return `
-        <button class="month-day ${date.getMonth() === monthStart.getMonth() ? "" : "other"}" data-date="${date.toISOString()}">
+        <button class="month-day ${date.getMonth() === monthStart.getMonth() ? "" : "other"}" data-date="${date.toISOString()}" data-stars='${JSON.stringify(stars)}'>
           <span class="month-day-number">${date.getDate()}</span>
-          <span class="month-day-events">${countHtml}</span>
+          <span class="month-day-events">${starsHtml}${extraHtml}${countHtml}</span>
         </button>
       `;
     })
@@ -874,6 +1049,7 @@ function renderMonth() {
 
   dom.views.month.innerHTML = `
     <div class="month-calendar">
+      <div class="month-summary">Starred: ${monthStarredCount}</div>
       <div class="month-weekdays">
         ${weekdayLabels.map((label) => `<div>${label}</div>`).join("")}
       </div>
@@ -882,6 +1058,36 @@ function renderMonth() {
       </div>
     </div>
   `;
+  dom.views.month.querySelectorAll(".month-day").forEach((dayEl) => {
+    dayEl.addEventListener("mouseenter", () => {
+      let stars = [];
+      try {
+        const starsRaw = dayEl.getAttribute("data-stars");
+        stars = starsRaw ? JSON.parse(starsRaw) : [];
+      } catch (error) {
+        stars = [];
+      }
+      if (!stars.length) return;
+      const dateIso = dayEl.getAttribute("data-date");
+      const date = dateIso ? new Date(dateIso) : null;
+      const dateLabel = date
+        ? date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })
+        : "Starred";
+      const listItems = stars
+        .slice(0, 6)
+        .map((name) => `<li>${name}</li>`)
+        .join("");
+      const more = stars.length > 6 ? `<div class="info-text">+${stars.length - 6} more</div>` : "";
+      const html = `
+        <div class="info-title">${dateLabel}</div>
+        <div class="info-label">Starred</div>
+        <ul class="info-list">${listItems}</ul>
+        ${more}
+      `;
+      showInfoCardHtml(html, dayEl.getBoundingClientRect());
+    });
+    dayEl.addEventListener("mouseleave", hideInfoCard);
+  });
   setDateLabel(formatMonthLabel(state.anchorDate));
 }
 
@@ -892,6 +1098,7 @@ function renderYear() {
     .map((monthStart) => {
       const monthEnd = new Date(year, monthStart.getMonth() + 1, 1);
       const events = state.blobs.filter((blob) => {
+        if (!isOccurrenceStarred(blob)) return false;
         const start = toZonedDate(
           toDate(
           blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
@@ -911,7 +1118,7 @@ function renderYear() {
           <div class="card-title">${monthStart.toLocaleDateString(undefined, {
             month: "long",
           })}</div>
-          <div class="card-summary">${events.length} sessions</div>
+          <div class="card-summary">Starred: ${events.length}</div>
         </button>
       `;
     })

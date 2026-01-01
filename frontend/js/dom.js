@@ -35,6 +35,8 @@ const dom = {
   infoCard: document.getElementById("infoCard"),
   deleteRecurrenceBtn: document.getElementById("deleteRecurrenceBtn"),
   deleteOccurrenceBtn: document.getElementById("deleteOccurrenceBtn"),
+  starRecurrenceBtn: document.getElementById("starRecurrenceBtn"),
+  starOccurrenceBtn: document.getElementById("starOccurrenceBtn"),
 };
 
 export { dom };

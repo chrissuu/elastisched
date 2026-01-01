@@ -384,6 +384,20 @@ body {
   background: rgba(180, 73, 63, 0.08);
 }
 
+.ghost.star {
+  border-color: rgba(247, 200, 108, 0.8);
+  color: #b07a2a;
+}
+
+.ghost.star:hover {
+  background: rgba(247, 200, 108, 0.18);
+}
+
+.ghost.star.active {
+  background: rgba(247, 200, 108, 0.18);
+  color: #8b5a12;
+}
+
 .tabs {
   display: inline-flex;
   background: #e9dfd0;
@@ -483,6 +497,18 @@ body {
   font-weight: 700;
   font-size: 14px;
   color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-star {
+  font-size: 14px;
+  color: rgba(27, 26, 22, 0.3);
+}
+
+.info-star.active {
+  color: #f2b340;
 }
 
 .info-label {
@@ -495,6 +521,22 @@ body {
 .info-text {
   font-size: 12px;
   color: var(--ink);
+}
+
+.info-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.info-list li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .info-divider {
@@ -579,6 +621,7 @@ body {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
+  z-index: 10;
 }
 
 .schedulable-overlay.active {
@@ -595,6 +638,7 @@ body {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
+  z-index: 12;
 }
 
 .selection-overlay.active {
@@ -609,6 +653,7 @@ body {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 13;
 }
 
 .selection-caret.active {
@@ -685,47 +730,85 @@ body {
 
 .day-block {
   position: absolute;
-  --columns: 1;
-  --column: 0;
   --col-gap: 6px;
-  left: calc(8px + ((100% - 16px) / var(--columns)) * var(--column));
-  width: calc((100% - 16px) / var(--columns) - var(--col-gap));
+  left: calc(8px + var(--stack-index, 0) * var(--stack-step, 10px));
+  width: calc(100% - 16px - (var(--stack-count, 1) - 1) * var(--stack-step, 10px));
   border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
   padding: 8px 10px;
   font-size: 13px;
   font-weight: 600;
   color: #1c1a12;
   display: grid;
   gap: 4px;
+  align-content: start;
+  align-items: start;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  padding-right: 28px;
 }
 
-.day-block.hovered {
+.day-block .star-toggle {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: rgba(27, 26, 22, 0.35);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.day-block .star-toggle.active {
+  color: #f2b340;
+}
+
+.day-block .star-toggle:focus-visible {
+  outline: 2px solid rgba(242, 179, 64, 0.5);
+  border-radius: 6px;
+}
+
+.day-block.active {
   transform: translateY(-2px);
   box-shadow: 0 8px 18px rgba(27, 26, 22, 0.18);
-  z-index: 3;
+  z-index: 6;
+  left: 8px;
+  width: calc(100% - 16px);
 }
 
 .day-block.focus {
-  background: rgba(247, 200, 108, 0.45);
-  border: 1px solid rgba(247, 200, 108, 0.7);
+  background: #f7d89b;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
 }
 
 .day-block.deep {
-  background: rgba(75, 107, 77, 0.2);
-  border: 1px solid rgba(75, 107, 77, 0.4);
+  background: #cbd8cc;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
 }
 
 .day-block.admin {
-  background: rgba(58, 110, 122, 0.2);
-  border: 1px solid rgba(58, 110, 122, 0.4);
+  background: #c7d7db;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
 }
 
 .day-block .event-time {
+  display: block;
   font-size: 11px;
   color: var(--muted);
   font-weight: 500;
+  margin-top: 0;
+}
+
+.day-block .event-title {
+  padding-right: 8px;
+}
+
+.day-block .event-header {
+  display: grid;
+  gap: 2px;
+  align-self: start;
 }
 
 .policy-badges {
@@ -874,6 +957,13 @@ body {
   gap: 12px;
 }
 
+.month-summary {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  justify-content: flex-end;
+}
+
 .month-weekdays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -917,16 +1007,41 @@ body {
 }
 
 .month-day-events {
-  display: flex;
-  align-items: center;
+  display: grid;
   gap: 6px;
   min-height: 14px;
 }
 
 .month-day-count {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.month-day-star {
+  font-size: 12px;
+  color: var(--ink);
+  background: rgba(247, 200, 108, 0.24);
+  border: 1px solid rgba(247, 200, 108, 0.55);
+  border-radius: 999px;
+  padding: 2px 8px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.month-day-more {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px dashed rgba(27, 26, 22, 0.25);
+  border-radius: 999px;
+  padding: 2px 6px;
+  justify-self: start;
 }
 .card {
   background: #fffaf2;

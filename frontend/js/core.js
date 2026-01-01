@@ -15,6 +15,7 @@ const state = {
   pendingSchedulableRange: null,
   selectionPointer: null,
   selectionScrollHandler: null,
+  activeBlockClickHandler: null,
 };
 
 const defaultConfig = {

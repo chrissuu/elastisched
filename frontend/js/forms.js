@@ -61,6 +61,43 @@ async function refreshCalendar() {
   }
 }
 
+function normalizeOccurrenceKey(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function isOccurrenceStarred(payload, occurrenceStart) {
+  if (!payload || !occurrenceStart) return false;
+  const key = normalizeOccurrenceKey(occurrenceStart);
+  if (!key) return false;
+  if (payload.starred) {
+    const unstarred = Array.isArray(payload.unstarred) ? payload.unstarred : [];
+    return !unstarred.some((item) => normalizeOccurrenceKey(item) === key);
+  }
+  const stars = Array.isArray(payload.stars) ? payload.stars : [];
+  return stars.some((item) => normalizeOccurrenceKey(item) === key);
+}
+
+function updateStarButtons() {
+  if (!dom.starRecurrenceBtn || !dom.starOccurrenceBtn) return;
+  const payload = state.editingRecurrencePayload || {};
+  const isStarred = Boolean(payload.starred);
+  dom.starRecurrenceBtn.textContent = isStarred ? "Unstar recurrence" : "Star recurrence";
+  dom.starRecurrenceBtn.classList.toggle("active", isStarred);
+
+  const occurrenceStart = state.editingOccurrenceStart;
+  const occurrenceStarred = isOccurrenceStarred(payload, occurrenceStart);
+  dom.starOccurrenceBtn.textContent = occurrenceStarred ? "Unstar occurrence" : "Star occurrence";
+  dom.starOccurrenceBtn.classList.toggle("active", occurrenceStarred);
+}
+
+function markUnsavedChanges() {
+  if (state.editingRecurrenceId) {
+    dom.formStatus.textContent = "Unsaved changes.";
+  }
+}
+
 function getPolicyFlagsFromPolicy(policy = {}) {
   const rawMask = Number(policy.scheduling_policies);
   const mask = Number.isFinite(rawMask) ? rawMask : 0;
@@ -404,6 +441,7 @@ function resetFormMode() {
   }
   updateRecurrenceUI();
   setFormMode("create");
+  updateStarButtons();
   dom.formStatus.textContent = "";
   document.querySelectorAll(".selection-overlay").forEach((overlay) => {
     overlay.classList.remove("active");
@@ -512,6 +550,7 @@ function openEditForm(blob) {
   state.editingOccurrenceStart = blob.schedulable_timerange?.start || null;
   updateRecurrenceUI();
   setFormMode("edit");
+  updateStarButtons();
   dom.formStatus.textContent = "";
   toggleForm(true);
 }
@@ -577,6 +616,49 @@ async function deleteOccurrence() {
   }
 }
 
+function toggleStarRecurrence() {
+  if (!state.editingRecurrenceId) return;
+  const payload = state.editingRecurrencePayload || {};
+  const nextStarred = !payload.starred;
+  state.editingRecurrencePayload = {
+    ...payload,
+    starred: nextStarred,
+    unstarred: nextStarred ? payload.unstarred || [] : [],
+  };
+  updateStarButtons();
+  markUnsavedChanges();
+}
+
+function toggleStarOccurrence() {
+  if (!state.editingRecurrenceId) return;
+  const occurrenceStart = state.editingOccurrenceStart;
+  if (!occurrenceStart) {
+    dom.formStatus.textContent = "Missing occurrence start.";
+    return;
+  }
+  const key = normalizeOccurrenceKey(occurrenceStart);
+  if (!key) {
+    dom.formStatus.textContent = "Invalid occurrence start.";
+    return;
+  }
+  const payload = state.editingRecurrencePayload || {};
+  if (payload.starred) {
+    const unstarred = Array.isArray(payload.unstarred) ? payload.unstarred : [];
+    const nextUnstarred = unstarred.some((item) => normalizeOccurrenceKey(item) === key)
+      ? unstarred.filter((item) => normalizeOccurrenceKey(item) !== key)
+      : [...unstarred, key];
+    state.editingRecurrencePayload = { ...payload, unstarred: nextUnstarred };
+  } else {
+    const stars = Array.isArray(payload.stars) ? payload.stars : [];
+    const nextStars = stars.some((item) => normalizeOccurrenceKey(item) === key)
+      ? stars.filter((item) => normalizeOccurrenceKey(item) !== key)
+      : [...stars, key];
+    state.editingRecurrencePayload = { ...payload, stars: nextStars };
+  }
+  updateStarButtons();
+  markUnsavedChanges();
+}
+
 async function handleBlobSubmit(event) {
   event.preventDefault();
   dom.formStatus.textContent = "Saving...";
@@ -615,6 +697,7 @@ async function handleBlobSubmit(event) {
     tags: [],
   };
   const recurrenceType = formData.get("recurrenceType") || "single";
+  const priorPayload = state.editingRecurrencePayload || {};
   let recurrencePayload = {};
   if (recurrenceType === "weekly") {
     const isValid = validateWeeklySlots();
@@ -704,6 +787,15 @@ async function handleBlobSubmit(event) {
       recurrence_name: formData.get("recurrenceName") || null,
       recurrence_description: formData.get("recurrenceDescription") || null,
       blob: baseBlob,
+    };
+  }
+  if (state.editingRecurrenceId) {
+    recurrencePayload = {
+      ...recurrencePayload,
+      starred: priorPayload.starred || false,
+      stars: Array.isArray(priorPayload.stars) ? priorPayload.stars : [],
+      exclusions: Array.isArray(priorPayload.exclusions) ? priorPayload.exclusions : [],
+      unstarred: Array.isArray(priorPayload.unstarred) ? priorPayload.unstarred : [],
     };
   }
   const payload = { type: recurrenceType, payload: recurrencePayload };
@@ -833,6 +925,12 @@ function bindFormHandlers(onRefresh) {
   }
   if (dom.deleteOccurrenceBtn) {
     dom.deleteOccurrenceBtn.addEventListener("click", deleteOccurrence);
+  }
+  if (dom.starRecurrenceBtn) {
+    dom.starRecurrenceBtn.addEventListener("click", toggleStarRecurrence);
+  }
+  if (dom.starOccurrenceBtn) {
+    dom.starOccurrenceBtn.addEventListener("click", toggleStarOccurrence);
   }
   dom.toggleFormBtn.addEventListener("click", handleAddClick);
   dom.settingsBtn.addEventListener("click", handleSettingsClick);

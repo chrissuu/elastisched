@@ -35,14 +35,26 @@ document.addEventListener("click", (event) => {
   refreshView("day");
 });
 
-document.addEventListener("click", (event) => {
+document.addEventListener("contextmenu", (event) => {
   const target = event.target.closest("[data-blob-id]");
   if (!target) return;
+  if (dom.formPanel.classList.contains("active")) {
+    return;
+  }
+  event.preventDefault();
   const blobId = target.getAttribute("data-blob-id");
   const blob = state.blobs.find((item) => item.id === blobId);
   if (blob) {
     openEditForm(blob);
   }
+});
+
+document.addEventListener("click", (event) => {
+  if (!dom.formPanel.classList.contains("active")) return;
+  if (!state.editingRecurrenceId) return;
+  if (dom.formPanel.contains(event.target)) return;
+  toggleForm(false);
+  resetFormMode();
 });
 
 window.addEventListener("keydown", (event) => {
