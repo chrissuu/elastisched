@@ -6,12 +6,15 @@
 class Tag {
 private:
     std::string name;
+    std::string description;
 
 public:
-    Tag(const std::string& name);
+    Tag(const std::string& name, const std::string& description = "");
     
     const std::string& getName() const;
     void setName(const std::string& name);
+    const std::string& getDescription() const;
+    void setDescription(const std::string& description);
 
     bool operator==(const Tag& other) const;
     bool operator!=(const Tag& other) const;

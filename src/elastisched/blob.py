@@ -1,11 +1,54 @@
 import uuid
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import List, Optional, Set
+from typing import Iterable, List, Optional, Set
 
 from elastisched.timerange import TimeRange
 from elastisched.constants import *
 from engine import Policy, Tag, Job, TimeRange as tr
+
+
+def _normalize_tags(raw_tags: Iterable) -> Set[Tag]:
+    normalized: Set[Tag] = set()
+    for tag in raw_tags or []:
+        if isinstance(tag, Tag):
+            normalized.add(tag)
+            continue
+        if isinstance(tag, dict):
+            name = str(tag.get("name") or "").strip()
+            if not name:
+                continue
+            description = str(tag.get("description") or "")
+            normalized.add(Tag(name, description))
+            continue
+        if isinstance(tag, str):
+            name = tag.strip()
+            if not name:
+                continue
+            normalized.add(Tag(name))
+    return normalized
+
+
+def _clone_tags(raw_tags: Iterable) -> Set[Tag]:
+    cloned: Set[Tag] = set()
+    for tag in raw_tags or []:
+        if isinstance(tag, Tag):
+            cloned.add(Tag(tag.getName(), tag.getDescription()))
+            continue
+        if isinstance(tag, dict):
+            name = str(tag.get("name") or "").strip()
+            if not name:
+                continue
+            description = str(tag.get("description") or "")
+            cloned.add(Tag(name, description))
+            continue
+        if isinstance(tag, str):
+            name = tag.strip()
+            if not name:
+                continue
+            cloned.add(Tag(name))
+    return cloned
 
 
 @dataclass
@@ -29,6 +72,20 @@ class Blob:
             raise ValueError(
                 "Valid schedulable range must contain default scheduled timerange"
             )
+        self.tags = _normalize_tags(self.tags)
+
+    def __deepcopy__(self, memo):
+        return Blob(
+            default_scheduled_timerange=deepcopy(self.default_scheduled_timerange, memo),
+            schedulable_timerange=deepcopy(self.schedulable_timerange, memo),
+            name=deepcopy(self.name, memo),
+            description=deepcopy(self.description, memo),
+            tz=self.tz,
+            policy=deepcopy(self.policy, memo),
+            dependencies=deepcopy(self.dependencies, memo),
+            id=deepcopy(self.id, memo),
+            tags=_clone_tags(self.tags),
+        )
 
     def to_job(self, EPOCH_BEGIN: datetime) -> Job:
         schedulable_timerange_start = self.schedulable_timerange.start

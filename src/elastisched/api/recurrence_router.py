@@ -23,6 +23,7 @@ from elastisched.recurrence import (
     WeeklyBlobRecurrence,
 )
 from elastisched.timerange import TimeRange
+from engine import Tag
 
 
 recurrence_router = APIRouter(prefix="/recurrences", tags=["recurrences"])
@@ -63,6 +64,26 @@ def _parse_timerange(data: dict, tzinfo) -> TimeRange:
     return TimeRange(start=start, end=end)
 
 
+def _serialize_tags(raw_tags) -> list[str]:
+    tags = []
+    for tag in raw_tags or []:
+        if isinstance(tag, Tag):
+            name = tag.getName()
+            if name:
+                tags.append(name)
+            continue
+        if isinstance(tag, dict):
+            name = str(tag.get("name") or "").strip()
+            if name:
+                tags.append(name)
+            continue
+        if isinstance(tag, str):
+            name = tag.strip()
+            if name:
+                tags.append(name)
+    return tags
+
+
 def _blob_from_payload(data: dict) -> Blob:
     tz_name = data.get("tz") or "UTC"
     try:
@@ -79,7 +100,7 @@ def _blob_from_payload(data: dict) -> Blob:
         tz=tzinfo,
         policy=data.get("policy") or {},
         dependencies=set(data.get("dependencies") or []),
-        tags=set(data.get("tags") or []),
+        tags=data.get("tags") or [],
     )
 
 
@@ -188,7 +209,7 @@ def _to_occurrence_schema(
         tz=blob.tz.key if hasattr(blob.tz, "key") else str(blob.tz),
         policy=blob.policy or {},
         dependencies=list(blob.dependencies or []),
-        tags=list(blob.tags or []),
+        tags=_serialize_tags(blob.tags),
     )
 
 

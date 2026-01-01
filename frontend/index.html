@@ -193,6 +193,29 @@
             <div class="dependency-suggestions" id="dependencySuggestions"></div>
             <div class="dependency-list" id="dependencyList"></div>
           </div>
+          <div class="tag-field">
+            <span class="tag-label">Tags</span>
+            <div class="tag-input-row">
+              <input
+                type="text"
+                name="blobTagInput"
+                class="needs-input"
+                placeholder="Search or add a tag"
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                class="ghost small"
+                id="addTagBtn"
+                aria-label="Add tag"
+                title="Add tag"
+              >
+                +
+              </button>
+            </div>
+            <div class="tag-suggestions" id="tagSuggestions"></div>
+            <div class="tag-list" id="tagList"></div>
+          </div>
           <div class="form-actions">
             <button type="button" class="ghost star edit-only" id="starOccurrenceBtn">
               Star occurrence

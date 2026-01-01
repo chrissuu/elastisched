@@ -15,6 +15,7 @@ const recurrenceFieldGroups = document.querySelectorAll(".recurrence-fields");
 const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const editOnlyElements = document.querySelectorAll(".edit-only");
 let dependencyIds = [];
+let tagNames = [];
 
 function setRefreshHandler(handler) {
   refreshView = handler;
@@ -141,6 +142,34 @@ function getDependencies() {
   return dependencyIds.slice();
 }
 
+function normalizeTagName(value) {
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
+function tagKey(value) {
+  return normalizeTagName(value).toLowerCase();
+}
+
+function setTags(tags) {
+  const next = [];
+  const seen = new Set();
+  (tags || []).forEach((tag) => {
+    const name = normalizeTagName(tag);
+    if (!name) return;
+    const key = tagKey(name);
+    if (seen.has(key)) return;
+    seen.add(key);
+    next.push(name);
+  });
+  tagNames = next;
+  renderTagList();
+}
+
+function getTags() {
+  return tagNames.slice();
+}
+
 function findBlobById(id) {
   return state.blobs.find((item) => item.id === id) || null;
 }
@@ -164,6 +193,33 @@ function getDependencySuggestions(query) {
   return matches.slice(0, 6);
 }
 
+function getAvailableTags() {
+  const seen = new Map();
+  state.blobs.forEach((blob) => {
+    (blob.tags || []).forEach((tag) => {
+      const name = normalizeTagName(tag);
+      if (!name) return;
+      const key = tagKey(name);
+      if (!seen.has(key)) {
+        seen.set(key, name);
+      }
+    });
+  });
+  return Array.from(seen.values());
+}
+
+function getTagSuggestions(query) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
+  const selected = new Set(tagNames.map((tag) => tagKey(tag)));
+  const matches = getAvailableTags().filter((tag) => {
+    if (selected.has(tagKey(tag))) return false;
+    return tag.toLowerCase().includes(normalized);
+  });
+  matches.sort((a, b) => a.localeCompare(b));
+  return matches.slice(0, 6);
+}
+
 function renderDependencySuggestions() {
   if (!dom.dependencySuggestions) return;
   const query = dom.dependencyInput?.value || "";
@@ -178,6 +234,22 @@ function renderDependencySuggestions() {
     button.textContent = match.name || "Untitled";
     button.title = match.id;
     dom.dependencySuggestions.appendChild(button);
+  });
+}
+
+function renderTagSuggestions() {
+  if (!dom.tagSuggestions) return;
+  const query = dom.tagInput?.value || "";
+  const matches = getTagSuggestions(query);
+  dom.tagSuggestions.innerHTML = "";
+  if (!query.trim() || matches.length === 0) return;
+  matches.forEach((match) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tag-suggestion";
+    button.dataset.tagName = match;
+    button.textContent = match;
+    dom.tagSuggestions.appendChild(button);
   });
 }
 
@@ -243,6 +315,38 @@ function renderDependencyList() {
   });
 }
 
+function renderTagList() {
+  if (!dom.tagList) return;
+  dom.tagList.innerHTML = "";
+  tagNames.forEach((name) => {
+    const pill = document.createElement("div");
+    pill.className = "tag-pill";
+    pill.dataset.tagName = name;
+
+    const label = document.createElement("span");
+    label.className = "tag-name";
+    label.textContent = name;
+    pill.appendChild(label);
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "tag-tooltip";
+    const title = document.createElement("div");
+    title.className = "tag-tooltip-title";
+    title.textContent = name;
+    tooltip.appendChild(title);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "ghost small tag-remove";
+    removeBtn.textContent = "Remove tag";
+    removeBtn.dataset.removeTag = name;
+    tooltip.appendChild(removeBtn);
+
+    pill.appendChild(tooltip);
+    dom.tagList.appendChild(pill);
+  });
+}
+
 function addDependencyFromInput() {
   if (!dom.dependencyInput) return;
   const raw = dom.dependencyInput.value.trim();
@@ -263,6 +367,23 @@ function addDependencyFromInput() {
   dom.formStatus.textContent = "";
   dom.dependencyInput.value = "";
   dom.dependencySuggestions.innerHTML = "";
+}
+
+function addTagFromInput() {
+  if (!dom.tagInput) return;
+  const raw = dom.tagInput.value.trim();
+  if (!raw) return;
+  const matches = getTagSuggestions(raw);
+  const candidate = matches[0] || raw;
+  const key = tagKey(candidate);
+  const seen = new Set(tagNames.map((tag) => tagKey(tag)));
+  if (!seen.has(key)) {
+    tagNames.push(candidate);
+    renderTagList();
+  }
+  dom.formStatus.textContent = "";
+  dom.tagInput.value = "";
+  dom.tagSuggestions.innerHTML = "";
 }
 
 function applyPolicyToForm(policy) {
@@ -569,11 +690,18 @@ function resetFormMode() {
   }
   applyPolicyToForm({});
   setDependencies([]);
+  setTags([]);
   if (dom.dependencyInput) {
     dom.dependencyInput.value = "";
   }
   if (dom.dependencySuggestions) {
     dom.dependencySuggestions.innerHTML = "";
+  }
+  if (dom.tagInput) {
+    dom.tagInput.value = "";
+  }
+  if (dom.tagSuggestions) {
+    dom.tagSuggestions.innerHTML = "";
   }
   clearWeeklySlots();
   createWeeklySlot();
@@ -610,6 +738,7 @@ function openEditForm(blob) {
   dom.blobForm.blobName.value = blob.name || "";
   dom.blobForm.blobDescription.value = blob.description || "";
   setDependencies(Array.isArray(blob.dependencies) ? blob.dependencies : []);
+  setTags(Array.isArray(blob.tags) ? blob.tags : []);
   dom.blobForm.defaultStart.value = toLocalInputValueInTimeZone(
     blob.default_scheduled_timerange?.start,
     appConfig.userTimeZone
@@ -666,6 +795,7 @@ function openEditForm(blob) {
       });
     });
     setDependencies(Array.isArray(blobs[0]?.dependencies) ? blobs[0].dependencies : []);
+    setTags(Array.isArray(blobs[0]?.tags) ? blobs[0].tags : []);
   } else {
     applyPolicyToForm(blob.policy);
     createWeeklySlot();
@@ -808,6 +938,7 @@ async function handleBlobSubmit(event) {
   const formData = new FormData(dom.blobForm);
   const policyPayload = getPolicyPayloadFromForm();
   const dependencies = getDependencies();
+  const tags = getTags();
   const baseBlob = {
     name: formData.get("blobName"),
     description: formData.get("blobDescription") || null,
@@ -838,7 +969,7 @@ async function handleBlobSubmit(event) {
     },
     policy: policyPayload,
     dependencies,
-    tags: [],
+    tags,
   };
   const recurrenceType = formData.get("recurrenceType") || "single";
   const priorPayload = state.editingRecurrencePayload || {};
@@ -896,7 +1027,7 @@ async function handleBlobSubmit(event) {
         },
         policy: perSlot ? slot.policy : sharedPolicy,
         dependencies,
-        tags: [],
+        tags,
       };
     });
     recurrencePayload = {
@@ -1109,6 +1240,19 @@ function bindFormHandlers(onRefresh) {
   if (dom.addDependencyBtn) {
     dom.addDependencyBtn.addEventListener("click", addDependencyFromInput);
   }
+  if (dom.tagInput) {
+    dom.tagInput.addEventListener("input", renderTagSuggestions);
+    dom.tagInput.addEventListener("focus", renderTagSuggestions);
+    dom.tagInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addTagFromInput();
+      }
+    });
+  }
+  if (dom.addTagBtn) {
+    dom.addTagBtn.addEventListener("click", addTagFromInput);
+  }
   if (dom.dependencySuggestions) {
     dom.dependencySuggestions.addEventListener("click", (event) => {
       const target = event.target.closest(".dependency-suggestion");
@@ -1125,6 +1269,26 @@ function bindFormHandlers(onRefresh) {
       dom.dependencySuggestions.innerHTML = "";
     });
   }
+  if (dom.tagSuggestions) {
+    dom.tagSuggestions.addEventListener("click", (event) => {
+      const target = event.target.closest(".tag-suggestion");
+      if (!target) return;
+      const name = target.dataset.tagName;
+      if (name) {
+        const key = tagKey(name);
+        const seen = new Set(tagNames.map((tag) => tagKey(tag)));
+        if (!seen.has(key)) {
+          tagNames.push(name);
+          renderTagList();
+        }
+      }
+      dom.formStatus.textContent = "";
+      if (dom.tagInput) {
+        dom.tagInput.value = "";
+      }
+      dom.tagSuggestions.innerHTML = "";
+    });
+  }
   if (dom.dependencyList) {
     dom.dependencyList.addEventListener("click", (event) => {
       const target = event.target.closest("[data-remove-dependency]");
@@ -1132,6 +1296,15 @@ function bindFormHandlers(onRefresh) {
       const id = target.dataset.removeDependency;
       dependencyIds = dependencyIds.filter((depId) => depId !== id);
       renderDependencyList();
+    });
+  }
+  if (dom.tagList) {
+    dom.tagList.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-remove-tag]");
+      if (!target) return;
+      const name = target.dataset.removeTag;
+      tagNames = tagNames.filter((tag) => tagKey(tag) !== tagKey(name));
+      renderTagList();
     });
   }
   if (dom.weeklyPerSlot) {

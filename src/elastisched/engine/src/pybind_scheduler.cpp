@@ -16,13 +16,18 @@ namespace py = pybind11;
 PYBIND11_MODULE(engine, m) {
     // Tag
     py::class_<Tag>(m, "Tag")
-        .def(py::init<const std::string&>())
+        .def(py::init<const std::string&, const std::string&>(),
+             py::arg("name"),
+             py::arg("description") = "")
         .def_property("name", &Tag::getName, &Tag::setName)
+        .def_property("description", &Tag::getDescription, &Tag::setDescription)
         .def(py::self == py::self)
         .def(py::self != py::self)
         .def(py::self < py::self)
         .def("getName", &Tag::getName)
         .def("setName", &Tag::setName)
+        .def("getDescription", &Tag::getDescription)
+        .def("setDescription", &Tag::setDescription)
         .def("__hash__", [](const Tag& tag) { 
             return std::hash<std::string>()(tag.getName()); });
 

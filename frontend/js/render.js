@@ -115,6 +115,10 @@ function showInfoCard(blob, anchorRect) {
   if (state.infoCardLocked) return;
   const recurrenceName = blob.recurrence_payload?.recurrence_name;
   const recurrenceDescription = blob.recurrence_payload?.recurrence_description;
+  const recurrenceType = blob.recurrence_type || "single";
+  const recurrenceTypeLabel = recurrenceType
+    ? `${recurrenceType.charAt(0).toUpperCase()}${recurrenceType.slice(1)}`
+    : "Single";
   const starred = isOccurrenceStarred(blob);
   const blobName = blob.name || "Untitled";
   const blobDescription = blob.description;
@@ -125,6 +129,17 @@ function showInfoCard(blob, anchorRect) {
     appConfig.userTimeZone
   );
   const policyBadges = renderPolicyBadges(blob.policy);
+  const tags = Array.isArray(blob.tags)
+    ? blob.tags.map((tag) => (typeof tag === "string" ? tag.trim() : "")).filter(Boolean)
+    : [];
+  const recurrenceTypeBlock =
+    recurrenceType
+      ? `
+        <div class="info-divider"></div>
+        <div class="info-label">Recurrence type</div>
+        <div class="info-text">${recurrenceTypeLabel}</div>
+      `
+      : "";
   const recurrenceBlock =
     recurrenceName || recurrenceDescription
       ? `
@@ -132,6 +147,16 @@ function showInfoCard(blob, anchorRect) {
         <div class="info-label">Recurrence</div>
         ${recurrenceName ? `<div class="info-text">${recurrenceName}</div>` : ""}
         ${recurrenceDescription ? `<div class="info-text">${recurrenceDescription}</div>` : ""}
+      `
+      : "";
+  const tagBlock =
+    tags.length > 0
+      ? `
+        <div class="info-divider"></div>
+        <div class="info-label">Tags</div>
+        <div class="info-tags">
+          ${tags.map((tag) => `<span class="info-tag">${tag}</span>`).join("")}
+        </div>
       `
       : "";
   const idBlock = blobId
@@ -162,7 +187,9 @@ function showInfoCard(blob, anchorRect) {
       <span class="info-star ${starred ? "active" : ""}" aria-hidden="true">★</span>
     </div>
     ${blobDescription ? `<div class="info-text">${blobDescription}</div>` : ""}
+    ${recurrenceTypeBlock}
     ${recurrenceBlock}
+    ${tagBlock}
     ${idBlock}
     <div class="info-divider"></div>
     <div class="info-label">Time</div>

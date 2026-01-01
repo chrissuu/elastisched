@@ -41,6 +41,10 @@ const dom = {
   addDependencyBtn: document.getElementById("addDependencyBtn"),
   dependencyList: document.getElementById("dependencyList"),
   dependencySuggestions: document.getElementById("dependencySuggestions"),
+  tagInput: document.querySelector('[name="blobTagInput"]'),
+  addTagBtn: document.getElementById("addTagBtn"),
+  tagList: document.getElementById("tagList"),
+  tagSuggestions: document.getElementById("tagSuggestions"),
 };
 
 export { dom };
