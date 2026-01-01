@@ -42,6 +42,74 @@ function renderPolicyBadges(policy) {
   return badges.join("");
 }
 
+function getInfoCard() {
+  if (dom.infoCard) return dom.infoCard;
+  const card = document.createElement("div");
+  card.id = "infoCard";
+  card.className = "info-card";
+  card.setAttribute("aria-hidden", "true");
+  document.body.appendChild(card);
+  dom.infoCard = card;
+  return card;
+}
+
+function showInfoCard(blob, anchorRect) {
+  const card = getInfoCard();
+  if (!blob || !anchorRect) return;
+  const recurrenceName = blob.recurrence_payload?.recurrence_name;
+  const recurrenceDescription = blob.recurrence_payload?.recurrence_description;
+  const blobName = blob.name || "Untitled";
+  const blobDescription = blob.description;
+  const timeLabel = formatTimeRangeInTimeZone(
+    blob.realized_timerange?.start || blob.default_scheduled_timerange?.start,
+    blob.realized_timerange?.end || blob.default_scheduled_timerange?.end,
+    appConfig.userTimeZone
+  );
+  const policyBadges = renderPolicyBadges(blob.policy);
+  const recurrenceBlock =
+    recurrenceName || recurrenceDescription
+      ? `
+        <div class="info-divider"></div>
+        <div class="info-label">Recurrence</div>
+        ${recurrenceName ? `<div class="info-text">${recurrenceName}</div>` : ""}
+        ${recurrenceDescription ? `<div class="info-text">${recurrenceDescription}</div>` : ""}
+      `
+      : "";
+
+  card.innerHTML = `
+    <div class="info-title">${blobName}</div>
+    ${blobDescription ? `<div class="info-text">${blobDescription}</div>` : ""}
+    ${recurrenceBlock}
+    <div class="info-divider"></div>
+    <div class="info-label">Time</div>
+    <div class="info-text">${timeLabel}</div>
+    ${policyBadges ? `<div class="info-label">Policy</div><div class="policy-badges">${policyBadges}</div>` : ""}
+  `;
+
+  card.classList.add("active");
+  card.setAttribute("aria-hidden", "false");
+
+  const padding = 12;
+  const cardWidth = card.offsetWidth;
+  const cardHeight = card.offsetHeight;
+  let left = anchorRect.right + padding;
+  if (left + cardWidth > window.innerWidth - padding) {
+    left = anchorRect.left - cardWidth - padding;
+  }
+  left = Math.max(padding, Math.min(left, window.innerWidth - cardWidth - padding));
+  let top = anchorRect.top;
+  top = Math.max(padding, Math.min(top, window.innerHeight - cardHeight - padding));
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+}
+
+function hideInfoCard() {
+  const card = dom.infoCard;
+  if (!card) return;
+  card.classList.remove("active");
+  card.setAttribute("aria-hidden", "true");
+}
+
 function setDateLabel(text) {
   dom.dateLabel.textContent = text;
 }
@@ -190,6 +258,8 @@ function renderDay() {
   blocksEls.forEach((blockEl) => {
     blockEl.addEventListener("mouseenter", () => {
       blockEl.classList.add("hovered");
+      const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
+      showInfoCard(blob, blockEl.getBoundingClientRect());
       const schedStart = toZonedDate(
         toDate(blockEl.getAttribute("data-sched-start")),
         appConfig.userTimeZone
@@ -212,6 +282,7 @@ function renderDay() {
     blockEl.addEventListener("mouseleave", () => {
       blockEl.classList.remove("hovered");
       overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+      hideInfoCard();
     });
   });
 
@@ -493,6 +564,8 @@ function renderWeek() {
     column.querySelectorAll(".day-block").forEach((blockEl) => {
       blockEl.addEventListener("mouseenter", () => {
         blockEl.classList.add("hovered");
+        const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
+        showInfoCard(blob, blockEl.getBoundingClientRect());
         const schedStart = toZonedDate(
           toDate(blockEl.getAttribute("data-sched-start")),
           appConfig.userTimeZone
@@ -529,6 +602,7 @@ function renderWeek() {
         dayTracks.forEach(({ overlay }) => {
           overlay.classList.remove("active", "overflow-top", "overflow-bottom");
         });
+        hideInfoCard();
       });
     });
   });
@@ -838,6 +912,7 @@ function renderAll() {
 function setActive(view) {
   state.view = view;
   saveView(view);
+  hideInfoCard();
   dom.tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
   Object.entries(dom.views).forEach(([key, el]) => {
     el.classList.toggle("active", key === view);

@@ -32,6 +32,7 @@ const dom = {
   goTodayBtn: document.getElementById("goTodayBtn"),
   brandTitle: document.getElementById("brandTitle"),
   brandSubtitle: document.getElementById("brandSubtitle"),
+  infoCard: document.getElementById("infoCard"),
 };
 
 export { dom };
