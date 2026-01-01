@@ -54,6 +54,13 @@ function setFormMode(mode) {
   }
 }
 
+async function refreshCalendar() {
+  state.loadedRange = null;
+  if (refreshView) {
+    await refreshView(state.view);
+  }
+}
+
 function getPolicyFlagsFromPolicy(policy = {}) {
   const rawMask = Number(policy.scheduling_policies);
   const mask = Number.isFinite(rawMask) ? rawMask : 0;
@@ -131,8 +138,10 @@ function updateRecurrenceUI() {
   }
   document.querySelectorAll(".non-weekly-field input").forEach((field) => {
     const shouldDisable = type === "weekly";
+    const isCheckbox = field.type === "checkbox";
+    const isOptional = field.name === "blobDescription";
     field.disabled = shouldDisable;
-    field.required = !shouldDisable;
+    field.required = !shouldDisable && !isCheckbox && !isOptional;
   });
 
   const defaultStart = dom.blobForm.defaultStart.value;
@@ -522,9 +531,7 @@ async function deleteRecurrence() {
     dom.formStatus.textContent = "Deleted.";
     toggleForm(false);
     resetFormMode();
-    if (refreshView) {
-      await refreshView(state.view);
-    }
+    await refreshCalendar();
   } catch (error) {
     dom.formStatus.textContent = error?.message || "Error deleting recurrence.";
   }
@@ -564,9 +571,7 @@ async function deleteOccurrence() {
     dom.formStatus.textContent = "Deleted.";
     toggleForm(false);
     resetFormMode();
-    if (refreshView) {
-      await refreshView(state.view);
-    }
+    await refreshCalendar();
   } catch (error) {
     dom.formStatus.textContent = error?.message || "Error deleting occurrence.";
   }
@@ -728,9 +733,7 @@ async function handleBlobSubmit(event) {
     dom.formStatus.textContent = isEditing ? "Updated." : "Created.";
     toggleForm(false);
     resetFormMode();
-  if (refreshView) {
-      await refreshView(state.view);
-    }
+    await refreshCalendar();
   } catch (error) {
     dom.formStatus.textContent = error?.message || "Error saving recurrence.";
   }

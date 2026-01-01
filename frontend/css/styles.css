@@ -171,6 +171,10 @@ body {
   grid-row: 1;
 }
 
+.blob-form .policy-option::after {
+  content: none;
+}
+
 .blob-form label > input,
 .blob-form label > select {
   grid-column: 1 / -1;
