@@ -2,7 +2,7 @@ import { appConfig, isTypingInField, loadView, state } from "./core.js";
 import { dom } from "./dom.js";
 import { ensureOccurrences } from "./api.js";
 import { bindFormHandlers, openEditForm, resetFormMode, toggleForm, toggleSettings } from "./forms.js";
-import { setActive, startInteractiveCreate } from "./render.js";
+import { clearInfoCardLock, setActive, startInteractiveCreate } from "./render.js";
 import { getViewRange, shiftAnchorDate } from "./utils.js";
 
 dom.brandTitle.textContent = appConfig.scheduleName || dom.brandTitle.textContent;
@@ -33,6 +33,25 @@ document.addEventListener("click", (event) => {
     return;
   }
   refreshView("day");
+});
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-copy-blob-id]");
+  if (!button) return;
+  event.preventDefault();
+  const blobId = button.getAttribute("data-copy-blob-id");
+  if (!blobId) return;
+  const originalLabel = button.textContent;
+  button.textContent = "Copying...";
+  try {
+    await navigator.clipboard.writeText(blobId);
+    button.textContent = "Copied";
+  } catch (error) {
+    button.textContent = "Copy failed";
+  }
+  window.setTimeout(() => {
+    button.textContent = originalLabel;
+  }, 1200);
 });
 
 document.addEventListener("contextmenu", (event) => {
@@ -70,6 +89,7 @@ window.addEventListener("keydown", (event) => {
     event.code === "ArrowRight" ||
     event.keyCode === 39;
   if (event.key === "Escape") {
+    clearInfoCardLock();
     if (dom.settingsModal.classList.contains("active")) {
       toggleSettings(false);
       dom.settingsStatus.textContent = "";

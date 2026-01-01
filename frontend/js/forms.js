@@ -14,6 +14,7 @@ let refreshView = null;
 const recurrenceFieldGroups = document.querySelectorAll(".recurrence-fields");
 const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const editOnlyElements = document.querySelectorAll(".edit-only");
+let dependencyIds = [];
 
 function setRefreshHandler(handler) {
   refreshView = handler;
@@ -129,6 +130,139 @@ function getPolicyPayloadFromFlags(splittable, overlappable, invisible) {
     is_invisible: invisible,
     scheduling_policies: schedulingPolicies,
   };
+}
+
+function setDependencies(ids) {
+  dependencyIds = Array.from(new Set((ids || []).filter(Boolean)));
+  renderDependencyList();
+}
+
+function getDependencies() {
+  return dependencyIds.slice();
+}
+
+function findBlobById(id) {
+  return state.blobs.find((item) => item.id === id) || null;
+}
+
+function findBlobByName(name) {
+  if (!name) return null;
+  const normalized = name.trim().toLowerCase();
+  if (!normalized) return null;
+  return state.blobs.find((item) => item.name?.toLowerCase() === normalized) || null;
+}
+
+function getDependencySuggestions(query) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
+  const matches = state.blobs.filter((item) => {
+    if (dependencyIds.includes(item.id)) return false;
+    const name = item.name?.toLowerCase() || "";
+    return name.includes(normalized) || item.id.toLowerCase().includes(normalized);
+  });
+  matches.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  return matches.slice(0, 6);
+}
+
+function renderDependencySuggestions() {
+  if (!dom.dependencySuggestions) return;
+  const query = dom.dependencyInput?.value || "";
+  const matches = getDependencySuggestions(query);
+  dom.dependencySuggestions.innerHTML = "";
+  if (!query.trim() || matches.length === 0) return;
+  matches.forEach((match) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dependency-suggestion";
+    button.dataset.dependencyId = match.id;
+    button.textContent = match.name || "Untitled";
+    button.title = match.id;
+    dom.dependencySuggestions.appendChild(button);
+  });
+}
+
+function renderDependencyList() {
+  if (!dom.dependencyList) return;
+  dom.dependencyList.innerHTML = "";
+  dependencyIds.forEach((id) => {
+    const blob = findBlobById(id);
+    const name = blob?.name || "Unknown blob";
+    const recurrenceName = blob?.recurrence_payload?.recurrence_name;
+    const pill = document.createElement("div");
+    pill.className = "dependency-pill";
+    pill.dataset.dependencyId = id;
+
+    const label = document.createElement("span");
+    label.className = "dependency-name";
+    label.textContent = name;
+    pill.appendChild(label);
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "dependency-tooltip";
+
+    const title = document.createElement("div");
+    title.className = "dependency-tooltip-title";
+    title.textContent = name;
+    tooltip.appendChild(title);
+
+    const idRow = document.createElement("div");
+    idRow.className = "dependency-tooltip-row";
+    const idLabel = document.createElement("span");
+    idLabel.className = "dependency-tooltip-label";
+    idLabel.textContent = "Blob id";
+    const idValue = document.createElement("span");
+    idValue.className = "dependency-tooltip-value";
+    idValue.textContent = id;
+    idRow.appendChild(idLabel);
+    idRow.appendChild(idValue);
+    tooltip.appendChild(idRow);
+
+    if (recurrenceName) {
+      const recurrenceRow = document.createElement("div");
+      recurrenceRow.className = "dependency-tooltip-row";
+      const recurrenceLabel = document.createElement("span");
+      recurrenceLabel.className = "dependency-tooltip-label";
+      recurrenceLabel.textContent = "Recurrence";
+      const recurrenceValue = document.createElement("span");
+      recurrenceValue.className = "dependency-tooltip-value";
+      recurrenceValue.textContent = recurrenceName;
+      recurrenceRow.appendChild(recurrenceLabel);
+      recurrenceRow.appendChild(recurrenceValue);
+      tooltip.appendChild(recurrenceRow);
+    }
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "ghost small dependency-remove";
+    removeBtn.textContent = "Remove dependency";
+    removeBtn.dataset.removeDependency = id;
+    tooltip.appendChild(removeBtn);
+
+    pill.appendChild(tooltip);
+    dom.dependencyList.appendChild(pill);
+  });
+}
+
+function addDependencyFromInput() {
+  if (!dom.dependencyInput) return;
+  const raw = dom.dependencyInput.value.trim();
+  if (!raw) return;
+  const matches = getDependencySuggestions(raw);
+  const candidate =
+    matches[0] ||
+    findBlobById(raw) ||
+    findBlobByName(raw);
+  if (!candidate) {
+    dom.formStatus.textContent = "No matching blob found.";
+    return;
+  }
+  if (!dependencyIds.includes(candidate.id)) {
+    dependencyIds.push(candidate.id);
+    renderDependencyList();
+  }
+  dom.formStatus.textContent = "";
+  dom.dependencyInput.value = "";
+  dom.dependencySuggestions.innerHTML = "";
 }
 
 function applyPolicyToForm(policy) {
@@ -434,6 +568,13 @@ function resetFormMode() {
     dom.recurrenceType.value = "single";
   }
   applyPolicyToForm({});
+  setDependencies([]);
+  if (dom.dependencyInput) {
+    dom.dependencyInput.value = "";
+  }
+  if (dom.dependencySuggestions) {
+    dom.dependencySuggestions.innerHTML = "";
+  }
   clearWeeklySlots();
   createWeeklySlot();
   if (dom.weeklySlotStatus) {
@@ -468,6 +609,7 @@ function openEditForm(blob) {
     blob.recurrence_payload?.recurrence_description || "";
   dom.blobForm.blobName.value = blob.name || "";
   dom.blobForm.blobDescription.value = blob.description || "";
+  setDependencies(Array.isArray(blob.dependencies) ? blob.dependencies : []);
   dom.blobForm.defaultStart.value = toLocalInputValueInTimeZone(
     blob.default_scheduled_timerange?.start,
     appConfig.userTimeZone
@@ -523,6 +665,7 @@ function openEditForm(blob) {
         policy: weeklyBlob.policy || {},
       });
     });
+    setDependencies(Array.isArray(blobs[0]?.dependencies) ? blobs[0].dependencies : []);
   } else {
     applyPolicyToForm(blob.policy);
     createWeeklySlot();
@@ -664,6 +807,7 @@ async function handleBlobSubmit(event) {
   dom.formStatus.textContent = "Saving...";
   const formData = new FormData(dom.blobForm);
   const policyPayload = getPolicyPayloadFromForm();
+  const dependencies = getDependencies();
   const baseBlob = {
     name: formData.get("blobName"),
     description: formData.get("blobDescription") || null,
@@ -693,7 +837,7 @@ async function handleBlobSubmit(event) {
       ),
     },
     policy: policyPayload,
-    dependencies: [],
+    dependencies,
     tags: [],
   };
   const recurrenceType = formData.get("recurrenceType") || "single";
@@ -751,7 +895,7 @@ async function handleBlobSubmit(event) {
           end: schedEnd,
         },
         policy: perSlot ? slot.policy : sharedPolicy,
-        dependencies: [],
+        dependencies,
         tags: [],
       };
     });
@@ -918,6 +1062,11 @@ function handleToday() {
 
 function bindFormHandlers(onRefresh) {
   setRefreshHandler(onRefresh);
+  if (dom.formPanel) {
+    dom.formPanel.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+  }
   dom.blobForm.addEventListener("submit", handleBlobSubmit);
   dom.settingsForm.addEventListener("submit", handleSettingsSubmit);
   if (dom.deleteRecurrenceBtn) {
@@ -946,6 +1095,44 @@ function bindFormHandlers(onRefresh) {
     dom.blobForm.weeklyInterval.addEventListener("input", updateRecurrenceUI);
     dom.blobForm.deltaValue.addEventListener("input", updateRecurrenceUI);
     dom.blobForm.deltaUnit.addEventListener("change", updateRecurrenceUI);
+  }
+  if (dom.dependencyInput) {
+    dom.dependencyInput.addEventListener("input", renderDependencySuggestions);
+    dom.dependencyInput.addEventListener("focus", renderDependencySuggestions);
+    dom.dependencyInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addDependencyFromInput();
+      }
+    });
+  }
+  if (dom.addDependencyBtn) {
+    dom.addDependencyBtn.addEventListener("click", addDependencyFromInput);
+  }
+  if (dom.dependencySuggestions) {
+    dom.dependencySuggestions.addEventListener("click", (event) => {
+      const target = event.target.closest(".dependency-suggestion");
+      if (!target) return;
+      const id = target.dataset.dependencyId;
+      if (id && !dependencyIds.includes(id)) {
+        dependencyIds.push(id);
+        renderDependencyList();
+      }
+      dom.formStatus.textContent = "";
+      if (dom.dependencyInput) {
+        dom.dependencyInput.value = "";
+      }
+      dom.dependencySuggestions.innerHTML = "";
+    });
+  }
+  if (dom.dependencyList) {
+    dom.dependencyList.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-remove-dependency]");
+      if (!target) return;
+      const id = target.dataset.removeDependency;
+      dependencyIds = dependencyIds.filter((depId) => depId !== id);
+      renderDependencyList();
+    });
   }
   if (dom.weeklyPerSlot) {
     dom.weeklyPerSlot.addEventListener("change", () => {

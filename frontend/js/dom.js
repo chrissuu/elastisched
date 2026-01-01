@@ -37,6 +37,10 @@ const dom = {
   deleteOccurrenceBtn: document.getElementById("deleteOccurrenceBtn"),
   starRecurrenceBtn: document.getElementById("starRecurrenceBtn"),
   starOccurrenceBtn: document.getElementById("starOccurrenceBtn"),
+  dependencyInput: document.querySelector('[name="blobDependencyInput"]'),
+  addDependencyBtn: document.getElementById("addDependencyBtn"),
+  dependencyList: document.getElementById("dependencyList"),
+  dependencySuggestions: document.getElementById("dependencySuggestions"),
 };
 
 export { dom };

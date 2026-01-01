@@ -170,6 +170,29 @@
               </label>
             </div>
           </div>
+          <div class="dependency-field">
+            <span class="dependency-label">Dependencies</span>
+            <div class="dependency-input-row">
+              <input
+                type="text"
+                name="blobDependencyInput"
+                class="needs-input"
+                placeholder="Search by blob name or id"
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                class="ghost small"
+                id="addDependencyBtn"
+                aria-label="Add dependency"
+                title="Add dependency"
+              >
+                +
+              </button>
+            </div>
+            <div class="dependency-suggestions" id="dependencySuggestions"></div>
+            <div class="dependency-list" id="dependencyList"></div>
+          </div>
           <div class="form-actions">
             <button type="button" class="ghost star edit-only" id="starOccurrenceBtn">
               Star occurrence

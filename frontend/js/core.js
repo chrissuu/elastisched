@@ -16,6 +16,8 @@ const state = {
   selectionPointer: null,
   selectionScrollHandler: null,
   activeBlockClickHandler: null,
+  infoCardLocked: false,
+  lockedBlobId: null,
 };
 
 const defaultConfig = {

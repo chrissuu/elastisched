@@ -92,6 +92,7 @@ function getInfoCard() {
 function showInfoCardHtml(html, anchorRect) {
   const card = getInfoCard();
   if (!html || !anchorRect) return;
+  if (state.infoCardLocked) return;
   card.innerHTML = html;
   card.classList.add("active");
   card.setAttribute("aria-hidden", "false");
@@ -111,11 +112,13 @@ function showInfoCardHtml(html, anchorRect) {
 
 function showInfoCard(blob, anchorRect) {
   if (!blob || !anchorRect) return;
+  if (state.infoCardLocked) return;
   const recurrenceName = blob.recurrence_payload?.recurrence_name;
   const recurrenceDescription = blob.recurrence_payload?.recurrence_description;
   const starred = isOccurrenceStarred(blob);
   const blobName = blob.name || "Untitled";
   const blobDescription = blob.description;
+  const blobId = blob.id;
   const timeLabel = formatTimeRangeInTimeZone(
     blob.realized_timerange?.start || blob.default_scheduled_timerange?.start,
     blob.realized_timerange?.end || blob.default_scheduled_timerange?.end,
@@ -131,6 +134,27 @@ function showInfoCard(blob, anchorRect) {
         ${recurrenceDescription ? `<div class="info-text">${recurrenceDescription}</div>` : ""}
       `
       : "";
+  const idBlock = blobId
+    ? `
+        <div class="info-divider"></div>
+        <div class="info-label">Blob id</div>
+        <div class="info-id-row">
+          <span class="info-id info-id-pill" title="${blobId}">${blobId}</span>
+          <button
+            class="ghost small info-copy"
+            data-copy-blob-id="${blobId}"
+            aria-label="Copy blob id"
+            title="Copy blob id"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                d="M8 8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2V8zm-2 3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1h-2V6H5v3h1v2z"
+              />
+            </svg>
+          </button>
+        </div>
+      `
+    : "";
 
   const html = `
     <div class="info-title">
@@ -139,6 +163,7 @@ function showInfoCard(blob, anchorRect) {
     </div>
     ${blobDescription ? `<div class="info-text">${blobDescription}</div>` : ""}
     ${recurrenceBlock}
+    ${idBlock}
     <div class="info-divider"></div>
     <div class="info-label">Time</div>
     <div class="info-text">${timeLabel}</div>
@@ -152,6 +177,25 @@ function hideInfoCard() {
   if (!card) return;
   card.classList.remove("active");
   card.setAttribute("aria-hidden", "true");
+}
+
+function clearInfoCardLock() {
+  if (!state.infoCardLocked) return;
+  state.infoCardLocked = false;
+  state.lockedBlobId = null;
+  if (state.view === "day") {
+    dom.views.day?.querySelectorAll(".day-block").forEach((el) => el.classList.remove("active"));
+    const overlay = dom.views.day?.querySelector("#schedulableOverlay");
+    overlay?.classList.remove("active", "overflow-top", "overflow-bottom");
+  } else if (state.view === "week") {
+    dom.views.week
+      ?.querySelectorAll(".day-block")
+      .forEach((el) => el.classList.remove("active"));
+    dom.views.week
+      ?.querySelectorAll(".schedulable-overlay")
+      .forEach((overlay) => overlay.classList.remove("active", "overflow-top", "overflow-bottom"));
+  }
+  hideInfoCard();
 }
 
 function setDateLabel(text) {
@@ -370,31 +414,47 @@ function renderDay() {
     blocksEls.forEach((el) => el.classList.remove("active"));
   };
 
+  const setLockedInfoCard = (blockEl) => {
+    state.infoCardLocked = true;
+    state.lockedBlobId = blockEl.dataset.blobId || null;
+  };
+
+  const clearLockedInfoCard = () => {
+    state.infoCardLocked = false;
+    state.lockedBlobId = null;
+  };
+
+  const applyInfoCardAndOverlay = (blockEl) => {
+    const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
+    showInfoCard(blob, blockEl.getBoundingClientRect());
+    const schedStart = toZonedDate(
+      toDate(blockEl.getAttribute("data-sched-start")),
+      appConfig.userTimeZone
+    );
+    const schedEnd = toZonedDate(
+      toDate(blockEl.getAttribute("data-sched-end")),
+      appConfig.userTimeZone
+    );
+    if (!schedStart || !schedEnd) return;
+    const overlayStart = schedStart < dayStart ? dayStart : schedStart;
+    const overlayEnd = schedEnd > dayEnd ? dayEnd : schedEnd;
+    const minutes = (overlayEnd - overlayStart) / 60000;
+    const top = (overlayStart - dayStart) / 60000;
+    overlay.style.top = `${(top / 60) * hourHeight}px`;
+    overlay.style.height = `${Math.max(18, (minutes / 60) * hourHeight)}px`;
+    overlay.classList.toggle("overflow-top", schedStart < dayStart);
+    overlay.classList.toggle("overflow-bottom", schedEnd > dayEnd);
+    overlay.classList.add("active");
+  };
+
   blocksEls.forEach((blockEl) => {
     blockEl.addEventListener("mouseenter", () => {
       if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
-      const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
-      showInfoCard(blob, blockEl.getBoundingClientRect());
-      const schedStart = toZonedDate(
-        toDate(blockEl.getAttribute("data-sched-start")),
-        appConfig.userTimeZone
-      );
-      const schedEnd = toZonedDate(
-        toDate(blockEl.getAttribute("data-sched-end")),
-        appConfig.userTimeZone
-      );
-      if (!schedStart || !schedEnd) return;
-      const overlayStart = schedStart < dayStart ? dayStart : schedStart;
-      const overlayEnd = schedEnd > dayEnd ? dayEnd : schedEnd;
-      const minutes = (overlayEnd - overlayStart) / 60000;
-      const top = (overlayStart - dayStart) / 60000;
-      overlay.style.top = `${(top / 60) * hourHeight}px`;
-      overlay.style.height = `${Math.max(18, (minutes / 60) * hourHeight)}px`;
-      overlay.classList.toggle("overflow-top", schedStart < dayStart);
-      overlay.classList.toggle("overflow-bottom", schedEnd > dayEnd);
-      overlay.classList.add("active");
+      if (state.infoCardLocked) return;
+      applyInfoCardAndOverlay(blockEl);
     });
     blockEl.addEventListener("mouseleave", () => {
+      if (state.infoCardLocked) return;
       overlay.classList.remove("active", "overflow-top", "overflow-bottom");
       hideInfoCard();
     });
@@ -403,6 +463,8 @@ function renderDay() {
       if (event.target.closest(".star-toggle")) return;
       clearActiveBlocks();
       blockEl.classList.add("active");
+      applyInfoCardAndOverlay(blockEl);
+      setLockedInfoCard(blockEl);
     });
     const starBtn = blockEl.querySelector(".star-toggle");
     if (starBtn) {
@@ -417,8 +479,13 @@ function renderDay() {
     document.removeEventListener("click", state.activeBlockClickHandler);
   }
   state.activeBlockClickHandler = (event) => {
+    if (event.button !== 0) return;
     if (event.target.closest(".day-block")) return;
+    if (event.target.closest(".info-card")) return;
     clearActiveBlocks();
+    overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+    hideInfoCard();
+    clearLockedInfoCard();
   };
   document.addEventListener("click", state.activeBlockClickHandler);
 
@@ -710,8 +777,12 @@ function renderWeek() {
 
   dayColumns.forEach((column) => {
     column.querySelectorAll(".day-block").forEach((blockEl) => {
-      blockEl.addEventListener("mouseenter", () => {
-        if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
+      const setLockedInfoCard = () => {
+        state.infoCardLocked = true;
+        state.lockedBlobId = blockEl.dataset.blobId || null;
+      };
+
+      const applyInfoCardAndOverlay = () => {
         const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
         showInfoCard(blob, blockEl.getBoundingClientRect());
         const schedStart = toZonedDate(
@@ -744,8 +815,15 @@ function renderWeek() {
           );
           overlay.classList.add("active");
         });
+      };
+
+      blockEl.addEventListener("mouseenter", () => {
+        if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
+        if (state.infoCardLocked) return;
+        applyInfoCardAndOverlay();
       });
       blockEl.addEventListener("mouseleave", () => {
+        if (state.infoCardLocked) return;
         dayTracks.forEach(({ overlay }) => {
           overlay.classList.remove("active", "overflow-top", "overflow-bottom");
         });
@@ -758,6 +836,8 @@ function renderWeek() {
           col.querySelectorAll(".day-block").forEach((el) => el.classList.remove("active"))
         );
         blockEl.classList.add("active");
+        applyInfoCardAndOverlay();
+        setLockedInfoCard();
       });
       const starBtn = blockEl.querySelector(".star-toggle");
       if (starBtn) {
@@ -773,10 +853,18 @@ function renderWeek() {
     document.removeEventListener("click", state.activeBlockClickHandler);
   }
   state.activeBlockClickHandler = (event) => {
+    if (event.button !== 0) return;
     if (event.target.closest(".day-block")) return;
+    if (event.target.closest(".info-card")) return;
     dayColumns.forEach((col) =>
       col.querySelectorAll(".day-block").forEach((el) => el.classList.remove("active"))
     );
+    dayTracks.forEach(({ overlay }) => {
+      overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+    });
+    hideInfoCard();
+    state.infoCardLocked = false;
+    state.lockedBlobId = null;
   };
   document.addEventListener("click", state.activeBlockClickHandler);
 
@@ -1086,7 +1174,10 @@ function renderMonth() {
       `;
       showInfoCardHtml(html, dayEl.getBoundingClientRect());
     });
-    dayEl.addEventListener("mouseleave", hideInfoCard);
+    dayEl.addEventListener("mouseleave", () => {
+      if (state.infoCardLocked) return;
+      hideInfoCard();
+    });
   });
   setDateLabel(formatMonthLabel(state.anchorDate));
 }
@@ -1138,6 +1229,8 @@ function renderAll() {
 function setActive(view) {
   state.view = view;
   saveView(view);
+  state.infoCardLocked = false;
+  state.lockedBlobId = null;
   hideInfoCard();
   dom.tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.view === view));
   Object.entries(dom.views).forEach(([key, el]) => {
@@ -1174,4 +1267,13 @@ function startInteractiveCreate() {
   setActive(state.view);
 }
 
-export { renderAll, renderDay, renderMonth, renderWeek, renderYear, setActive, startInteractiveCreate };
+export {
+  clearInfoCardLock,
+  renderAll,
+  renderDay,
+  renderMonth,
+  renderWeek,
+  renderYear,
+  setActive,
+  startInteractiveCreate,
+};
