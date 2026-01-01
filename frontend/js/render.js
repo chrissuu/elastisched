@@ -27,19 +27,33 @@ function getPolicyFlags(policy = {}) {
   return { splittable, overlappable, invisible };
 }
 
-function renderPolicyBadges(policy) {
+function renderPolicyBadges(policy, { compact = false } = {}) {
   const flags = getPolicyFlags(policy || {});
-  const badges = [];
+  const items = [];
   if (flags.splittable) {
-    badges.push('<span class="policy-badge splittable">Splittable</span>');
+    items.push({ key: "splittable", label: "Splittable" });
   }
   if (flags.overlappable) {
-    badges.push('<span class="policy-badge overlappable">Overlappable</span>');
+    items.push({ key: "overlappable", label: "Overlappable" });
   }
   if (flags.invisible) {
-    badges.push('<span class="policy-badge invisible">Invisible</span>');
+    items.push({ key: "invisible", label: "Invisible" });
   }
-  return badges.join("");
+  if (items.length === 0) {
+    return "";
+  }
+  if (compact && items.length > 1) {
+    const [first, ...rest] = items;
+    const remainingCount = rest.length;
+    const remainderLabel = rest.map((item) => item.label).join(", ");
+    return `
+      <span class="policy-badge ${first.key}">${first.label}</span>
+      <span class="policy-badge summary" title="${remainderLabel}">+${remainingCount}</span>
+    `;
+  }
+  return items
+    .map((item) => `<span class="policy-badge ${item.key}">${item.label}</span>`)
+    .join("");
 }
 
 function getInfoCard() {
@@ -217,7 +231,7 @@ function renderDay() {
   const blockHtml = blocks
     .map(
       (block) => {
-        const policyBadges = renderPolicyBadges(block.policy);
+        const policyBadges = renderPolicyBadges(block.policy, { compact: true });
         return `
         <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px; --column: ${block.column}; --columns: ${block.columns};" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
           <span>${block.title}</span>
@@ -492,7 +506,7 @@ function renderWeek() {
       const blockHtml = blocks
         .map(
           (block) => {
-            const policyBadges = renderPolicyBadges(block.policy);
+            const policyBadges = renderPolicyBadges(block.policy, { compact: true });
             return `
             <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px; --column: ${block.column}; --columns: ${block.columns};" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
               <span>${block.title}</span>
