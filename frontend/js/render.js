@@ -13,6 +13,35 @@ import {
   toLocalInputFromDate,
 } from "./utils.js";
 
+function getPolicyFlags(policy = {}) {
+  const rawMask = Number(policy.scheduling_policies);
+  const mask = Number.isFinite(rawMask) ? rawMask : 0;
+  const splittable =
+    typeof policy.is_splittable === "boolean" ? policy.is_splittable : Boolean(mask & 1);
+  const overlappable =
+    typeof policy.is_overlappable === "boolean"
+      ? policy.is_overlappable
+      : Boolean(mask & 2);
+  const invisible =
+    typeof policy.is_invisible === "boolean" ? policy.is_invisible : Boolean(mask & 4);
+  return { splittable, overlappable, invisible };
+}
+
+function renderPolicyBadges(policy) {
+  const flags = getPolicyFlags(policy || {});
+  const badges = [];
+  if (flags.splittable) {
+    badges.push('<span class="policy-badge splittable">Splittable</span>');
+  }
+  if (flags.overlappable) {
+    badges.push('<span class="policy-badge overlappable">Overlappable</span>');
+  }
+  if (flags.invisible) {
+    badges.push('<span class="policy-badge invisible">Invisible</span>');
+  }
+  return badges.join("");
+}
+
 function setDateLabel(text) {
   dom.dateLabel.textContent = text;
 }
@@ -102,6 +131,7 @@ function renderDay() {
           appConfig.userTimeZone
         ),
         type: getTagType(blob.tags),
+        policy: blob.policy,
         top: (startMin / 60) * hourHeight,
         height: Math.max(18, (minutes / 60) * hourHeight),
         startMin,
@@ -118,12 +148,16 @@ function renderDay() {
   const hoursHtml = hours.map((hour) => `<div class="hour">${hour}</div>`).join("");
   const blockHtml = blocks
     .map(
-      (block) => `
+      (block) => {
+        const policyBadges = renderPolicyBadges(block.policy);
+        return `
         <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px; --column: ${block.column}; --columns: ${block.columns};" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
           <span>${block.title}</span>
           <span class="event-time">${block.time}</span>
+          ${policyBadges ? `<div class="policy-badges">${policyBadges}</div>` : ""}
         </div>
-      `
+      `;
+      }
     )
     .join("");
 
@@ -370,6 +404,7 @@ function renderWeek() {
               appConfig.userTimeZone
             ),
             type: getTagType(blob.tags),
+            policy: blob.policy,
             top: (startMin / 60) * hourHeight,
             height: Math.max(18, (minutes / 60) * hourHeight),
             startMin,
@@ -385,12 +420,16 @@ function renderWeek() {
 
       const blockHtml = blocks
         .map(
-          (block) => `
+          (block) => {
+            const policyBadges = renderPolicyBadges(block.policy);
+            return `
             <div class="day-block ${block.type}" style="top: ${block.top}px; height: ${block.height}px; --column: ${block.column}; --columns: ${block.columns};" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
               <span>${block.title}</span>
               <span class="event-time">${block.time}</span>
+              ${policyBadges ? `<div class="policy-badges">${policyBadges}</div>` : ""}
             </div>
-          `
+          `;
+          }
         )
         .join("");
 

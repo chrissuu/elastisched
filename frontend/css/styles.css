@@ -153,6 +153,23 @@ body {
   gap: 6px;
   font-size: 13px;
   color: var(--muted);
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.blob-form label:has(input[required])::after,
+.blob-form label:has(select[required])::after {
+  content: "*";
+  color: #b4493f;
+  font-weight: 700;
+  margin-left: 3px;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.blob-form label > input,
+.blob-form label > select {
+  grid-column: 1 / -1;
 }
 
 .blob-form input {
@@ -161,6 +178,10 @@ body {
   border-radius: 10px;
   padding: 8px 10px;
   font-family: inherit;
+}
+
+.blob-form input.needs-input {
+  background-image: none;
 }
 
 .blob-form select {
@@ -193,15 +214,49 @@ body {
 .recurrence-fields {
   display: none;
   grid-column: 1 / -1;
-  gap: 12px;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  border: 1px solid #e0d3c1;
+  background: #fffaf2;
+  border-radius: 14px;
+  padding: 12px;
 }
 
 .recurrence-fields.active {
   display: grid;
 }
 
+.recurrence-fields .recurrence-note,
+.recurrence-fields .recurrence-note.subtle {
+  grid-column: 1 / -1;
+  background: transparent;
+  padding: 0;
+}
+
+.recurrence-fields .weekly-controls,
+.recurrence-fields .weekly-slots {
+  grid-column: 1 / -1;
+}
+
 .form-panel.weekly-mode .non-weekly-field {
   display: none;
+}
+
+.blob-form .policy-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.blob-form .policy-option input {
+  width: 18px;
+  height: 18px;
+}
+
+.single-slot {
+  grid-column: 1 / -1;
 }
 
 .weekly-controls {
@@ -227,6 +282,10 @@ body {
   grid-column: 1 / -1;
   display: grid;
   gap: 12px;
+}
+
+.weekly-slots:not(.per-slot) .weekly-slot .slot-policy {
+  display: none;
 }
 
 .weekly-slots-header {
@@ -262,6 +321,10 @@ body {
 }
 
 .weekly-slots.per-slot .slot-meta {
+  display: grid;
+}
+
+.weekly-slot.single-slot .slot-meta {
   display: grid;
 }
 
@@ -610,6 +673,38 @@ body {
   font-size: 11px;
   color: var(--muted);
   font-weight: 500;
+}
+
+.policy-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.policy-badge {
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.policy-badge.splittable {
+  background: rgba(247, 200, 108, 0.35);
+  border-color: rgba(247, 200, 108, 0.7);
+}
+
+.policy-badge.overlappable {
+  background: rgba(58, 110, 122, 0.18);
+  border-color: rgba(58, 110, 122, 0.5);
+}
+
+.policy-badge.invisible {
+  background: rgba(192, 125, 107, 0.18);
+  border-color: rgba(192, 125, 107, 0.5);
+  color: #5a4a3f;
 }
 
 .day-empty {

@@ -66,12 +66,12 @@
         </div>
         <form id="blobForm" class="blob-form">
           <label>
-            Name
-            <input type="text" name="name" placeholder="Focus Sprint" required />
+            Recurrence name
+            <input type="text" name="recurrenceName" class="needs-input" />
           </label>
           <label>
-            Description
-            <input type="text" name="description" placeholder="Optional details" />
+            Recurrence description
+            <input type="text" name="recurrenceDescription" class="needs-input" />
           </label>
           <label>
             Recurrence
@@ -126,22 +126,50 @@
               Repeats annually on the default start date.
             </div>
           </div>
-          <label class="non-weekly-field">
-            Default start
-            <input type="datetime-local" name="defaultStart" required />
-          </label>
-          <label class="non-weekly-field">
-            Default end
-            <input type="datetime-local" name="defaultEnd" required />
-          </label>
-          <label class="non-weekly-field">
-            Schedulable start
-            <input type="datetime-local" name="schedulableStart" required />
-          </label>
-          <label class="non-weekly-field">
-            Schedulable end
-            <input type="datetime-local" name="schedulableEnd" required />
-          </label>
+          <div class="non-weekly-field weekly-slot single-slot">
+            <div class="weekly-slot-row">
+              <label>
+                Default start
+                <input type="datetime-local" name="defaultStart" required />
+              </label>
+              <label>
+                Default end
+                <input type="datetime-local" name="defaultEnd" required />
+              </label>
+              <label>
+                Schedulable start
+                <input type="datetime-local" name="schedulableStart" required />
+              </label>
+              <label>
+                Schedulable end
+                <input type="datetime-local" name="schedulableEnd" required />
+              </label>
+            </div>
+            <div class="weekly-slot-row slot-meta">
+              <label>
+                Slot name
+                <input type="text" name="blobName" class="needs-input" required />
+              </label>
+              <label>
+                Slot description
+                <input type="text" name="blobDescription" class="needs-input" />
+              </label>
+            </div>
+            <div class="weekly-slot-row slot-policy">
+              <label class="policy-option">
+                <input type="checkbox" name="policySplittable" />
+                <span>Splittable</span>
+              </label>
+              <label class="policy-option">
+                <input type="checkbox" name="policyOverlappable" />
+                <span>Overlappable</span>
+              </label>
+              <label class="policy-option">
+                <input type="checkbox" name="policyInvisible" />
+                <span>Invisible</span>
+              </label>
+            </div>
+          </div>
           <div class="form-actions">
             <button type="submit" class="primary" id="formSubmitBtn">Create</button>
             <span class="form-status" id="formStatus"></span>
@@ -184,5 +212,6 @@
 
     <script src="./js/constants.js"></script>
     <script type="module" src="./js/app.js"></script>
+    <script type="module" src="./js/dev-reload.js"></script>
   </body>
 </html>

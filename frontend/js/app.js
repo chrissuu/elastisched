@@ -5,8 +5,6 @@ import { bindFormHandlers, openEditForm, resetFormMode, toggleForm, toggleSettin
 import { setActive, startInteractiveCreate } from "./render.js";
 import { getViewRange, shiftAnchorDate } from "./utils.js";
 
-console.error("[nav] app.js loaded");
-
 dom.brandTitle.textContent = appConfig.scheduleName || dom.brandTitle.textContent;
 dom.brandSubtitle.textContent = appConfig.subtitle || dom.brandSubtitle.textContent;
 
@@ -14,7 +12,6 @@ bindFormHandlers(refreshView);
 
 async function refreshView(nextView = state.view) {
   const view = nextView || state.view;
-  console.error("[nav] refreshView", { requestedView: nextView, stateView: state.view, view });
   setActive(view);
   const range = getViewRange(view, state.anchorDate);
   await ensureOccurrences(range.start, range.end);

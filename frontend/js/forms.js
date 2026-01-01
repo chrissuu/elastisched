@@ -47,6 +47,70 @@ function setFormMode(mode) {
   }
 }
 
+function getPolicyFlagsFromPolicy(policy = {}) {
+  const rawMask = Number(policy.scheduling_policies);
+  const mask = Number.isFinite(rawMask) ? rawMask : 0;
+  const splittable =
+    typeof policy.is_splittable === "boolean" ? policy.is_splittable : Boolean(mask & 1);
+  const overlappable =
+    typeof policy.is_overlappable === "boolean"
+      ? policy.is_overlappable
+      : Boolean(mask & 2);
+  const invisible =
+    typeof policy.is_invisible === "boolean" ? policy.is_invisible : Boolean(mask & 4);
+  return { splittable, overlappable, invisible };
+}
+
+function getPolicyPayloadFromForm() {
+  return getPolicyPayloadFromFlags(
+    Boolean(dom.blobForm.policySplittable?.checked),
+    Boolean(dom.blobForm.policyOverlappable?.checked),
+    Boolean(dom.blobForm.policyInvisible?.checked)
+  );
+}
+
+function getPolicyPayloadFromFlags(splittable, overlappable, invisible) {
+  const schedulingPolicies =
+    (splittable ? 1 : 0) | (overlappable ? 2 : 0) | (invisible ? 4 : 0);
+  return {
+    is_splittable: splittable,
+    is_overlappable: overlappable,
+    is_invisible: invisible,
+    scheduling_policies: schedulingPolicies,
+  };
+}
+
+function applyPolicyToForm(policy) {
+  const flags = getPolicyFlagsFromPolicy(policy || {});
+  if (dom.blobForm.policySplittable) {
+    dom.blobForm.policySplittable.checked = flags.splittable;
+  }
+  if (dom.blobForm.policyOverlappable) {
+    dom.blobForm.policyOverlappable.checked = flags.overlappable;
+  }
+  if (dom.blobForm.policyInvisible) {
+    dom.blobForm.policyInvisible.checked = flags.invisible;
+  }
+}
+
+function applyPolicyToSlot(slot, policy) {
+  const flags = getPolicyFlagsFromPolicy(policy || {});
+  const splittableEl = slot.querySelector('[name="slotPolicySplittable"]');
+  const overlappableEl = slot.querySelector('[name="slotPolicyOverlappable"]');
+  const invisibleEl = slot.querySelector('[name="slotPolicyInvisible"]');
+  if (splittableEl) splittableEl.checked = flags.splittable;
+  if (overlappableEl) overlappableEl.checked = flags.overlappable;
+  if (invisibleEl) invisibleEl.checked = flags.invisible;
+}
+
+function syncSlotPoliciesFromForm() {
+  if (!dom.weeklySlots) return;
+  const sharedPolicy = getPolicyPayloadFromForm();
+  dom.weeklySlots.querySelectorAll(".weekly-slot").forEach((slot) => {
+    applyPolicyToSlot(slot, sharedPolicy);
+  });
+}
+
 function updateRecurrenceUI() {
   const type = dom.recurrenceType?.value || "single";
   recurrenceFieldGroups.forEach((group) => {
@@ -143,6 +207,8 @@ function createWeeklySlot(slotData = {}) {
   const schedEnd = slotData.schedEnd || "10:30";
   const nameValue = slotData.name || "";
   const descriptionValue = slotData.description || "";
+  const fallbackPolicy = dom.weeklyPerSlot?.checked ? getPolicyPayloadFromForm() : {};
+  const policyFlags = getPolicyFlagsFromPolicy(slotData.policy ?? fallbackPolicy);
   slot.innerHTML = `
     <div class="weekly-slot-row">
       <label>
@@ -181,6 +247,26 @@ function createWeeklySlot(slotData = {}) {
         <input type="text" name="slotDescription" value="${descriptionValue}" />
       </label>
     </div>
+    <div class="weekly-slot-row slot-policy">
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicySplittable" ${
+          policyFlags.splittable ? "checked" : ""
+        } />
+        <span>Splittable</span>
+      </label>
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicyOverlappable" ${
+          policyFlags.overlappable ? "checked" : ""
+        } />
+        <span>Overlappable</span>
+      </label>
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicyInvisible" ${
+          policyFlags.invisible ? "checked" : ""
+        } />
+        <span>Invisible</span>
+      </label>
+    </div>
     <div class="weekly-slot-actions">
       <button type="button" class="ghost small" data-action="remove-slot">Remove</button>
     </div>
@@ -206,6 +292,9 @@ function getWeeklySlots() {
   const slots = [];
   dom.weeklySlots.querySelectorAll(".weekly-slot").forEach((slot) => {
     const day = Number(slot.querySelector('[name="slotDay"]').value);
+    const splittable = Boolean(slot.querySelector('[name="slotPolicySplittable"]')?.checked);
+    const overlappable = Boolean(slot.querySelector('[name="slotPolicyOverlappable"]')?.checked);
+    const invisible = Boolean(slot.querySelector('[name="slotPolicyInvisible"]')?.checked);
     slots.push({
       day,
       defaultStart: slot.querySelector('[name="slotDefaultStart"]').value,
@@ -214,6 +303,7 @@ function getWeeklySlots() {
       schedEnd: slot.querySelector('[name="slotSchedEnd"]').value,
       name: slot.querySelector('[name="slotName"]').value,
       description: slot.querySelector('[name="slotDescription"]').value,
+      policy: getPolicyPayloadFromFlags(splittable, overlappable, invisible),
     });
   });
   return slots;
@@ -288,6 +378,7 @@ function resetFormMode() {
   if (dom.recurrenceType) {
     dom.recurrenceType.value = "single";
   }
+  applyPolicyToForm({});
   clearWeeklySlots();
   createWeeklySlot();
   if (dom.weeklySlotStatus) {
@@ -316,8 +407,11 @@ function openEditForm(blob) {
   if (dom.recurrenceType) {
     dom.recurrenceType.value = recurrenceType;
   }
-  dom.blobForm.name.value = blob.name || "";
-  dom.blobForm.description.value = blob.description || "";
+  dom.blobForm.recurrenceName.value = blob.recurrence_payload?.recurrence_name || "";
+  dom.blobForm.recurrenceDescription.value =
+    blob.recurrence_payload?.recurrence_description || "";
+  dom.blobForm.blobName.value = blob.name || "";
+  dom.blobForm.blobDescription.value = blob.description || "";
   dom.blobForm.defaultStart.value = toLocalInputValueInTimeZone(
     blob.default_scheduled_timerange?.start,
     appConfig.userTimeZone
@@ -340,10 +434,11 @@ function openEditForm(blob) {
   }
   if (recurrenceType === "weekly" && blob.recurrence_payload?.blobs_of_week) {
     const blobs = blob.recurrence_payload.blobs_of_week;
+    applyPolicyToForm(blobs[0]?.policy || {});
     const sharedName = blobs[0]?.name || "";
     const sharedDescription = blobs[0]?.description || "";
-    dom.blobForm.name.value = sharedName;
-    dom.blobForm.description.value = sharedDescription || "";
+    dom.blobForm.blobName.value = sharedName;
+    dom.blobForm.blobDescription.value = sharedDescription || "";
     const hasCustom =
       blobs.some((item) => item.name !== sharedName || item.description !== sharedDescription) ||
       false;
@@ -369,9 +464,11 @@ function openEditForm(blob) {
         schedEnd: timeValueFromDate(schedEnd, "10:30", appConfig.userTimeZone),
         name: weeklyBlob.name || "",
         description: weeklyBlob.description || "",
+        policy: weeklyBlob.policy || {},
       });
     });
   } else {
+    applyPolicyToForm(blob.policy);
     createWeeklySlot();
   }
   if (blob.recurrence_payload?.delta_seconds && dom.blobForm.deltaValue) {
@@ -403,9 +500,10 @@ async function handleBlobSubmit(event) {
   event.preventDefault();
   dom.formStatus.textContent = "Saving...";
   const formData = new FormData(dom.blobForm);
+  const policyPayload = getPolicyPayloadFromForm();
   const baseBlob = {
-    name: formData.get("name"),
-    description: formData.get("description") || null,
+    name: formData.get("blobName"),
+    description: formData.get("blobDescription") || null,
     tz: appConfig.userTimeZone,
     default_scheduled_timerange: {
       start: toProjectIsoFromLocalInput(
@@ -431,7 +529,7 @@ async function handleBlobSubmit(event) {
         appConfig.projectTimeZone
       ),
     },
-    policy: {},
+    policy: policyPayload,
     dependencies: [],
     tags: [],
   };
@@ -446,8 +544,9 @@ async function handleBlobSubmit(event) {
     const weekStart = getWeekStart(state.anchorDate);
     const slots = getWeeklySlots();
     const perSlot = Boolean(dom.weeklyPerSlot?.checked);
-    const sharedName = formData.get("name");
-    const sharedDescription = formData.get("description") || null;
+    const sharedName = formData.get("blobName");
+    const sharedDescription = formData.get("blobDescription") || null;
+    const sharedPolicy = policyPayload;
     const blobsOfWeek = slots.map((slot) => {
       const offset = dayOffsetFromMonday(slot.day);
       const slotDate = addDays(weekStart, offset);
@@ -487,13 +586,15 @@ async function handleBlobSubmit(event) {
           start: schedStart,
           end: schedEnd,
         },
-        policy: {},
+        policy: perSlot ? slot.policy : sharedPolicy,
         dependencies: [],
         tags: [],
       };
     });
     recurrencePayload = {
       interval: Math.max(1, Number(formData.get("weeklyInterval") || 1)),
+      recurrence_name: formData.get("recurrenceName") || null,
+      recurrence_description: formData.get("recurrenceDescription") || null,
       blobs_of_week: blobsOfWeek,
     };
   } else if (recurrenceType === "delta") {
@@ -507,12 +608,22 @@ async function handleBlobSubmit(event) {
     };
     recurrencePayload = {
       delta_seconds: value * (unitSeconds[unit] || 86400),
+      recurrence_name: formData.get("recurrenceName") || null,
+      recurrence_description: formData.get("recurrenceDescription") || null,
       start_blob: baseBlob,
     };
   } else if (recurrenceType === "date") {
-    recurrencePayload = { blob: baseBlob };
+    recurrencePayload = {
+      recurrence_name: formData.get("recurrenceName") || null,
+      recurrence_description: formData.get("recurrenceDescription") || null,
+      blob: baseBlob,
+    };
   } else {
-    recurrencePayload = { blob: baseBlob };
+    recurrencePayload = {
+      recurrence_name: formData.get("recurrenceName") || null,
+      recurrence_description: formData.get("recurrenceDescription") || null,
+      blob: baseBlob,
+    };
   }
   const payload = { type: recurrenceType, payload: recurrencePayload };
 
@@ -608,7 +719,6 @@ function getActiveView() {
 
 function handlePrevDay() {
   const view = getActiveView();
-  console.error("[nav] prev click", { activeView: view, stateView: state.view });
   const next = shiftAnchorDate(view, state.anchorDate, -1);
   if (!next) return;
   state.anchorDate = next;
@@ -619,7 +729,6 @@ function handlePrevDay() {
 
 function handleNextDay() {
   const view = getActiveView();
-  console.error("[nav] next click", { activeView: view, stateView: state.view });
   const next = shiftAnchorDate(view, state.anchorDate, 1);
   if (!next) return;
   state.anchorDate = next;
@@ -630,7 +739,6 @@ function handleNextDay() {
 
 function handleToday() {
   const view = getActiveView();
-  console.error("[nav] today click", { activeView: view, stateView: state.view });
   state.anchorDate = new Date();
   if (refreshView) {
     refreshView(view);
@@ -657,11 +765,28 @@ function bindFormHandlers(onRefresh) {
     dom.blobForm.deltaUnit.addEventListener("change", updateRecurrenceUI);
   }
   if (dom.weeklyPerSlot) {
-    dom.weeklyPerSlot.addEventListener("change", updateRecurrenceUI);
+    dom.weeklyPerSlot.addEventListener("change", () => {
+      const weeklyWrapper = dom.weeklySlots?.closest(".weekly-slots");
+      const wasPerSlot = weeklyWrapper?.classList.contains("per-slot");
+      updateRecurrenceUI();
+      if (!wasPerSlot && dom.weeklyPerSlot.checked) {
+        syncSlotPoliciesFromForm();
+      }
+    });
   }
   if (dom.addWeeklySlotBtn) {
     dom.addWeeklySlotBtn.addEventListener("click", () => createWeeklySlot());
   }
+  ["policySplittable", "policyOverlappable", "policyInvisible"].forEach((name) => {
+    const field = dom.blobForm?.[name];
+    if (field) {
+      field.addEventListener("change", () => {
+        if (!dom.weeklyPerSlot?.checked) {
+          syncSlotPoliciesFromForm();
+        }
+      });
+    }
+  });
   if (dom.weeklySlots && dom.weeklySlots.children.length === 0) {
     createWeeklySlot();
   }
