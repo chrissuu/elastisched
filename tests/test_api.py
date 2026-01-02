@@ -7,7 +7,7 @@ from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture
-def api_client(tmp_path_factory):
+async def api_client(tmp_path_factory):
     db_path = tmp_path_factory.mktemp("db") / "test.db"
     os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{db_path}"
 
@@ -17,7 +17,8 @@ def api_client(tmp_path_factory):
     importlib.reload(db_module)
     importlib.reload(main_module)
 
-    transport = ASGITransport(app=main_module.app, lifespan="on")
+    await db_module.init_db()
+    transport = ASGITransport(app=main_module.app)
     return AsyncClient(transport=transport, base_url="http://test")
 
 

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from elastisched.api.db import get_session
 from elastisched.api.models import BlobModel
 from elastisched.api.schemas import BlobCreate, BlobRead, BlobUpdate, TimeRangeSchema
+from elastisched.constants import DEFAULT_TZ, PROJECT_TIMEZONE
 
 
 router = APIRouter(prefix="/blobs", tags=["blobs"])
@@ -33,6 +34,19 @@ def _validate_timeranges(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="default_scheduled_timerange must be within schedulable_timerange",
         )
+
+
+def _coerce_datetime_to_project(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=DEFAULT_TZ)
+    return value.astimezone(DEFAULT_TZ)
+
+
+def _coerce_timerange_to_project(timerange: TimeRangeSchema) -> TimeRangeSchema:
+    return TimeRangeSchema(
+        start=_coerce_datetime_to_project(timerange.start),
+        end=_coerce_datetime_to_project(timerange.end),
+    )
 
 
 def _to_schema(blob: BlobModel) -> BlobRead:
@@ -62,20 +76,27 @@ def _to_schema(blob: BlobModel) -> BlobRead:
 async def create_blob(
     payload: BlobCreate, session: AsyncSession = Depends(get_session)
 ) -> BlobRead:
-    _validate_timeranges(payload.default_scheduled_timerange, payload.schedulable_timerange)
-    if payload.realized_timerange:
-        _validate_timeranges(payload.realized_timerange, payload.schedulable_timerange)
+    default_tr = _coerce_timerange_to_project(payload.default_scheduled_timerange)
+    schedulable_tr = _coerce_timerange_to_project(payload.schedulable_timerange)
+    realized_tr = (
+        _coerce_timerange_to_project(payload.realized_timerange)
+        if payload.realized_timerange
+        else None
+    )
+    _validate_timeranges(default_tr, schedulable_tr)
+    if realized_tr:
+        _validate_timeranges(realized_tr, schedulable_tr)
     blob = BlobModel(
         id=str(uuid.uuid4()),
         name=payload.name,
         description=payload.description,
-        tz=payload.tz,
-        default_scheduled_start=payload.default_scheduled_timerange.start,
-        default_scheduled_end=payload.default_scheduled_timerange.end,
-        schedulable_start=payload.schedulable_timerange.start,
-        schedulable_end=payload.schedulable_timerange.end,
-        realized_start=payload.realized_timerange.start if payload.realized_timerange else None,
-        realized_end=payload.realized_timerange.end if payload.realized_timerange else None,
+        tz=PROJECT_TIMEZONE,
+        default_scheduled_start=default_tr.start,
+        default_scheduled_end=default_tr.end,
+        schedulable_start=schedulable_tr.start,
+        schedulable_end=schedulable_tr.end,
+        realized_start=realized_tr.start if realized_tr else None,
+        realized_end=realized_tr.end if realized_tr else None,
         policy=payload.policy,
         dependencies=payload.dependencies,
         tags=payload.tags,
@@ -127,14 +148,22 @@ async def update_blob(
     if not blob:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blob not found")
 
-    default_tr = payload.default_scheduled_timerange or TimeRangeSchema(
-        start=blob.default_scheduled_start, end=blob.default_scheduled_end
+    default_tr = (
+        _coerce_timerange_to_project(payload.default_scheduled_timerange)
+        if payload.default_scheduled_timerange
+        else TimeRangeSchema(start=blob.default_scheduled_start, end=blob.default_scheduled_end)
     )
-    schedulable_tr = payload.schedulable_timerange or TimeRangeSchema(
-        start=blob.schedulable_start, end=blob.schedulable_end
+    schedulable_tr = (
+        _coerce_timerange_to_project(payload.schedulable_timerange)
+        if payload.schedulable_timerange
+        else TimeRangeSchema(start=blob.schedulable_start, end=blob.schedulable_end)
     )
     _validate_timeranges(default_tr, schedulable_tr)
-    realized_tr = payload.realized_timerange
+    realized_tr = (
+        _coerce_timerange_to_project(payload.realized_timerange)
+        if payload.realized_timerange
+        else None
+    )
     if realized_tr:
         _validate_timeranges(realized_tr, schedulable_tr)
 
@@ -142,8 +171,7 @@ async def update_blob(
         blob.name = payload.name
     if payload.description is not None:
         blob.description = payload.description
-    if payload.tz is not None:
-        blob.tz = payload.tz
+    blob.tz = PROJECT_TIMEZONE
     if payload.policy is not None:
         blob.policy = payload.policy
     if payload.dependencies is not None:

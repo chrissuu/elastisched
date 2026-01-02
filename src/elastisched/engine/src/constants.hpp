@@ -1,6 +1,7 @@
 #ifndef CONSTANTS
 #define CONSTANTS
 
+#include <cstdlib>
 #include <string>
 
 #include "utils/Interval.hpp"
@@ -33,5 +34,19 @@ namespace constants {
     constexpr double ILLEGAL_SCHEDULE_COST = 1e12f;
 
     constexpr double EPSILON = 1e-5f;
+    constexpr uint32_t DEFAULT_RNG_SEED = 1337;
+
+    inline uint32_t rng_seed() {
+        const char* value = std::getenv("ELASTISCHED_RNG_SEED");
+        if (!value || !*value) {
+            return DEFAULT_RNG_SEED;
+        }
+        char* end = nullptr;
+        unsigned long parsed = std::strtoul(value, &end, 10);
+        if (end == value || *end != '\0') {
+            return DEFAULT_RNG_SEED;
+        }
+        return static_cast<uint32_t>(parsed);
+    }
 }
 #endif

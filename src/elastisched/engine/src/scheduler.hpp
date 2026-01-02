@@ -177,8 +177,7 @@ std::pair<Schedule, std::vector<double>> scheduleJobs(
     }
 
     std::vector<std::vector<Job>> disjointJobs = getDisjointIntervals(jobs);
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    std::mt19937 gen(constants::rng_seed());
 
     Schedule initialSchedule = Schedule(jobs);
 

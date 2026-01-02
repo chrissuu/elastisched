@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from elastisched.blob import Blob
+from elastisched.constants import DEFAULT_TZ
 from elastisched.recurrence import SingleBlobOccurrence
 from elastisched.timerange import TimeRange
 
@@ -23,7 +24,7 @@ def test_schedulable_after_current_next_occurrence():
 
     single_occurrence = SingleBlobOccurrence(blob)
 
-    dt = datetime(year=1999, month=1, day=1, hour=1)
+    dt = datetime(year=1999, month=1, day=1, hour=1, tzinfo=DEFAULT_TZ)
     next_occurrence = single_occurrence.next_occurrence(dt)
 
     # Assert that
@@ -49,7 +50,7 @@ def test_schedulable_contains_current_next_occurrence():
 
     single_occurrence = SingleBlobOccurrence(blob)
 
-    dt = datetime(year=2000, month=6, day=1, hour=1)
+    dt = datetime(year=2000, month=6, day=1, hour=1, tzinfo=DEFAULT_TZ)
     next_occurrence = single_occurrence.next_occurrence(dt)
 
     # Assert that
@@ -74,7 +75,7 @@ def test_schedulable_before_current_next_occurrence():
 
     single_occurrence = SingleBlobOccurrence(blob)
 
-    dt = datetime(year=2005, month=6, day=1, hour=1)
+    dt = datetime(year=2005, month=6, day=1, hour=1, tzinfo=DEFAULT_TZ)
     next_occurrence = single_occurrence.next_occurrence(dt)
 
     # Assert that

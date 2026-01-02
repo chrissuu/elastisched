@@ -44,6 +44,7 @@ async function runSchedule(granularityMinutes, lookaheadSeconds) {
   const payload = {
     granularity_minutes: granularityMinutes,
     lookahead_seconds: lookaheadSeconds,
+    user_timezone: appConfig.userTimeZone,
   };
   const response = await fetch(`${API_BASE}/schedule`, {
     method: "POST",

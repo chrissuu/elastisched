@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from elastisched.blob import Blob
+from elastisched.constants import DEFAULT_TZ
 from elastisched.recurrence import DeltaBlobRecurrence
 from elastisched.timerange import TimeRange
 
@@ -18,7 +19,7 @@ def test_delta_next_occurrence_before_start():
     blob = Blob(default_timerange, schedulable_timerange)
     recurrence = DeltaBlobRecurrence(delta=timedelta(days=1), start_blob=blob)
 
-    dt = datetime(1999, 12, 30, 12)
+    dt = datetime(1999, 12, 30, 12, tzinfo=DEFAULT_TZ)
     next_occurrence = recurrence.next_occurrence(dt)
 
     # Assert that
@@ -39,12 +40,16 @@ def test_delta_next_occurrence_after_start():
     blob = Blob(default_timerange, schedulable_timerange)
     recurrence = DeltaBlobRecurrence(delta=timedelta(days=1), start_blob=blob)
 
-    dt = datetime(2000, 1, 3, 10)
+    dt = datetime(2000, 1, 3, 10, tzinfo=DEFAULT_TZ)
     next_occurrence = recurrence.next_occurrence(dt)
 
     # Assert that
-    assert next_occurrence.get_schedulable_timerange().start == datetime(2000, 1, 4, 8)
-    assert next_occurrence.get_schedulable_timerange().end == datetime(2000, 1, 4, 11)
+    assert next_occurrence.get_schedulable_timerange().start == datetime(
+        2000, 1, 4, 8, tzinfo=DEFAULT_TZ
+    )
+    assert next_occurrence.get_schedulable_timerange().end == datetime(
+        2000, 1, 4, 11, tzinfo=DEFAULT_TZ
+    )
 
 
 def test_delta_all_occurrences_within_range():
@@ -68,10 +73,10 @@ def test_delta_all_occurrences_within_range():
 
     # Assert that
     expected_starts = [
-        datetime(2000, 1, 1, 9),
-        datetime(2000, 1, 3, 9),
-        datetime(2000, 1, 5, 9),
-        datetime(2000, 1, 7, 9),
+        datetime(2000, 1, 1, 9, tzinfo=DEFAULT_TZ),
+        datetime(2000, 1, 3, 9, tzinfo=DEFAULT_TZ),
+        datetime(2000, 1, 5, 9, tzinfo=DEFAULT_TZ),
+        datetime(2000, 1, 7, 9, tzinfo=DEFAULT_TZ),
     ]
     assert len(occurrences) == 4
     for i, expected_start in enumerate(expected_starts):

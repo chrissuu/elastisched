@@ -1,5 +1,6 @@
 from collections import deque
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, select
@@ -33,17 +34,26 @@ schedule_router = APIRouter(prefix="/schedule", tags=["schedule"])
 DEFAULT_LOOKAHEAD_SECONDS = 14 * 24 * 60 * 60
 
 
-def _coerce_tz(value: datetime, tzinfo) -> datetime:
+def _as_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
-        return value.replace(tzinfo=tzinfo)
-    return value.astimezone(tzinfo)
+        value = value.replace(tzinfo=DEFAULT_TZ)
+    return value.astimezone(timezone.utc)
 
 
-def _epoch_start(reference: datetime) -> datetime:
-    tzinfo = reference.tzinfo or timezone.utc
-    reference = _coerce_tz(reference, tzinfo)
-    start = reference - timedelta(days=reference.weekday())
-    return start.replace(hour=0, minute=0, second=0, microsecond=0)
+def _resolve_user_tz(name: str | None):
+    if not name:
+        return DEFAULT_TZ
+    try:
+        return ZoneInfo(name)
+    except Exception:
+        return DEFAULT_TZ
+
+
+def _epoch_start_utc(reference_utc: datetime, user_tz) -> datetime:
+    reference_local = _as_utc(reference_utc).astimezone(user_tz)
+    start_local = reference_local - timedelta(days=reference_local.weekday())
+    start_local = start_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    return start_local.astimezone(timezone.utc)
 
 
 def _policy_from_payload(policy) -> engine.Policy:
@@ -90,9 +100,9 @@ def _tags_from_payload(raw_tags) -> set:
     return tags
 
 
-def _to_epoch_seconds(value: datetime, epoch_start: datetime) -> int:
-    value = _coerce_tz(value, epoch_start.tzinfo or timezone.utc)
-    return int((value - epoch_start).total_seconds())
+def _to_epoch_seconds(value_utc: datetime, epoch_start_utc: datetime) -> int:
+    value_utc = _as_utc(value_utc)
+    return int((value_utc - epoch_start_utc).total_seconds())
 
 
 def _dependency_violation_message(jobs: list[engine.Job]) -> str | None:
@@ -176,9 +186,10 @@ async def run_schedule(
             detail="lookahead_seconds must be greater than 0.",
         )
 
-    start = datetime.now(DEFAULT_TZ)
-    end = start + timedelta(seconds=lookahead_seconds)
-    timerange = TimeRange(start=start, end=end)
+    start_utc = datetime.now(timezone.utc)
+    end_utc = start_utc + timedelta(seconds=lookahead_seconds)
+    timerange = TimeRange(start=start_utc, end=end_utc)
+    user_tz = _resolve_user_tz(payload.user_timezone)
 
     result = await session.execute(select(RecurrenceModel))
     occurrences = []
@@ -201,7 +212,7 @@ async def run_schedule(
                 )
             )
 
-    epoch_start = _epoch_start(start)
+    epoch_start_utc = _epoch_start_utc(start_utc, user_tz)
     granularity_minutes = max(1, int(payload.granularity_minutes or 5))
     granularity_seconds = granularity_minutes * 60
 
@@ -219,10 +230,10 @@ async def run_schedule(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Default scheduled range invalid for {occurrence.id}.",
             )
-        schedulable_low = _to_epoch_seconds(schedulable.start, epoch_start)
-        schedulable_high = _to_epoch_seconds(schedulable.end, epoch_start)
-        scheduled_low = _to_epoch_seconds(scheduled.start, epoch_start)
-        scheduled_high = _to_epoch_seconds(scheduled.end, epoch_start)
+        schedulable_low = _to_epoch_seconds(schedulable.start, epoch_start_utc)
+        schedulable_high = _to_epoch_seconds(schedulable.end, epoch_start_utc)
+        scheduled_low = _to_epoch_seconds(scheduled.start, epoch_start_utc)
+        scheduled_high = _to_epoch_seconds(scheduled.end, epoch_start_utc)
         duration = scheduled_high - scheduled_low
         if duration <= 0:
             raise HTTPException(
@@ -258,8 +269,14 @@ async def run_schedule(
     await session.execute(delete(ScheduledOccurrenceModel))
     scheduled_rows = []
     for job in schedule.scheduledJobs:
-        realized_start = epoch_start + timedelta(seconds=job.scheduledTimeRange.getLow())
-        realized_end = epoch_start + timedelta(seconds=job.scheduledTimeRange.getHigh())
+        realized_start_utc = epoch_start_utc + timedelta(
+            seconds=job.scheduledTimeRange.getLow()
+        )
+        realized_end_utc = epoch_start_utc + timedelta(
+            seconds=job.scheduledTimeRange.getHigh()
+        )
+        realized_start = realized_start_utc.astimezone(DEFAULT_TZ)
+        realized_end = realized_end_utc.astimezone(DEFAULT_TZ)
         scheduled_rows.append(
             ScheduledOccurrenceModel(
                 id=job.id,

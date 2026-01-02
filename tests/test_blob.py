@@ -1,12 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from elastisched.blob import Blob
 from elastisched.timerange import TimeRange
 
 
-def test_different_timezone_le_comparison_raise_value_error():
+def test_different_timezone_le_comparison_normalizes_timezone():
     # Given
     default_timerange1 = TimeRange(
         start=datetime(year=2000, month=1, day=1, hour=1),
@@ -46,5 +44,4 @@ def test_different_timezone_le_comparison_raise_value_error():
     )
 
     # Assert that
-    with pytest.raises(ValueError):
-        blob1 <= blob2
+    assert blob1 <= blob2

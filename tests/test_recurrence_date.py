@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from elastisched.blob import Blob
+from elastisched.constants import DEFAULT_TZ
 from elastisched.recurrence import DateBlobRecurrence
 from elastisched.timerange import TimeRange
 
@@ -20,12 +21,12 @@ def test_dateblobrecurrence_regular_date_next_occurrence_before():
     blob = Blob(default, schedulable)
     recurrence = DateBlobRecurrence(blob=blob)
 
-    dt = datetime(1999, 5, 1)
+    dt = datetime(1999, 5, 1, tzinfo=DEFAULT_TZ)
     next_occurrence = recurrence.next_occurrence(dt)
 
     # Assert that
     assert next_occurrence.get_schedulable_timerange().start == datetime(
-        2000, 5, 15, 10
+        2000, 5, 15, 10, tzinfo=DEFAULT_TZ
     )
 
 
@@ -42,12 +43,12 @@ def test_dateblobrecurrence_regular_date_next_occurrence_after():
     blob = Blob(default, schedulable)
     recurrence = DateBlobRecurrence(blob=blob)
 
-    dt = datetime(2005, 5, 16)
+    dt = datetime(2005, 5, 16, tzinfo=DEFAULT_TZ)
     next_occurrence = recurrence.next_occurrence(dt)
 
     # Assert that
     assert next_occurrence.get_schedulable_timerange().start == datetime(
-        2006, 5, 15, 10
+        2006, 5, 15, 10, tzinfo=DEFAULT_TZ
     )
 
 
@@ -91,12 +92,12 @@ def test_dateblobrecurrence_feb29_next_occurrence():
     blob = Blob(default, schedulable)
     recurrence = DateBlobRecurrence(blob=blob)
 
-    dt = datetime(2001, 1, 1)
+    dt = datetime(2001, 1, 1, tzinfo=DEFAULT_TZ)
     next_occurrence = recurrence.next_occurrence(dt)
 
     # Assert that
     assert next_occurrence.get_schedulable_timerange().start == datetime(
-        2004, 2, 29, 10
+        2004, 2, 29, 10, tzinfo=DEFAULT_TZ
     )
 
 

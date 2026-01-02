@@ -37,8 +37,7 @@ public:
 
         costHistory.push_back(currCost);
 
-        std::random_device rd;
-        std::mt19937 gen(rd());
+        std::mt19937 gen(constants::rng_seed());
         std::uniform_real_distribution<> dis(0.0, 1.0);
 
         for (int iter = 0; iter < maxIters; ++iter) {

@@ -20,6 +20,14 @@ def has_overlapping_blobs(blobs: List[Blob]) -> bool:
     return False
 
 
+def _coerce_datetime(value: datetime, tzinfo) -> datetime:
+    if tzinfo is None:
+        return value
+    if value.tzinfo is None:
+        return value.replace(tzinfo=tzinfo)
+    return value.astimezone(tzinfo)
+
+
 def blob_copy_with_delta_future(blob: Blob, td: timedelta):
     blob_copy = deepcopy(blob)
 
@@ -67,7 +75,8 @@ class SingleBlobOccurrence(BlobRecurrence):
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
         timerange = self.blob.get_schedulable_timerange()
 
-        if current < timerange.start:
+        current_local = _coerce_datetime(current, timerange.start.tzinfo)
+        if current_local < timerange.start:
             return self.blob
 
         return None
@@ -114,7 +123,7 @@ class WeeklyBlobRecurrence(BlobRecurrence):
             current_local = current
             base_start_local = base_start
             if tzinfo:
-                current_local = current.astimezone(tzinfo)
+                current_local = _coerce_datetime(current, tzinfo)
                 base_start_local = base_start.astimezone(tzinfo)
 
             total_days = (current_local - base_start_local).days
@@ -192,10 +201,12 @@ class DeltaBlobRecurrence(BlobRecurrence):
             )
 
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
-        if current < self.start_blob.get_schedulable_timerange().start:
+        start = self.start_blob.get_schedulable_timerange().start
+        current_local = _coerce_datetime(current, start.tzinfo)
+        if current_local < start:
             return deepcopy(self.start_blob)
 
-        time_diff = current - self.start_blob.get_schedulable_timerange().start
+        time_diff = current_local - start
         intervals_passed = time_diff // self.delta
         delta_to_occurrence = (intervals_passed + 1) * self.delta
 
@@ -268,7 +279,7 @@ class DateBlobRecurrence(BlobRecurrence):
         tzinfo = self.blob.tz or start.tzinfo
         dt: datetime = schedulable_timerange.start
         start_local = start.astimezone(tzinfo) if tzinfo else start
-        current_local = current.astimezone(tzinfo) if tzinfo else current
+        current_local = _coerce_datetime(current, tzinfo)
         dt_local = dt.astimezone(tzinfo) if tzinfo else dt
         date = dt_local.date()
         time = dt_local.time()

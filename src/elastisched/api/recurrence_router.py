@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import delete, select
@@ -27,6 +26,7 @@ from elastisched.recurrence import (
     WeeklyBlobRecurrence,
 )
 from elastisched.timerange import TimeRange
+from elastisched.constants import DEFAULT_TZ
 from engine import Tag
 
 
@@ -101,11 +101,7 @@ def _serialize_tags(raw_tags) -> list[str]:
 
 
 def _blob_from_payload(data: dict) -> Blob:
-    tz_name = data.get("tz") or "UTC"
-    try:
-        tzinfo = ZoneInfo(tz_name)
-    except Exception:
-        tzinfo = timezone.utc
+    tzinfo = DEFAULT_TZ
     default_tr = _parse_timerange(data.get("default_scheduled_timerange", {}), tzinfo)
     schedulable_tr = _parse_timerange(data.get("schedulable_timerange", {}), tzinfo)
     return Blob(
@@ -349,25 +345,25 @@ async def list_occurrences(
             item.id: item for item in scheduled_result.scalars().all()
         }
         if scheduled:
-            def _coerce_aware(value: datetime) -> datetime:
+            def _coerce_project(value: datetime) -> datetime:
                 if value.tzinfo is None:
-                    return value.replace(tzinfo=timezone.utc)
-                return value
+                    return value.replace(tzinfo=DEFAULT_TZ)
+                return value.astimezone(DEFAULT_TZ)
 
             occurrences = [
                 occurrence.model_copy(
                     update={
                         "realized_timerange": TimeRangeSchema(
-                            start=scheduled[occurrence.id].realized_start,
-                            end=scheduled[occurrence.id].realized_end,
+                            start=_coerce_project(scheduled[occurrence.id].realized_start),
+                            end=_coerce_project(scheduled[occurrence.id].realized_end),
                         )
                     }
                 )
                 if occurrence.id in scheduled
-                and _coerce_aware(occurrence.schedulable_timerange.start)
-                <= _coerce_aware(scheduled[occurrence.id].realized_start)
-                <= _coerce_aware(scheduled[occurrence.id].realized_end)
-                <= _coerce_aware(occurrence.schedulable_timerange.end)
+                and _coerce_project(occurrence.schedulable_timerange.start)
+                <= _coerce_project(scheduled[occurrence.id].realized_start)
+                <= _coerce_project(scheduled[occurrence.id].realized_end)
+                <= _coerce_project(occurrence.schedulable_timerange.end)
                 else occurrence
                 for occurrence in occurrences
             ]
