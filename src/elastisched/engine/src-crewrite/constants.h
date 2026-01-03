@@ -29,4 +29,6 @@ const double ILLEGAL_SCHEDULE_COST = 1e12f;
 
 const double EPSILON = 1e-5f;
 const unsigned int DEFAULT_RNG_SEED = 1337;
+
+const size_t INITIAL_TAGSET_CAPACITY = 8;
 #endif

@@ -16,12 +16,8 @@ typedef struct Policy {
     uint8_t scheduling_policies; /// overloaded bitfield: bit 0 = is_splittable, bit 1 = is_overlappable, bit 2 = is_invisible
 } Policy;
 
-uint8_t get_max_splits(Policy* policy);
-time_t get_min_split_duration(Policy* policy);
-uint8_t get_scheduling_policies(Policy* policy);
-
-bool is_splittable(Policy* policy);
-bool is_overlappable(Policy* policy);
-bool is_invisible(Policy* policy);
+bool policy_is_splittable(Policy* policy);
+bool policy_is_overlappable(Policy* policy);
+bool policy_is_invisible(Policy* policy);
 
 #endif

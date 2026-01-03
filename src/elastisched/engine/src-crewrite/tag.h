@@ -6,10 +6,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "constants.h"
+
 /**
  * Tag.h
  * 
- * Definitions for working with the Tag and TagSet structs.
+ * Definitions for working with the Tag and TagContainer structs.
+ * 
+ * TagContainer is a simple container struct which allows for
+ * functions to operate on it and implement Sets and Vectors.
+ * 
  * TagSet in practice does not get very large nor updated
  * often so we opt for a simple vector-based sorted set.
  * 
@@ -27,11 +33,11 @@ typedef struct Tag {
     char* description;
 } Tag;
 
-typedef struct TagSet {
+typedef struct TagContainer {
     Tag* data;
     size_t size;
     size_t capacity;
-} TagSet;
+} TagContainer;
 
 /**
  * @brief returns True if the names of ```U``` and ```V``` are the same
@@ -44,17 +50,12 @@ bool tag_eq(Tag* U, Tag* V);
 int tag_cmp(Tag* U, Tag* V);
 
 /**
- * @brief sets the description of ```U``` to ```description```
- */
-void tag_set_description(Tag* U, char* description);
-
-/**
- * @brief constructs a TagSet with capacity ```capacity```
+ * @brief constructs a TagContainer with capacity ```capacity```
  * 
- * @param capacity number of tags that the TagSet can hold
- * @return TagSet* 
+ * @param capacity number of tags that the TagContainer can hold
+ * @return TagContainer* 
  */
-TagSet* mk_tag_set(size_t capacity);
+TagContainer* mk_tag_container(size_t capacity);
 
 /**
  * @brief resizes a set by doubling capacity and copying memory
@@ -62,7 +63,7 @@ TagSet* mk_tag_set(size_t capacity);
  * @param set set to resize
  * @return true if resize successful, false otherwise
  */
-bool resize_set(TagSet* set);
+bool ts_resize(TagContainer* set);
 
 /**
  * @brief Find the insert index
@@ -70,9 +71,9 @@ bool resize_set(TagSet* set);
  * @param set the set to look in.
  * Internally, ```set```->data should be sorted.
  * @param tag the tag to look for
- * @return size_t 
+ * @return first index, i, such that tag <= set[j], i<=j<n
  */
-size_t set_insert_index(TagSet* set, Tag* tag);
+size_t ts_insert_index(TagContainer* set, Tag* tag);
 
 /**
  * @brief Helper function for inserting tag into a set
@@ -81,15 +82,31 @@ size_t set_insert_index(TagSet* set, Tag* tag);
  * @param tag the tag to insert
  * @param insert_ind the index to insert at
  */
-void set_insert(TagSet* set, Tag* tag, size_t insert_ind);
+void ts_insert(TagContainer* set, Tag* tag, size_t insert_ind);
 
 /**
- * @brief Helper function for addiing tag into a set
+ * @brief Helper function for adding tag into a set
  * 
  * @param set set to add to
  * @param tag the tag to add
  * @return true if no memory failures, false otherwise
  */
-bool set_add(TagSet* set, Tag* tag);
+bool ts_add(TagContainer* set, Tag* tag);
+
+/**
+ * @brief Membership checking in O(logn)
+ * 
+ * @param set set to check membership of
+ * @param tag tag to check membership in
+ * @return true if ```tag``` is in ```set```
+ */
+bool ts_in(TagContainer* set, Tag* tag);
+
+TagContainer* ts_union(TagContainer* U, TagContainer* V);
+TagContainer* ts_intersection(TagContainer* U, TagContainer* V);
+
+bool tv_resize(TagContainer* vec);
+bool tv_pushback(TagContainer* vec, Tag* tag);
+
 
 #endif
