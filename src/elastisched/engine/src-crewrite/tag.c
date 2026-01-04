@@ -27,19 +27,19 @@ TagContainer* mk_tag_container(size_t capacity) {
     return tag_set;
 }
 
-void tag_container_free(TagContainer* set) {
-    free((void*)set->data);
-    free(set);
+void tag_container_free(TagContainer* container) {
+    free((void*)container->data);
+    free(container);
     return;
 }
 
-bool ts_resize(TagContainer* set) {
-    size_t new_capacity = (set->capacity == 0) ? 
-        INITIAL_TAGSET_CAPACITY : set->capacity * 2;
-    Tag* new_data = realloc(set->data, new_capacity * sizeof(Tag));
+bool tag_container_resize(TagContainer* container) {
+    size_t new_capacity = (container->capacity == 0) ? 
+        INITIAL_TAGCONTAINER_CAPACITY : container->capacity * 2;
+    Tag* new_data = realloc(container->data, new_capacity * sizeof(Tag));
     if (!new_data) return false;
-    set->data = new_data;
-    set->capacity = new_capacity;
+    container->data = new_data;
+    container->capacity = new_capacity;
     return true;
 }
 
@@ -72,7 +72,9 @@ bool ts_add(TagContainer* set, Tag tag) {
     if (insert_index < set->size && 
         tag_eq(&tag, &set->data[insert_index])) return true;
 
-    if (set->size == set->capacity && !ts_resize(set)) return false;
+    if (set->size == set->capacity && 
+        !tag_container_resize(set)) 
+        return false;
 
     ts_insert(set, tag, insert_index);
     return true;
@@ -86,14 +88,14 @@ bool ts_in(TagContainer* set, Tag tag) {
 
 TagContainer* ts_union(TagContainer* U, TagContainer* V) {
     if (U->size == 0) {
-        TagContainer* set_union = mk_tag_set(V->size);
+        TagContainer* set_union = mk_tag_container(V->size);
         if (!set_union) return NULL;
         memcpy(set_union->data, V->data, V->size * sizeof(Tag));
         set_union->size = V->size;
         return set_union;
     }
     if (V->size == 0) {
-        TagContainer* set_union= mk_tag_set(U->size);
+        TagContainer* set_union= mk_tag_container(U->size);
         if (!set_union) return NULL;
         memcpy(set_union->data, U->data, U->size * sizeof(Tag));
         set_union->size = U->size;
@@ -135,15 +137,35 @@ TagContainer* ts_union(TagContainer* U, TagContainer* V) {
 };
 
 TagContainer* ts_intersection(TagContainer* U, TagContainer* V) {
-    TagContainer* set_intersection = mk_tag_container(min(U->capacity, V->capacity));
+    TagContainer* set_intersection = mk_tag_container(min(U->size, V->size));
+    if (!set_intersection) return NULL;
 
-    size_t u_ptr = 0;
-    size_t v_ptr = 0;
+    TagContainer* anchor = U->size > V->size ? V : U;
+    TagContainer* ot = U->size > V->size ? U : V;
     size_t insert_ind = 0;
-
-    while(u_ptr < U->size) {
-        Tag* curr_u_tag = &U->data[u_ptr];
-        Tag* curr_v_tag = &V->data[v_ptr];
-        if (tag_eq(curr_u_tag, curr_v_tag)) set_intersection->data[insert_ind++] = U->data[u_ptr++];
+    for (int i = 0; i < anchor->size; i++) {
+        if (ts_in(ot, anchor->data[i])) {
+            set_intersection->data[insert_ind++] = anchor->data[i];
+        }
     }
+
+    set_intersection->size = insert_ind;
+    return set_intersection;
+}
+
+int _tag_cmp(const void* u, const void* v) {
+    return tag_cmp((Tag*)u, (Tag*)v);
+}
+
+bool ts_is_valid(TagContainer* set) {
+    return set->size <= set->capacity &&
+        is_sorted((void*)set->data, set->size, sizeof(Tag), &_tag_cmp);
+}
+
+bool tv_pushback(TagContainer* vec, Tag tag) {
+    if (vec->size == vec->capacity && 
+        !tag_container_resize(vec)) return false;
+    
+    vec->data[vec->size++] = tag;
+    return true;
 }

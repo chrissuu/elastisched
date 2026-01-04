@@ -1,27 +1,27 @@
 #include "interval.h"
 
-bool interval_eq(Interval* U, Interval* V) {
+bool interval_eq(const Interval* U, const Interval* V) {
     return (U->low == V->low) && (U->high == V->high);
 }
 
-bool interval_overlaps(Interval* U, Interval* V) {
+bool interval_overlaps(const Interval* U, const Interval* V) {
     return !(U->high < V->low || V->high < U->low);
 }
 
-bool interval_contains(Interval* U, Interval* V) {
+bool interval_contains(const Interval* U, const Interval* V) {
     return (U->low <= V->low && V->high <= U->high);
 }
 
-time_t interval_length(Interval* interval) {
+sec_t interval_length(const Interval* interval) {
     return interval->high - interval->low;
 }
 
-time_t interval_is_valid(Interval* interval) {
+bool interval_is_valid(const Interval* interval) {
     return interval->high >= interval->low;
 }
 
 Node* mk_leaf_node(Node* parent, Interval* interval,
-    void* value, time_t max, Color color
+    void* value, sec_t max, Color color
 ) {
     Node* node = malloc(sizeof(Node));
     if (!node) return NULL;
@@ -39,7 +39,7 @@ Node* mk_leaf_node(Node* parent, Interval* interval,
 }
 
 Node* mk_node(Node* left, Node* right, Node* parent,
-    Interval* interval, void* value, time_t max, Color color
+    Interval* interval, void* value, sec_t max, Color color
 ) {
     Node* node = malloc(sizeof(Node));
     if (!node) return NULL;

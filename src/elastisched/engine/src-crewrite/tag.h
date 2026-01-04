@@ -7,6 +7,8 @@
 #include <string.h>
 
 #include "constants.h"
+#include "utils.h"
+
 
 /**
  * Tag.h
@@ -39,15 +41,18 @@ typedef struct TagContainer {
     size_t capacity;
 } TagContainer;
 
+typedef Tag ID; /// an dependency ID is a Tag with an empty description
+typedef TagContainer DependencyContainer; 
+
 /**
  * @brief returns True if the names of ```U``` and ```V``` are the same
  */
-bool tag_eq(Tag* U, Tag* V);
+bool tag_eq(const Tag* U, const Tag* V);
 
 /**
  * @brief comparator for Tag type
  */
-int tag_cmp(Tag* U, Tag* V);
+int tag_cmp(const Tag* U, const Tag* V);
 
 /**
  * @brief constructs a TagContainer with capacity ```capacity```
@@ -58,12 +63,19 @@ int tag_cmp(Tag* U, Tag* V);
 TagContainer* mk_tag_container(size_t capacity);
 
 /**
- * @brief resizes a set by doubling capacity and copying memory
+ * @brief frees a TagContainer and its data
+ *
+ * @param container
+ */
+void tag_container_free(TagContainer* container);
+
+/**
+ * @brief resizes a container by doubling capacity and copying memory
  * 
- * @param set set to resize
+ * @param container
  * @return true if resize successful, false otherwise
  */
-bool ts_resize(TagContainer* set);
+bool tag_container_resize(TagContainer* container);
 
 /**
  * @brief Find the insert index
@@ -73,40 +85,73 @@ bool ts_resize(TagContainer* set);
  * @param tag the tag to look for
  * @return first index, i, such that tag <= set[j], i<=j<n
  */
-size_t ts_insert_index(TagContainer* set, Tag* tag);
+size_t ts_insert_index(TagContainer* set, Tag tag);
 
 /**
  * @brief Helper function for inserting tag into a set
  * 
- * @param set the set to insert to 
- * @param tag the tag to insert
+ * @param set
+ * @param tag
  * @param insert_ind the index to insert at
  */
-void ts_insert(TagContainer* set, Tag* tag, size_t insert_ind);
+void ts_insert(TagContainer* set, Tag tag, size_t insert_ind);
 
 /**
  * @brief Helper function for adding tag into a set
  * 
- * @param set set to add to
- * @param tag the tag to add
+ * @param set
+ * @param tag
  * @return true if no memory failures, false otherwise
  */
-bool ts_add(TagContainer* set, Tag* tag);
+bool ts_add(TagContainer* set, Tag tag);
 
 /**
- * @brief Membership checking in O(logn)
+ * @brief Membership checking in O(log|```set```|)
  * 
- * @param set set to check membership of
- * @param tag tag to check membership in
+ * @param set
+ * @param tag
  * @return true if ```tag``` is in ```set```
  */
-bool ts_in(TagContainer* set, Tag* tag);
+bool ts_in(TagContainer* set, Tag tag);
 
+/**
+ * @brief returns a new set containing the set union
+ * 
+ * @param U
+ * @param V 
+ * @return TagContainer*
+ *
+ * @note runtime of this is O(|U| + |V|)
+ */
 TagContainer* ts_union(TagContainer* U, TagContainer* V);
+
+/**
+ * @brief returns a new set containing the set intersection
+ * 
+ * @param U 
+ * @param V 
+ * @return TagContainer* 
+ *
+ * @note runtime of this is O(min(|U|, |V|)*log(max(|U|, |V|)))
+ */
 TagContainer* ts_intersection(TagContainer* U, TagContainer* V);
 
-bool tv_resize(TagContainer* vec);
-bool tv_pushback(TagContainer* vec, Tag* tag);
+/**
+ * @brief ensures that the tag set internals meet the appropriate
+ * invariants.
+ * 
+ * @param set
+ * @return: true if the invariants are met
+ */
+bool ts_is_valid(TagContainer* set);
 
+/**
+ * @brief pushback tag to tagvec
+ * 
+ * @param vec 
+ * @param tag 
+ * @return: true if no memory failures, false otherwise
+ */
+bool tv_pushback(TagContainer* vec, Tag tag);
 
 #endif
