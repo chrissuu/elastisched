@@ -6,7 +6,7 @@
 #include "vec.h"
 
 typedef struct Schedule {
-    JobVec* scheduledJobs;
+    JobVec* scheduled_jobs;
 } Schedule;
 
 void schedule_add_job(Schedule* schedule, const Job* job);

@@ -4,6 +4,11 @@
  * Macros for working with arbitrary C vectors
  */
 
+#define vec_realloc(vec) \
+        do { \
+            vec->data = realloc(vec->data, vec->capacity * sizeof(*vec->data)); \
+        } while (0)
+
 #define vec_pushback(vec, e) \
         do { \
             if (vec->size >= vec->capacity) { \

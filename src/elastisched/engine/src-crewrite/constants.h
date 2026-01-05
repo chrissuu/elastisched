@@ -32,4 +32,6 @@ const size_t INITIAL_TAGCONTAINER_CAPACITY = 8;
 const size_t INITIAL_CONTAINER_CAPACITY = 256;
 const size_t INITIAL_MAP_CAPACITY = 32;
 
+const size_t ELASTISCHED_INTERNAL_DLL_SZ = 3 * sizeof(size_t);
+
 #endif
