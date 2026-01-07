@@ -1,5 +1,6 @@
 import { API_BASE, appConfig, minuteGranularity, saveView, state } from "./core.js";
 import { dom } from "./dom.js";
+import { choiceDialog } from "./popups.js";
 import {
   addDays,
   clampToGranularity,
@@ -289,6 +290,7 @@ function showInfoCard(blob, anchorRect) {
   const html = `
     <div class="info-title">
       ${blobName}
+      <button class="info-close" type="button" aria-label="Delete options">×</button>
       <span class="info-star ${starred ? "active" : ""}" aria-hidden="true">★</span>
     </div>
     ${blobDescription ? `<div class="info-text">${blobDescription}</div>` : ""}
@@ -304,6 +306,10 @@ function showInfoCard(blob, anchorRect) {
     ${policyBadges ? `<div class="info-label">Policy</div><div class="policy-badges">${policyBadges}</div>` : ""}
   `;
   showInfoCardHtml(html, anchorRect);
+  const card = dom.infoCard;
+  if (card) {
+    card.dataset.blobId = blob.id || "";
+  }
 }
 
 function hideInfoCard() {
@@ -311,6 +317,7 @@ function hideInfoCard() {
   if (!card) return;
   card.classList.remove("active");
   card.setAttribute("aria-hidden", "true");
+  delete card.dataset.blobId;
 }
 
 function clearInfoCardLock() {
@@ -437,6 +444,82 @@ async function toggleStarFromCalendar(blob) {
     });
   } catch (error) {
     // Ignore network errors; state will resync on next refresh.
+  }
+}
+
+async function handleInfoCardDelete(event) {
+  const button = event.target.closest(".info-close");
+  if (!button) return;
+  const blobId = dom.infoCard?.dataset?.blobId || state.lockedBlobId;
+  if (!blobId) return;
+  const blob = state.blobs.find((item) => item.id === blobId);
+  if (!blob?.recurrence_id) return;
+  const choice = await choiceDialog("Delete this occurrence or the full recurrence?", {
+    confirmText: "Delete recurrence",
+    confirmValue: "recurrence",
+    altText: "Delete occurrence",
+    altValue: "occurrence",
+    cancelText: "Cancel",
+    destructive: true,
+    altDestructive: true,
+    confirmVariant: "ghost",
+    altVariant: "ghost",
+    actionOrder: "confirm-alt-cancel",
+  });
+  if (!choice) return;
+  if (choice === "occurrence" && blob.recurrence_type === "single") {
+    await deleteRecurrence(blob.recurrence_id);
+    return;
+  }
+  if (choice === "occurrence") {
+    await deleteOccurrence(blob);
+    return;
+  }
+  if (choice === "recurrence") {
+    await deleteRecurrence(blob.recurrence_id);
+  }
+}
+
+async function deleteRecurrence(recurrenceId) {
+  if (!recurrenceId) return;
+  try {
+    const response = await fetch(`${API_BASE}/recurrences/${recurrenceId}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete recurrence");
+    }
+    clearInfoCardLock();
+    window.dispatchEvent(new CustomEvent("elastisched:refresh"));
+  } catch (error) {
+    // No-op for now; alerts handled elsewhere.
+  }
+}
+
+async function deleteOccurrence(blob) {
+  if (!blob?.recurrence_id) return;
+  const occurrenceStart = blob.schedulable_timerange?.start;
+  if (!occurrenceStart) return;
+  const payload = blob.recurrence_payload || {};
+  const existing = Array.isArray(payload.exclusions) ? payload.exclusions : [];
+  const nextExclusions = Array.from(new Set([...existing, occurrenceStart]));
+  const nextPayload = { ...payload, exclusions: nextExclusions };
+  try {
+    const response = await fetch(`${API_BASE}/recurrences/${blob.recurrence_id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: blob.recurrence_type || "single",
+        payload: nextPayload,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete occurrence");
+    }
+    clearInfoCardLock();
+    window.dispatchEvent(new CustomEvent("elastisched:refresh"));
+  } catch (error) {
+    // No-op for now; alerts handled elsewhere.
   }
 }
 
@@ -673,6 +756,15 @@ function renderDay() {
     clearLockedInfoCard();
   };
   document.addEventListener("click", state.activeBlockClickHandler);
+  if (state.infoCardActionHandler) {
+    document.removeEventListener("click", state.infoCardActionHandler);
+  }
+  state.infoCardActionHandler = (event) => {
+    if (event.target.closest(".info-close")) {
+      handleInfoCardDelete(event);
+    }
+  };
+  document.addEventListener("click", state.infoCardActionHandler);
 
   if (state.selectionMode) {
     let clickStart = null;
@@ -1077,6 +1169,15 @@ function renderWeek() {
     state.lockedBlobId = null;
   };
   document.addEventListener("click", state.activeBlockClickHandler);
+  if (state.infoCardActionHandler) {
+    document.removeEventListener("click", state.infoCardActionHandler);
+  }
+  state.infoCardActionHandler = (event) => {
+    if (event.target.closest(".info-close")) {
+      handleInfoCardDelete(event);
+    }
+  };
+  document.addEventListener("click", state.infoCardActionHandler);
 
   if (state.selectionMode) {
     let clickStart = null;

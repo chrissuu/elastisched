@@ -9,6 +9,7 @@ import {
   toProjectIsoFromLocalInput,
 } from "./utils.js";
 import { startInteractiveCreate } from "./render.js";
+import { confirmDialog } from "./popups.js";
 
 let refreshView = null;
 const recurrenceFieldGroups = document.querySelectorAll(".recurrence-fields");
@@ -1156,7 +1157,11 @@ function openEditForm(blob) {
 
 async function deleteRecurrence() {
   if (!state.editingRecurrenceId) return;
-  const confirmed = window.confirm("Delete this entire recurrence?");
+  const confirmed = await confirmDialog("Delete this entire recurrence?", {
+    confirmText: "Delete",
+    cancelText: "Cancel",
+    destructive: true,
+  });
   if (!confirmed) return;
   dom.formStatus.textContent = "Deleting recurrence...";
   try {
@@ -1170,6 +1175,7 @@ async function deleteRecurrence() {
     toggleForm(false);
     resetFormMode();
     await refreshCalendar();
+    window.dispatchEvent(new CustomEvent("elastisched:refresh"));
   } catch (error) {
     dom.formStatus.textContent = error?.message || "Error deleting recurrence.";
   }
@@ -1186,7 +1192,11 @@ async function deleteOccurrence() {
     dom.formStatus.textContent = "Missing occurrence start.";
     return;
   }
-  const confirmed = window.confirm("Delete only this occurrence?");
+  const confirmed = await confirmDialog("Delete only this occurrence?", {
+    confirmText: "Delete",
+    cancelText: "Cancel",
+    destructive: true,
+  });
   if (!confirmed) return;
   const existing = Array.isArray(state.editingRecurrencePayload?.exclusions)
     ? state.editingRecurrencePayload.exclusions
@@ -1210,6 +1220,7 @@ async function deleteOccurrence() {
     toggleForm(false);
     resetFormMode();
     await refreshCalendar();
+    window.dispatchEvent(new CustomEvent("elastisched:refresh"));
   } catch (error) {
     dom.formStatus.textContent = error?.message || "Error deleting occurrence.";
   }
