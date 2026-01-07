@@ -180,6 +180,10 @@ async function extendOccurrenceByMinutes(minutes) {
   const blob = getSelectedOccurrence();
   if (!blob) return;
   if (!Number.isFinite(minutes) || minutes <= 0) return;
+  const effective = getEffectiveOccurrenceRange(blob);
+  if (!effective) return;
+  const schedEnd = new Date(blob.schedulable_timerange?.end);
+  if (Number.isNaN(schedEnd.getTime())) return;
   const occurrenceKey = blob.schedulable_timerange?.start;
   if (!occurrenceKey) return;
   const payload = blob.recurrence_payload || {};
@@ -190,10 +194,26 @@ async function extendOccurrenceByMinutes(minutes) {
   const currentOverride = getOccurrenceOverride(blob);
   let currentAdded = Number(currentOverride?.added_minutes || 0);
   if (!Number.isFinite(currentAdded)) currentAdded = 0;
+  const nextAdded = currentAdded + minutes;
+  const nextEnd = new Date(effective.end.getTime() + nextAdded * 60000);
+  let schedulableEndOverride = null;
+  if (nextEnd > schedEnd) {
+    const confirmed = window.confirm(
+      "This extends beyond the schedulable window. Continue anyway?"
+    );
+    if (!confirmed) return;
+    schedulableEndOverride = nextEnd;
+  }
   const nextOverride = {
     ...(currentOverride || {}),
-    added_minutes: currentAdded + minutes,
+    added_minutes: nextAdded,
   };
+  if (schedulableEndOverride) {
+    nextOverride.schedulable_timerange = {
+      start: blob.schedulable_timerange?.start,
+      end: toProjectIsoFromDate(schedulableEndOverride, appConfig.projectTimeZone),
+    };
+  }
   if (nextOverride.finished_at) {
     delete nextOverride.finished_at;
   }

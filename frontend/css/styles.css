@@ -359,6 +359,19 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.settings-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
 .color-field {
   grid-column: 1 / -1;
   display: grid;
@@ -1029,9 +1042,9 @@ body {
 }
 
 .now-event.active {
-  background: #1b1a16;
-  color: #f7f2e8;
-  border-color: #1b1a16;
+  background: rgba(58, 110, 122, 0.18);
+  color: var(--ink);
+  border-color: rgba(58, 110, 122, 0.45);
 }
 
 .now-event-time {

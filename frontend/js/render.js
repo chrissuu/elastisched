@@ -5,6 +5,7 @@ import {
   clampToGranularity,
   formatTimeRangeInTimeZone,
   getEffectiveOccurrenceRange,
+  getOccurrenceOverride,
   getWeekStart,
   getTagType,
   getTimeZoneParts,
@@ -266,6 +267,24 @@ function showInfoCard(blob, anchorRect) {
         </div>
       `
     : "";
+  const override = getOccurrenceOverride(blob);
+  let addedMinutes = Number(override?.added_minutes || 0);
+  if (!Number.isFinite(addedMinutes)) addedMinutes = 0;
+  const finishDate = override?.finished_at ? toDate(override.finished_at) : null;
+  const hasFinish = finishDate && !Number.isNaN(finishDate.getTime());
+  const finishDateLabel =
+    hasFinish && finishDate
+      ? toZonedDate(finishDate, getBlobTimeZone(blob))?.toLocaleString() || ""
+      : "";
+  const adjustmentsBlock =
+    hasFinish || addedMinutes
+      ? `
+        <div class="info-divider"></div>
+        <div class="info-label">Adjustments</div>
+        ${hasFinish ? `<div class="info-text">Finished at ${finishDateLabel}</div>` : ""}
+        ${addedMinutes ? `<div class="info-text">Added time: ${addedMinutes} min</div>` : ""}
+      `
+      : "";
 
   const html = `
     <div class="info-title">
@@ -281,6 +300,7 @@ function showInfoCard(blob, anchorRect) {
     <div class="info-divider"></div>
     <div class="info-label">Time</div>
     <div class="info-text">${timeLabel}</div>
+    ${adjustmentsBlock}
     ${policyBadges ? `<div class="info-label">Policy</div><div class="policy-badges">${policyBadges}</div>` : ""}
   `;
   showInfoCardHtml(html, anchorRect);
@@ -353,6 +373,8 @@ function updateCaret(caretEl, minutes, hourHeight) {
 
 async function toggleStarFromCalendar(blob) {
   if (!blob?.recurrence_id) return;
+  const wasLocked = state.infoCardLocked;
+  const lockedId = state.lockedBlobId;
   const occurrenceStart = blob.schedulable_timerange?.start;
   const occurrenceDate = occurrenceStart ? new Date(occurrenceStart) : null;
   if (!occurrenceDate || Number.isNaN(occurrenceDate.getTime())) return;
@@ -391,6 +413,18 @@ async function toggleStarFromCalendar(blob) {
       : item
   );
   setActive(state.view);
+  if (wasLocked && lockedId === blob.id) {
+    const viewRoot = state.view === "week" ? dom.views.week : dom.views.day;
+    const blockEl = viewRoot?.querySelector(`.day-block[data-blob-id="${lockedId}"]`);
+    const updatedBlob = state.blobs.find((item) => item.id === lockedId);
+    if (blockEl && updatedBlob) {
+      state.infoCardLocked = false;
+      showInfoCard(updatedBlob, blockEl.getBoundingClientRect());
+      state.infoCardLocked = true;
+      state.lockedBlobId = lockedId;
+      blockEl.classList.add("active");
+    }
+  }
 
   try {
     await fetch(`${API_BASE}/recurrences/${blob.recurrence_id}`, {
@@ -608,6 +642,9 @@ function renderDay() {
       if (event.shiftKey) return;
       if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
       if (event.target.closest(".star-toggle")) return;
+      if (state.infoCardLocked) {
+        clearLockedInfoCard();
+      }
       clearActiveBlocks();
       blockEl.classList.add("active");
       applyInfoCardAndOverlay(blockEl);
@@ -1002,6 +1039,8 @@ function renderWeek() {
         if (event.shiftKey) return;
         if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
         if (event.target.closest(".star-toggle")) return;
+        state.infoCardLocked = false;
+        state.lockedBlobId = null;
         dayColumns.forEach((col) =>
           col.querySelectorAll(".day-block").forEach((el) => el.classList.remove("active"))
         );

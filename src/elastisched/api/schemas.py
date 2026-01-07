@@ -76,6 +76,7 @@ class ScheduleRequest(BaseModel):
     granularity_minutes: int | None = Field(default=None, ge=1)
     lookahead_seconds: int | None = Field(default=None, ge=1)
     user_timezone: str | None = Field(default=None, max_length=64)
+    include_active_occurrences: bool | None = None
 
 
 class ScheduleResponse(ScheduleStatus):
