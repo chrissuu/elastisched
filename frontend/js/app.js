@@ -1,9 +1,26 @@
 import { appConfig, isTypingInField, loadView, state } from "./core.js";
 import { dom } from "./dom.js";
-import { ensureOccurrences, fetchScheduleStatus, runSchedule } from "./api.js";
+import {
+  ensureOccurrences,
+  fetchScheduleStatus,
+  runSchedule,
+  updateRecurrence,
+} from "./api.js";
 import { bindFormHandlers, openEditForm, resetFormMode, toggleForm, toggleSettings } from "./forms.js";
-import { clearInfoCardLock, setActive, startInteractiveCreate } from "./render.js";
-import { getViewRange, shiftAnchorDate } from "./utils.js";
+import {
+  clearInfoCardLock,
+  setActive,
+  startInteractiveCreate,
+  updateNowIndicators,
+} from "./render.js";
+import {
+  formatTimeRangeInTimeZone,
+  getEffectiveOccurrenceRange,
+  getOccurrenceOverride,
+  getViewRange,
+  shiftAnchorDate,
+  toProjectIsoFromDate,
+} from "./utils.js";
 
 dom.brandTitle.textContent = appConfig.scheduleName || dom.brandTitle.textContent;
 dom.brandSubtitle.textContent = appConfig.subtitle || dom.brandSubtitle.textContent;
@@ -17,6 +34,8 @@ async function refreshView(nextView = state.view) {
   await ensureOccurrences(range.start, range.end);
   setActive(view);
   await refreshScheduleStatus();
+  renderNowPanel();
+  updateNowIndicators();
 }
 
 function setScheduleStatusState(mode, message) {
@@ -67,6 +86,170 @@ async function handleRunSchedule() {
   }
 }
 
+function getOccurrenceRange(blob) {
+  const effective = getEffectiveOccurrenceRange(blob);
+  if (!effective) return null;
+  return { start: effective.start, end: effective.effectiveEnd };
+}
+
+function getCurrentOccurrences() {
+  const now = new Date();
+  return state.blobs
+    .map((blob) => {
+      const range = getOccurrenceRange(blob);
+      if (!range) return null;
+      if (now < range.start || now >= range.end) return null;
+      return { blob, range };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.range.start - b.range.start);
+}
+
+function ensureSelectedOccurrence(current) {
+  if (!current.length) {
+    state.currentOccurrenceId = null;
+    return;
+  }
+  const exists = current.some((item) => item.blob.id === state.currentOccurrenceId);
+  if (!exists) {
+    state.currentOccurrenceId = current[0].blob.id;
+  }
+}
+
+function renderNowPanel() {
+  if (!dom.nowPanel || !dom.nowTime || !dom.nowDate || !dom.nowEvents) return;
+  const now = new Date();
+  const timeFormatter = new Intl.DateTimeFormat(undefined, {
+    timeZone: appConfig.userTimeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const dateFormatter = new Intl.DateTimeFormat(undefined, {
+    timeZone: appConfig.userTimeZone,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  dom.nowTime.textContent = timeFormatter.format(now);
+  dom.nowDate.textContent = dateFormatter.format(now);
+
+  const current = getCurrentOccurrences();
+  ensureSelectedOccurrence(current);
+  const activeId = state.currentOccurrenceId;
+
+  if (!current.length) {
+    dom.nowEvents.innerHTML = `<div class="now-empty">No active events.</div>`;
+    if (dom.finishNowBtn) dom.finishNowBtn.disabled = true;
+    if (dom.addTimeBtn) dom.addTimeBtn.disabled = true;
+    const addMenu = dom.addTimeBtn?.closest(".add-time-menu");
+    if (addMenu) addMenu.classList.add("disabled");
+    return;
+  }
+
+  const eventHtml = current
+    .map(({ blob }) => {
+      const timeZone = blob?.tz || appConfig.userTimeZone;
+      const effectiveRange = getEffectiveOccurrenceRange(blob);
+      if (!effectiveRange) return "";
+      const timeLabel = formatTimeRangeInTimeZone(
+        effectiveRange.start,
+        effectiveRange.effectiveEnd,
+        timeZone
+      );
+      return `
+        <button class="now-event ${blob.id === activeId ? "active" : ""}" data-occurrence-id="${blob.id}" type="button">
+          <span class="now-event-title">${blob.name || "Untitled"}</span>
+          <span class="now-event-time">${timeLabel}</span>
+        </button>
+      `;
+    })
+    .join("");
+  dom.nowEvents.innerHTML = eventHtml;
+  if (dom.finishNowBtn) dom.finishNowBtn.disabled = false;
+  if (dom.addTimeBtn) dom.addTimeBtn.disabled = false;
+  const addMenu = dom.addTimeBtn?.closest(".add-time-menu");
+  if (addMenu) addMenu.classList.remove("disabled");
+}
+
+function getSelectedOccurrence() {
+  if (!state.currentOccurrenceId) return null;
+  return state.blobs.find((blob) => blob.id === state.currentOccurrenceId) || null;
+}
+
+async function extendOccurrenceByMinutes(minutes) {
+  const blob = getSelectedOccurrence();
+  if (!blob) return;
+  if (!Number.isFinite(minutes) || minutes <= 0) return;
+  const occurrenceKey = blob.schedulable_timerange?.start;
+  if (!occurrenceKey) return;
+  const payload = blob.recurrence_payload || {};
+  const overrides =
+    payload.occurrence_overrides && typeof payload.occurrence_overrides === "object"
+      ? { ...payload.occurrence_overrides }
+      : {};
+  const currentOverride = getOccurrenceOverride(blob);
+  let currentAdded = Number(currentOverride?.added_minutes || 0);
+  if (!Number.isFinite(currentAdded)) currentAdded = 0;
+  const nextOverride = {
+    ...(currentOverride || {}),
+    added_minutes: currentAdded + minutes,
+  };
+  if (nextOverride.finished_at) {
+    delete nextOverride.finished_at;
+  }
+  overrides[occurrenceKey] = nextOverride;
+
+  try {
+    await updateRecurrence(
+      blob.recurrence_id,
+      blob.recurrence_type || "single",
+      { ...payload, occurrence_overrides: overrides }
+    );
+    state.loadedRange = null;
+    await refreshView(state.view);
+  } catch (error) {
+    window.alert(error?.message || "Failed to update occurrence.");
+  }
+}
+
+async function handleFinishNow() {
+  const blob = getSelectedOccurrence();
+  if (!blob) return;
+  const effective = getEffectiveOccurrenceRange(blob);
+  if (!effective) return;
+  const bufferMinutes = Math.max(1, Number(appConfig.finishEarlyBufferMinutes || 15));
+  const threshold = new Date(
+    effective.effectiveEnd.getTime() - bufferMinutes * 60000
+  );
+  const now = new Date();
+  const occurrenceKey = blob.schedulable_timerange?.start;
+  if (!occurrenceKey) return;
+  const payload = blob.recurrence_payload || {};
+  const overrides =
+    payload.occurrence_overrides && typeof payload.occurrence_overrides === "object"
+      ? { ...payload.occurrence_overrides }
+      : {};
+  const currentOverride = getOccurrenceOverride(blob);
+  overrides[occurrenceKey] = {
+    ...(currentOverride || {}),
+    finished_at: toProjectIsoFromDate(now, appConfig.projectTimeZone),
+  };
+  try {
+    await updateRecurrence(
+      blob.recurrence_id,
+      blob.recurrence_type || "single",
+      { ...payload, occurrence_overrides: overrides }
+    );
+    state.loadedRange = null;
+    await refreshView(state.view);
+    if (now < threshold) {
+      await handleRunSchedule();
+    }
+  } catch (error) {
+    window.alert(error?.message || "Failed to finish occurrence.");
+  }
+}
+
 dom.tabs.forEach((tab) => {
   tab.addEventListener("click", () => refreshView(tab.dataset.view));
 });
@@ -75,8 +258,46 @@ if (dom.runScheduleBtn) {
   dom.runScheduleBtn.addEventListener("click", handleRunSchedule);
 }
 
+if (dom.nowEvents) {
+  dom.nowEvents.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-occurrence-id]");
+    if (!target) return;
+    const occurrenceId = target.getAttribute("data-occurrence-id");
+    if (!occurrenceId) return;
+    state.currentOccurrenceId = occurrenceId;
+    renderNowPanel();
+  });
+}
+
+if (dom.finishNowBtn) {
+  dom.finishNowBtn.addEventListener("click", () => {
+    handleFinishNow();
+  });
+}
+
+if (dom.addTimePopover) {
+  dom.addTimePopover.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-add-minutes]");
+    if (!button) return;
+    const minutes = Number(button.getAttribute("data-add-minutes"));
+    if (!Number.isFinite(minutes)) return;
+    extendOccurrenceByMinutes(minutes);
+  });
+}
+
+if (dom.addTimeForm) {
+  dom.addTimeForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formData = new FormData(dom.addTimeForm);
+    const minutes = Number(formData.get("addMinutes") || 0);
+    if (!Number.isFinite(minutes) || minutes <= 0) return;
+    extendOccurrenceByMinutes(minutes);
+    dom.addTimeForm.reset();
+  });
+}
+
 document.addEventListener("click", (event) => {
-  const target = event.target.closest("[data-date]");
+  const target = event.target.closest(".week-day-label button, .month-day, .year-month");
   if (!target) return;
   const dateIso = target.getAttribute("data-date");
   if (!dateIso) return;
@@ -182,3 +403,7 @@ window.addEventListener("keydown", (event) => {
 resetFormMode();
 const savedView = loadView();
 refreshView(savedView || "day");
+window.setInterval(() => {
+  renderNowPanel();
+  updateNowIndicators();
+}, 30000);

@@ -4,6 +4,35 @@ function toDate(value) {
   return value ? new Date(value) : null;
 }
 
+function getOccurrenceOverride(blob) {
+  if (!blob) return null;
+  const key = blob.schedulable_timerange?.start;
+  if (!key) return null;
+  const overrides = blob.recurrence_payload?.occurrence_overrides;
+  if (!overrides || typeof overrides !== "object") return null;
+  const override = overrides[key];
+  return override && typeof override === "object" ? override : null;
+}
+
+function getEffectiveOccurrenceRange(blob) {
+  if (!blob) return null;
+  const baseRange = blob.realized_timerange || blob.default_scheduled_timerange;
+  if (!baseRange?.start || !baseRange?.end) return null;
+  const start = toDate(baseRange.start);
+  const end = toDate(baseRange.end);
+  if (!start || !end) return null;
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const override = getOccurrenceOverride(blob);
+  let addedMinutes = Number(override?.added_minutes || 0);
+  if (!Number.isFinite(addedMinutes)) addedMinutes = 0;
+  let finishedAt = override?.finished_at ? toDate(override.finished_at) : null;
+  if (finishedAt && Number.isNaN(finishedAt.getTime())) finishedAt = null;
+  const effectiveEnd = finishedAt
+    ? finishedAt
+    : new Date(end.getTime() + addedMinutes * 60000);
+  return { start, end, effectiveEnd, addedMinutes, finishedAt };
+}
+
 function getLocalTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
@@ -333,6 +362,8 @@ export {
   getTagType,
   getViewRange,
   getWeekStart,
+  getEffectiveOccurrenceRange,
+  getOccurrenceOverride,
   getLocalTimeZone,
   getTimeZoneParts,
   formatDateTimeLocalInTimeZone,
