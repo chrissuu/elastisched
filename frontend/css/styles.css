@@ -102,6 +102,25 @@ body {
   animation: fadeIn 0.45s ease;
 }
 
+.form-panel.floating {
+  position: fixed;
+  top: 90px;
+  right: 32px;
+  width: min(520px, 92vw);
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+  z-index: 35;
+}
+
+.form-panel.floating .form-header {
+  cursor: grab;
+  user-select: none;
+}
+
+.form-panel.floating.dragging .form-header {
+  cursor: grabbing;
+}
+
 #settingsPanel .blob-form {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
@@ -739,6 +758,14 @@ body.modal-open .info-card {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.weekly-slot-row.time-range-row {
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+.weekly-slot-row.slot-day-row {
+  grid-template-columns: 1fr;
 }
 
 .slot-day-field {
@@ -1960,6 +1987,12 @@ body.modal-open .info-card {
 
   .day-grid {
     grid-template-columns: 60px 1fr;
+  }
+
+  .form-panel.floating {
+    right: 20px;
+    left: 20px;
+    width: auto;
   }
 
   .now-panel {

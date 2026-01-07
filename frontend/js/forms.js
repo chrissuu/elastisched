@@ -18,6 +18,9 @@ const editOnlyElements = document.querySelectorAll(".edit-only");
 let dependencyIds = [];
 let tagNames = [];
 const slotTagStore = new WeakMap();
+let isDraggingForm = false;
+let dragOffset = { x: 0, y: 0 };
+let formPosition = null;
 
 function setRefreshHandler(handler) {
   refreshView = handler;
@@ -26,6 +29,12 @@ function setRefreshHandler(handler) {
 function toggleForm(show) {
   const isActive = typeof show === "boolean" ? show : !dom.formPanel.classList.contains("active");
   dom.formPanel.classList.toggle("active", isActive);
+  dom.formPanel.classList.toggle("floating", isActive);
+  if (isActive && formPosition) {
+    dom.formPanel.style.left = `${formPosition.x}px`;
+    dom.formPanel.style.top = `${formPosition.y}px`;
+    dom.formPanel.style.right = "auto";
+  }
 }
 
 function toggleSettings(show) {
@@ -742,7 +751,7 @@ function createWeeklySlot(slotData = {}) {
   const fallbackPolicy = dom.weeklyPerSlot?.checked ? getPolicyPayloadFromForm() : {};
   const policyFlags = getPolicyFlagsFromPolicy(slotData.policy ?? fallbackPolicy);
   slot.innerHTML = `
-    <div class="weekly-slot-row">
+    <div class="weekly-slot-row slot-day-row">
       <div class="slot-day-field">
         <span class="slot-day-label">Day</span>
         <div class="slot-day-toggle" role="group" aria-label="Day of week">
@@ -752,6 +761,8 @@ function createWeeklySlot(slotData = {}) {
           ).join("")}
         </div>
       </div>
+    </div>
+    <div class="weekly-slot-row time-range-row">
       <label>
         Default start
         <input type="time" name="slotDefaultStart" value="${defaultStart}" required />
@@ -760,6 +771,8 @@ function createWeeklySlot(slotData = {}) {
         Default end
         <input type="time" name="slotDefaultEnd" value="${defaultEnd}" required />
       </label>
+    </div>
+    <div class="weekly-slot-row time-range-row">
       <label>
         Schedulable start
         <input type="time" name="slotSchedStart" value="${schedStart}" required />
@@ -1513,6 +1526,46 @@ function handleCloseForm() {
   resetFormMode();
 }
 
+function bindDraggableForm() {
+  if (!dom.formPanel) return;
+  const header = dom.formPanel.querySelector(".form-header");
+  if (!header) return;
+
+  const onPointerDown = (event) => {
+    if (event.button !== 0) return;
+    if (event.target.closest("button")) return;
+    const rect = dom.formPanel.getBoundingClientRect();
+    isDraggingForm = true;
+    dragOffset = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    dom.formPanel.classList.add("dragging");
+    dom.formPanel.setPointerCapture?.(event.pointerId);
+  };
+
+  const onPointerMove = (event) => {
+    if (!isDraggingForm) return;
+    const nextX = Math.max(12, event.clientX - dragOffset.x);
+    const nextY = Math.max(12, event.clientY - dragOffset.y);
+    formPosition = { x: nextX, y: nextY };
+    dom.formPanel.style.left = `${nextX}px`;
+    dom.formPanel.style.top = `${nextY}px`;
+    dom.formPanel.style.right = "auto";
+  };
+
+  const stopDrag = () => {
+    if (!isDraggingForm) return;
+    isDraggingForm = false;
+    dom.formPanel.classList.remove("dragging");
+  };
+
+  header.addEventListener("pointerdown", onPointerDown);
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", stopDrag);
+  window.addEventListener("pointercancel", stopDrag);
+}
+
 function getActiveView() {
   const activeViewEntry = Object.entries(dom.views).find(([, el]) => el.classList.contains("active"));
   if (activeViewEntry) {
@@ -1571,6 +1624,7 @@ function bindFormHandlers(onRefresh) {
   if (dom.starOccurrenceBtn) {
     dom.starOccurrenceBtn.addEventListener("click", toggleStarOccurrence);
   }
+  bindDraggableForm();
   dom.toggleFormBtn.addEventListener("click", handleAddClick);
   dom.settingsBtn.addEventListener("click", handleSettingsClick);
   dom.closeSettingsBtn.addEventListener("click", handleCloseSettings);
