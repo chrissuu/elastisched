@@ -683,6 +683,45 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
+.slot-day-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.slot-day-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.slot-day-toggle {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.day-pill {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #e0d3c1;
+  background: #fffaf2;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.day-pill.active {
+  background: #1b1a16;
+  color: #f7f2e8;
+  border-color: #1b1a16;
+}
+
 .weekly-slot .slot-meta {
   display: none;
 }
