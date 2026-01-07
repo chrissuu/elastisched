@@ -17,6 +17,7 @@ from elastisched.api.recurrence_router import (
     _coerce_timerange,
     _exclusion_set,
     _payload_end_datetime,
+    _parse_datetime,
     _recurrence_from_payload,
     _recurrence_tzinfo,
     _to_occurrence_schema,
@@ -48,6 +49,62 @@ def _resolve_user_tz(name: str | None):
         return ZoneInfo(name)
     except Exception:
         return DEFAULT_TZ
+
+
+def _occurrence_override(payload: dict, occurrence) -> dict | None:
+    overrides = payload.get("occurrence_overrides") if isinstance(payload, dict) else None
+    if not isinstance(overrides, dict):
+        return None
+    occurrence_start = occurrence.schedulable_timerange.start
+    occurrence_ts = int(occurrence_start.timestamp())
+    for key, value in overrides.items():
+        if not isinstance(value, dict):
+            continue
+        try:
+            key_dt = _parse_datetime(key)
+        except HTTPException:
+            continue
+        if key_dt.tzinfo is None:
+            key_dt = key_dt.replace(tzinfo=occurrence_start.tzinfo)
+        else:
+            key_dt = key_dt.astimezone(occurrence_start.tzinfo)
+        if int(key_dt.timestamp()) == occurrence_ts:
+            return value
+    return None
+
+
+def _override_finished_at(override: dict, tzinfo):
+    if not isinstance(override, dict):
+        return None
+    raw = override.get("finished_at")
+    if not raw:
+        return None
+    try:
+        finished_at = _parse_datetime(raw)
+    except HTTPException:
+        return None
+    if tzinfo:
+        if finished_at.tzinfo is None:
+            finished_at = finished_at.replace(tzinfo=tzinfo)
+        else:
+            finished_at = finished_at.astimezone(tzinfo)
+    return finished_at
+
+
+def _occurrence_effective_end(occurrence, override: dict | None):
+    base_end = occurrence.default_scheduled_timerange.end
+    tzinfo = base_end.tzinfo
+    finished_at = _override_finished_at(override, tzinfo)
+    if finished_at:
+        return finished_at
+    added_minutes = override.get("added_minutes") if isinstance(override, dict) else None
+    try:
+        added_minutes = float(added_minutes or 0)
+    except (TypeError, ValueError):
+        added_minutes = 0
+    if added_minutes:
+        return base_end + timedelta(minutes=added_minutes)
+    return base_end
 
 
 def _epoch_start_utc(reference_utc: datetime, user_tz) -> datetime:
@@ -223,9 +280,25 @@ async def run_schedule(
     epoch_start_utc = _epoch_start_utc(start_utc, user_tz)
     granularity_minutes = max(1, int(payload.granularity_minutes or 5))
     granularity_seconds = granularity_minutes * 60
+    include_active = True if payload.include_active_occurrences is None else bool(
+        payload.include_active_occurrences
+    )
+    now_utc = datetime.now(timezone.utc)
 
     jobs = []
     for occurrence in occurrences:
+        override = _occurrence_override(occurrence.recurrence_payload or {}, occurrence)
+        finished_at = _override_finished_at(
+            override, occurrence.default_scheduled_timerange.end.tzinfo
+        )
+        if finished_at:
+            continue
+        if not include_active:
+            effective_end = _occurrence_effective_end(occurrence, override)
+            if _as_utc(occurrence.default_scheduled_timerange.start) <= now_utc < _as_utc(
+                effective_end
+            ):
+                continue
         schedulable = occurrence.schedulable_timerange
         scheduled = occurrence.default_scheduled_timerange
         if schedulable.start >= schedulable.end:

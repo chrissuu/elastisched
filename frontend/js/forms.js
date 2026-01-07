@@ -40,6 +40,8 @@ function hydrateSettingsForm() {
   dom.settingsForm.minuteGranularity.value = appConfig.minuteGranularity || 5;
   dom.settingsForm.finishEarlyBufferMinutes.value =
     appConfig.finishEarlyBufferMinutes || 15;
+  dom.settingsForm.includeActiveOccurrences.checked =
+    appConfig.includeActiveOccurrences !== false;
   dom.settingsForm.lookaheadSeconds.value =
     appConfig.lookaheadSeconds || 14 * 24 * 60 * 60;
   dom.settingsForm.userTimeZone.value = appConfig.userTimeZone || "";
@@ -1452,6 +1454,8 @@ function handleSettingsSubmit(event) {
     1,
     Number(formData.get("finishEarlyBufferMinutes") || 1)
   );
+  const includeActiveOccurrences =
+    formData.get("includeActiveOccurrences") === "on";
   const lookaheadSeconds = Math.max(1, Number(formData.get("lookaheadSeconds") || 1));
   const userTimeZone = formData.get("userTimeZone")?.toString().trim() || "";
   if (userTimeZone) {
@@ -1466,6 +1470,7 @@ function handleSettingsSubmit(event) {
   appConfig.subtitle = subtitle || appConfig.subtitle;
   appConfig.minuteGranularity = granularity;
   appConfig.finishEarlyBufferMinutes = finishEarlyBufferMinutes;
+  appConfig.includeActiveOccurrences = includeActiveOccurrences;
   appConfig.lookaheadSeconds = lookaheadSeconds;
   if (userTimeZone) {
     appConfig.userTimeZone = userTimeZone;

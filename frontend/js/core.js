@@ -32,6 +32,10 @@ const defaultConfig = {
     1,
     Number(window.APP_CONFIG?.finishEarlyBufferMinutes || 15)
   ),
+  includeActiveOccurrences:
+    typeof window.APP_CONFIG?.includeActiveOccurrences === "boolean"
+      ? window.APP_CONFIG.includeActiveOccurrences
+      : true,
   projectTimeZone: window.APP_CONFIG?.projectTimeZone || "UTC",
   lookaheadSeconds: Math.max(
     1,

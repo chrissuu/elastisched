@@ -231,6 +231,32 @@ def _to_occurrence_schema(
 ) -> OccurrenceRead:
     default_tr = blob.get_default_scheduled_timerange()
     schedulable_tr = blob.get_schedulable_timerange()
+    overrides = payload.get("occurrence_overrides") if isinstance(payload, dict) else None
+    if isinstance(overrides, dict):
+        occurrence_start = schedulable_tr.start
+        occurrence_ts = int(occurrence_start.timestamp())
+        override = None
+        for key, value in overrides.items():
+            if not isinstance(value, dict):
+                continue
+            try:
+                key_dt = _parse_datetime(key)
+            except HTTPException:
+                continue
+            if key_dt.tzinfo is None:
+                key_dt = key_dt.replace(tzinfo=occurrence_start.tzinfo)
+            else:
+                key_dt = key_dt.astimezone(occurrence_start.tzinfo)
+            if int(key_dt.timestamp()) == occurrence_ts:
+                override = value
+                break
+        if override:
+            tzinfo = blob.tz or occurrence_start.tzinfo
+            sched_override = override.get("schedulable_timerange")
+            if isinstance(sched_override, dict):
+                candidate = _parse_timerange(sched_override, tzinfo)
+                if candidate.start < candidate.end:
+                    schedulable_tr = candidate
     return OccurrenceRead(
         id=_occurrence_id(recurrence_id, blob),
         recurrence_id=recurrence_id,
