@@ -16,6 +16,7 @@ const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 const editOnlyElements = document.querySelectorAll(".edit-only");
 let dependencyIds = [];
 let tagNames = [];
+const slotTagStore = new WeakMap();
 
 function setRefreshHandler(handler) {
   refreshView = handler;
@@ -153,6 +154,18 @@ function tagKey(value) {
   return normalizeTagName(value).toLowerCase();
 }
 
+function parseTagInput(value) {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((item) => normalizeTagName(item))
+    .filter(Boolean);
+}
+
+function formatTagInput(tags) {
+  return (tags || []).map((item) => normalizeTagName(item)).filter(Boolean).join(", ");
+}
+
 function setTags(tags) {
   const next = [];
   const seen = new Set();
@@ -170,6 +183,65 @@ function setTags(tags) {
 
 function getTags() {
   return tagNames.slice();
+}
+
+function setSlotTagList(slot, tags) {
+  const next = [];
+  const seen = new Set();
+  (tags || []).forEach((tag) => {
+    const name = normalizeTagName(tag);
+    if (!name) return;
+    const key = tagKey(name);
+    if (seen.has(key)) return;
+    seen.add(key);
+    next.push(name);
+  });
+  slotTagStore.set(slot, next);
+  renderSlotTagList(slot);
+}
+
+function getSlotTagList(slot) {
+  return slotTagStore.get(slot) || [];
+}
+
+function setSlotTags(slot, tags) {
+  setSlotTagList(slot, tags);
+}
+
+function getSlotTags(slot) {
+  return getSlotTagList(slot);
+}
+
+function getRecurrenceColor() {
+  const selected = document.querySelector('input[name="recurrenceColor"]:checked');
+  const value = selected?.value || "default";
+  return value === "default" ? null : value;
+}
+
+function setRecurrenceColor(value) {
+  const target = value || "default";
+  document.querySelectorAll('input[name="recurrenceColor"]').forEach((input) => {
+    input.checked = input.value === target;
+  });
+}
+
+function getRecurrenceEndValue() {
+  if (!dom.recurrenceEnd) return null;
+  const value = dom.recurrenceEnd.value;
+  if (!value) return null;
+  const iso = toProjectIsoFromLocalInput(
+    value,
+    appConfig.userTimeZone,
+    appConfig.projectTimeZone
+  );
+  return iso || null;
+}
+
+function setRecurrenceEndValue(value) {
+  if (!dom.recurrenceEnd) return;
+  dom.recurrenceEnd.value = value
+    ? toLocalInputValueInTimeZone(value, appConfig.userTimeZone)
+    : "";
 }
 
 function findBlobById(id) {
@@ -222,6 +294,18 @@ function getTagSuggestions(query) {
   return matches.slice(0, 6);
 }
 
+function getSlotTagSuggestions(query, selectedTags) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
+  const selected = new Set((selectedTags || []).map((tag) => tagKey(tag)));
+  const matches = getAvailableTags().filter((tag) => {
+    if (selected.has(tagKey(tag))) return false;
+    return tag.toLowerCase().includes(normalized);
+  });
+  matches.sort((a, b) => a.localeCompare(b));
+  return matches.slice(0, 6);
+}
+
 function renderDependencySuggestions() {
   if (!dom.dependencySuggestions) return;
   const query = dom.dependencyInput?.value || "";
@@ -252,6 +336,24 @@ function renderTagSuggestions() {
     button.dataset.tagName = match;
     button.textContent = match;
     dom.tagSuggestions.appendChild(button);
+  });
+}
+
+function renderSlotTagSuggestions(slot) {
+  const suggestions = slot.querySelector(".slot-tag-suggestions");
+  const input = slot.querySelector('[name="slotTagInput"]');
+  if (!suggestions || !input) return;
+  const query = input.value || "";
+  const matches = getSlotTagSuggestions(query, getSlotTagList(slot));
+  suggestions.innerHTML = "";
+  if (!query.trim() || matches.length === 0) return;
+  matches.forEach((match) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tag-suggestion";
+    button.dataset.tagName = match;
+    button.textContent = match;
+    suggestions.appendChild(button);
   });
 }
 
@@ -349,6 +451,39 @@ function renderTagList() {
   });
 }
 
+function renderSlotTagList(slot) {
+  const list = slot.querySelector(".slot-tag-list");
+  if (!list) return;
+  list.innerHTML = "";
+  getSlotTagList(slot).forEach((name) => {
+    const pill = document.createElement("div");
+    pill.className = "tag-pill";
+    pill.dataset.tagName = name;
+
+    const label = document.createElement("span");
+    label.className = "tag-name";
+    label.textContent = name;
+    pill.appendChild(label);
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "tag-tooltip";
+    const title = document.createElement("div");
+    title.className = "tag-tooltip-title";
+    title.textContent = name;
+    tooltip.appendChild(title);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "ghost small tag-remove";
+    removeBtn.textContent = "Remove tag";
+    removeBtn.dataset.removeSlotTag = name;
+    tooltip.appendChild(removeBtn);
+
+    pill.appendChild(tooltip);
+    list.appendChild(pill);
+  });
+}
+
 function addDependencyFromInput() {
   if (!dom.dependencyInput) return;
   const raw = dom.dependencyInput.value.trim();
@@ -388,6 +523,26 @@ function addTagFromInput() {
   dom.tagSuggestions.innerHTML = "";
 }
 
+function addSlotTagFromInput(slot) {
+  const input = slot.querySelector('[name="slotTagInput"]');
+  const suggestions = slot.querySelector(".slot-tag-suggestions");
+  if (!input) return;
+  const raw = input.value.trim();
+  if (!raw) return;
+  const matches = getSlotTagSuggestions(raw, getSlotTagList(slot));
+  const candidate = matches[0] || raw;
+  const key = tagKey(candidate);
+  const seen = new Set(getSlotTagList(slot).map((tag) => tagKey(tag)));
+  if (!seen.has(key)) {
+    setSlotTagList(slot, [...getSlotTagList(slot), candidate]);
+  }
+  dom.formStatus.textContent = "";
+  input.value = "";
+  if (suggestions) {
+    suggestions.innerHTML = "";
+  }
+}
+
 function applyPolicyToForm(policy) {
   const flags = getPolicyFlagsFromPolicy(policy || {});
   if (dom.blobForm.policySplittable) {
@@ -419,6 +574,31 @@ function syncSlotPoliciesFromForm() {
   });
 }
 
+function syncSlotTagsFromForm() {
+  if (!dom.weeklySlots) return;
+  const sharedTags = getTags();
+  dom.weeklySlots.querySelectorAll(".weekly-slot").forEach((slot) => {
+    setSlotTags(slot, sharedTags);
+  });
+}
+
+function collectSlotTagsUnion() {
+  if (!dom.weeklySlots) return [];
+  const merged = [];
+  const seen = new Set();
+  dom.weeklySlots.querySelectorAll(".weekly-slot").forEach((slot) => {
+    getSlotTags(slot).forEach((tag) => {
+      const name = normalizeTagName(tag);
+      if (!name) return;
+      const key = tagKey(name);
+      if (seen.has(key)) return;
+      seen.add(key);
+      merged.push(name);
+    });
+  });
+  return merged;
+}
+
 function updateRecurrenceUI() {
   const type = dom.recurrenceType?.value || "single";
   recurrenceFieldGroups.forEach((group) => {
@@ -430,6 +610,12 @@ function updateRecurrenceUI() {
   if (weeklyWrapper) {
     weeklyWrapper.classList.toggle("per-slot", Boolean(dom.weeklyPerSlot?.checked));
   }
+  if (dom.recurrenceTagField) {
+    dom.recurrenceTagField.classList.toggle(
+      "hidden",
+      type === "weekly" && Boolean(dom.weeklyPerSlot?.checked)
+    );
+  }
   document.querySelectorAll(".non-weekly-field input").forEach((field) => {
     const shouldDisable = type === "weekly";
     const isCheckbox = field.type === "checkbox";
@@ -437,6 +623,12 @@ function updateRecurrenceUI() {
     field.disabled = shouldDisable;
     field.required = !shouldDisable && !isCheckbox && !isOptional;
   });
+  if (dom.recurrenceEnd) {
+    dom.recurrenceEnd.disabled = type === "single";
+    if (type === "single") {
+      dom.recurrenceEnd.value = "";
+    }
+  }
 
   const defaultStart = dom.blobForm.defaultStart.value;
   const startDate = defaultStart
@@ -469,6 +661,21 @@ function updateRecurrenceUI() {
   } else {
     dom.recurrenceSummary.textContent = "One-time event. Switch to create repeats.";
   }
+
+  const endValue = dom.recurrenceEnd?.value;
+  if (endValue && type !== "single") {
+    const endDate = new Date(endValue);
+    if (!Number.isNaN(endDate.getTime())) {
+      const endLabel = endDate.toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      dom.recurrenceSummary.textContent = `${dom.recurrenceSummary.textContent} Ends ${endLabel}.`;
+    }
+  }
 }
 
 function timeToMinutes(value) {
@@ -487,13 +694,13 @@ function timeValueFromDate(date, fallback, timeZone) {
 function weekdayIndexFromDateString(dateString) {
   const [year, month, day] = dateString.split("-").map((part) => Number(part));
   if ([year, month, day].some((item) => Number.isNaN(item))) {
-    return 1;
+    return 0;
   }
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
-function dayOffsetFromMonday(dayIndex) {
-  return (dayIndex + 6) % 7;
+function dayOffsetFromSunday(dayIndex) {
+  return dayIndex;
 }
 
 function clearWeeklySlots() {
@@ -510,13 +717,14 @@ function createWeeklySlot(slotData = {}) {
     ? crypto.randomUUID()
     : `slot-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   slot.dataset.slotId = slotId;
-  const dayValue = slotData.day ?? 1;
+  const dayValue = slotData.day ?? 0;
   const defaultStart = slotData.defaultStart || "09:00";
   const defaultEnd = slotData.defaultEnd || "10:00";
   const schedStart = slotData.schedStart || "08:30";
   const schedEnd = slotData.schedEnd || "10:30";
   const nameValue = slotData.name || "";
   const descriptionValue = slotData.description || "";
+  const tagsValue = slotData.tags || [];
   const fallbackPolicy = dom.weeklyPerSlot?.checked ? getPolicyPayloadFromForm() : {};
   const policyFlags = getPolicyFlagsFromPolicy(slotData.policy ?? fallbackPolicy);
   slot.innerHTML = `
@@ -557,6 +765,29 @@ function createWeeklySlot(slotData = {}) {
         <input type="text" name="slotDescription" value="${descriptionValue}" />
       </label>
     </div>
+    <div class="weekly-slot-row slot-tags slot-tag-field">
+      <span class="tag-label">Slot tags</span>
+      <div class="tag-input-row">
+        <input
+          type="text"
+          name="slotTagInput"
+          class="needs-input"
+          placeholder="Search or add a tag"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="ghost small"
+          data-action="add-slot-tag"
+          aria-label="Add tag"
+          title="Add tag"
+        >
+          +
+        </button>
+      </div>
+      <div class="tag-suggestions slot-tag-suggestions"></div>
+      <div class="tag-list slot-tag-list"></div>
+    </div>
     <div class="weekly-slot-row slot-policy">
       <label class="policy-option">
         <input type="checkbox" name="slotPolicySplittable" ${
@@ -586,12 +817,60 @@ function createWeeklySlot(slotData = {}) {
     updateRecurrenceUI();
     validateWeeklySlots();
   });
+  slotTagStore.set(slot, Array.isArray(tagsValue) ? tagsValue : []);
+  renderSlotTagList(slot);
   slot.querySelectorAll("input, select").forEach((field) => {
     field.addEventListener("change", () => {
       updateRecurrenceUI();
       validateWeeklySlots();
     });
   });
+  const slotTagInput = slot.querySelector('[name="slotTagInput"]');
+  const slotTagSuggestions = slot.querySelector(".slot-tag-suggestions");
+  const addSlotTagBtn = slot.querySelector('[data-action="add-slot-tag"]');
+  if (slotTagInput) {
+    slotTagInput.addEventListener("input", () => renderSlotTagSuggestions(slot));
+    slotTagInput.addEventListener("focus", () => renderSlotTagSuggestions(slot));
+    slotTagInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addSlotTagFromInput(slot);
+      }
+    });
+  }
+  if (addSlotTagBtn) {
+    addSlotTagBtn.addEventListener("click", () => addSlotTagFromInput(slot));
+  }
+  if (slotTagSuggestions) {
+    slotTagSuggestions.addEventListener("click", (event) => {
+      const target = event.target.closest(".tag-suggestion");
+      if (!target) return;
+      const name = target.dataset.tagName;
+      if (name) {
+        const key = tagKey(name);
+        const seen = new Set(getSlotTagList(slot).map((tag) => tagKey(tag)));
+        if (!seen.has(key)) {
+          setSlotTagList(slot, [...getSlotTagList(slot), name]);
+        }
+      }
+      if (slotTagInput) {
+        slotTagInput.value = "";
+      }
+      slotTagSuggestions.innerHTML = "";
+    });
+  }
+  const slotTagList = slot.querySelector(".slot-tag-list");
+  if (slotTagList) {
+    slotTagList.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-remove-slot-tag]");
+      if (!target) return;
+      const name = target.dataset.removeSlotTag;
+      setSlotTagList(
+        slot,
+        getSlotTagList(slot).filter((tag) => tagKey(tag) !== tagKey(name))
+      );
+    });
+  }
   dom.weeklySlots.appendChild(slot);
   updateRecurrenceUI();
   validateWeeklySlots();
@@ -613,6 +892,7 @@ function getWeeklySlots() {
       schedEnd: slot.querySelector('[name="slotSchedEnd"]').value,
       name: slot.querySelector('[name="slotName"]').value,
       description: slot.querySelector('[name="slotDescription"]').value,
+      tags: getSlotTags(slot),
       policy: getPolicyPayloadFromFlags(splittable, overlappable, invisible),
     });
   });
@@ -654,7 +934,7 @@ function validateWeeklySlots() {
         "Schedulable range must contain default range for each slot.";
       return false;
     }
-    const offset = dayOffsetFromMonday(slot.day);
+    const offset = dayOffsetFromSunday(slot.day);
     ranges.push({
       start: offset * 1440 + schedStart,
       end: offset * 1440 + schedEnd,
@@ -690,6 +970,8 @@ function resetFormMode() {
   if (dom.recurrenceType) {
     dom.recurrenceType.value = "single";
   }
+  setRecurrenceColor(null);
+  setRecurrenceEndValue(null);
   applyPolicyToForm({});
   setDependencies([]);
   setTags([]);
@@ -737,25 +1019,28 @@ function openEditForm(blob) {
   dom.blobForm.recurrenceName.value = blob.recurrence_payload?.recurrence_name || "";
   dom.blobForm.recurrenceDescription.value =
     blob.recurrence_payload?.recurrence_description || "";
+  setRecurrenceEndValue(blob.recurrence_payload?.end_date || null);
+  setRecurrenceColor(blob.recurrence_payload?.color || null);
   dom.blobForm.blobName.value = blob.name || "";
   dom.blobForm.blobDescription.value = blob.description || "";
   setDependencies(Array.isArray(blob.dependencies) ? blob.dependencies : []);
   setTags(Array.isArray(blob.tags) ? blob.tags : []);
+  const blobTimeZone = blob.tz || appConfig.userTimeZone;
   dom.blobForm.defaultStart.value = toLocalInputValueInTimeZone(
     blob.default_scheduled_timerange?.start,
-    appConfig.userTimeZone
+    blobTimeZone
   );
   dom.blobForm.defaultEnd.value = toLocalInputValueInTimeZone(
     blob.default_scheduled_timerange?.end,
-    appConfig.userTimeZone
+    blobTimeZone
   );
   dom.blobForm.schedulableStart.value = toLocalInputValueInTimeZone(
     blob.schedulable_timerange?.start,
-    appConfig.userTimeZone
+    blobTimeZone
   );
   dom.blobForm.schedulableEnd.value = toLocalInputValueInTimeZone(
     blob.schedulable_timerange?.end,
-    appConfig.userTimeZone
+    blobTimeZone
   );
   clearWeeklySlots();
   if (blob.recurrence_payload?.interval && dom.blobForm.weeklyInterval) {
@@ -766,38 +1051,51 @@ function openEditForm(blob) {
     applyPolicyToForm(blobs[0]?.policy || {});
     const sharedName = blobs[0]?.name || "";
     const sharedDescription = blobs[0]?.description || "";
+    const sharedTags = Array.isArray(blobs[0]?.tags) ? blobs[0].tags : [];
     dom.blobForm.blobName.value = sharedName;
     dom.blobForm.blobDescription.value = sharedDescription || "";
+    const tagsDiffer = blobs.some((item) => {
+      const itemTags = Array.isArray(item.tags) ? item.tags : [];
+      if (itemTags.length !== sharedTags.length) return true;
+      const sharedKeys = new Set(sharedTags.map((tag) => tagKey(tag)));
+      return itemTags.some((tag) => !sharedKeys.has(tagKey(tag)));
+    });
     const hasCustom =
       blobs.some((item) => item.name !== sharedName || item.description !== sharedDescription) ||
+      tagsDiffer ||
       false;
     if (dom.weeklyPerSlot) {
-      dom.weeklyPerSlot.checked = hasCustom;
+      const storedPerSlot = typeof blob.recurrence_payload?.weekly_per_slot === "boolean"
+        ? blob.recurrence_payload.weekly_per_slot
+        : null;
+      dom.weeklyPerSlot.checked = storedPerSlot !== null ? storedPerSlot : hasCustom;
     }
     blobs.forEach((weeklyBlob) => {
+      const slotTimeZone = weeklyBlob.tz || appConfig.userTimeZone;
       const start = new Date(weeklyBlob.default_scheduled_timerange?.start);
       const end = new Date(weeklyBlob.default_scheduled_timerange?.end);
       const schedStart = new Date(weeklyBlob.schedulable_timerange?.start);
       const schedEnd = new Date(weeklyBlob.schedulable_timerange?.end);
       const startLocal = Number.isNaN(start.getTime())
         ? ""
-        : formatDateTimeLocalInTimeZone(start, appConfig.userTimeZone);
+        : formatDateTimeLocalInTimeZone(start, slotTimeZone);
       const dayValue = startLocal
         ? weekdayIndexFromDateString(startLocal.split("T")[0])
         : 1;
       createWeeklySlot({
         day: dayValue,
-        defaultStart: timeValueFromDate(start, "09:00", appConfig.userTimeZone),
-        defaultEnd: timeValueFromDate(end, "10:00", appConfig.userTimeZone),
-        schedStart: timeValueFromDate(schedStart, "08:30", appConfig.userTimeZone),
-        schedEnd: timeValueFromDate(schedEnd, "10:30", appConfig.userTimeZone),
+        defaultStart: timeValueFromDate(start, "09:00", slotTimeZone),
+        defaultEnd: timeValueFromDate(end, "10:00", slotTimeZone),
+        schedStart: timeValueFromDate(schedStart, "08:30", slotTimeZone),
+        schedEnd: timeValueFromDate(schedEnd, "10:30", slotTimeZone),
         name: weeklyBlob.name || "",
         description: weeklyBlob.description || "",
+        tags: Array.isArray(weeklyBlob.tags) ? weeklyBlob.tags : [],
         policy: weeklyBlob.policy || {},
       });
     });
     setDependencies(Array.isArray(blobs[0]?.dependencies) ? blobs[0].dependencies : []);
-    setTags(Array.isArray(blobs[0]?.tags) ? blobs[0].tags : []);
+    setTags(hasCustom ? [] : sharedTags);
   } else {
     applyPolicyToForm(blob.policy);
     createWeeklySlot();
@@ -941,10 +1239,14 @@ async function handleBlobSubmit(event) {
   const policyPayload = getPolicyPayloadFromForm();
   const dependencies = getDependencies();
   const tags = getTags();
+  const recurrenceType = formData.get("recurrenceType") || "single";
+  const perSlot = recurrenceType === "weekly" && Boolean(dom.weeklyPerSlot?.checked);
+  const recurrenceColor = getRecurrenceColor();
+  const recurrenceEnd = getRecurrenceEndValue();
   const baseBlob = {
     name: formData.get("blobName"),
     description: formData.get("blobDescription") || null,
-    tz: appConfig.projectTimeZone,
+    tz: appConfig.userTimeZone,
     default_scheduled_timerange: {
       start: toProjectIsoFromLocalInput(
         formData.get("defaultStart"),
@@ -973,7 +1275,6 @@ async function handleBlobSubmit(event) {
     dependencies,
     tags,
   };
-  const recurrenceType = formData.get("recurrenceType") || "single";
   const priorPayload = state.editingRecurrencePayload || {};
   let recurrencePayload = {};
   if (recurrenceType === "weekly") {
@@ -984,12 +1285,12 @@ async function handleBlobSubmit(event) {
     }
     const weekStart = getWeekStart(state.anchorDate);
     const slots = getWeeklySlots();
-    const perSlot = Boolean(dom.weeklyPerSlot?.checked);
-    const sharedName = formData.get("blobName");
+    const fallbackName = formData.get("recurrenceName") || "Unnamed Blob";
+    const sharedName = perSlot ? formData.get("blobName") : (formData.get("blobName") || fallbackName);
     const sharedDescription = formData.get("blobDescription") || null;
     const sharedPolicy = policyPayload;
     const blobsOfWeek = slots.map((slot) => {
-      const offset = dayOffsetFromMonday(slot.day);
+    const offset = dayOffsetFromSunday(slot.day);
       const slotDate = addDays(weekStart, offset);
       const slotDateValue = formatDateTimeLocalInTimeZone(
         slotDate,
@@ -1018,7 +1319,7 @@ async function handleBlobSubmit(event) {
       return {
         name: perSlot && slot.name ? slot.name : sharedName,
         description: perSlot ? slot.description || null : sharedDescription,
-        tz: appConfig.projectTimeZone,
+        tz: appConfig.userTimeZone,
         default_scheduled_timerange: {
           start: defaultStart,
           end: defaultEnd,
@@ -1029,13 +1330,16 @@ async function handleBlobSubmit(event) {
         },
         policy: perSlot ? slot.policy : sharedPolicy,
         dependencies,
-        tags,
+        tags: perSlot ? slot.tags : tags,
       };
     });
     recurrencePayload = {
       interval: Math.max(1, Number(formData.get("weeklyInterval") || 1)),
       recurrence_name: formData.get("recurrenceName") || null,
       recurrence_description: formData.get("recurrenceDescription") || null,
+      end_date: recurrenceEnd,
+      color: recurrenceColor,
+      weekly_per_slot: perSlot,
       blobs_of_week: blobsOfWeek,
     };
   } else if (recurrenceType === "delta") {
@@ -1051,18 +1355,24 @@ async function handleBlobSubmit(event) {
       delta_seconds: value * (unitSeconds[unit] || 86400),
       recurrence_name: formData.get("recurrenceName") || null,
       recurrence_description: formData.get("recurrenceDescription") || null,
+      end_date: recurrenceEnd,
+      color: recurrenceColor,
       start_blob: baseBlob,
     };
   } else if (recurrenceType === "date") {
     recurrencePayload = {
       recurrence_name: formData.get("recurrenceName") || null,
       recurrence_description: formData.get("recurrenceDescription") || null,
+      end_date: recurrenceEnd,
+      color: recurrenceColor,
       blob: baseBlob,
     };
   } else {
     recurrencePayload = {
       recurrence_name: formData.get("recurrenceName") || null,
       recurrence_description: formData.get("recurrenceDescription") || null,
+      end_date: recurrenceEnd,
+      color: recurrenceColor,
       blob: baseBlob,
     };
   }
@@ -1231,6 +1541,9 @@ function bindFormHandlers(onRefresh) {
     dom.blobForm.deltaValue.addEventListener("input", updateRecurrenceUI);
     dom.blobForm.deltaUnit.addEventListener("change", updateRecurrenceUI);
   }
+  if (dom.recurrenceEnd) {
+    dom.recurrenceEnd.addEventListener("change", updateRecurrenceUI);
+  }
   if (dom.dependencyInput) {
     dom.dependencyInput.addEventListener("input", renderDependencySuggestions);
     dom.dependencyInput.addEventListener("focus", renderDependencySuggestions);
@@ -1316,8 +1629,13 @@ function bindFormHandlers(onRefresh) {
       const weeklyWrapper = dom.weeklySlots?.closest(".weekly-slots");
       const wasPerSlot = weeklyWrapper?.classList.contains("per-slot");
       updateRecurrenceUI();
+      if (wasPerSlot && !dom.weeklyPerSlot.checked) {
+        const merged = collectSlotTagsUnion();
+        setTags(merged);
+      }
       if (!wasPerSlot && dom.weeklyPerSlot.checked) {
         syncSlotPoliciesFromForm();
+        syncSlotTagsFromForm();
       }
     });
   }
