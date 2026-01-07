@@ -111,7 +111,7 @@ body {
   inset: 0;
   display: none;
   place-items: center;
-  z-index: 20;
+  z-index: 40;
 }
 
 .modal.active {
@@ -131,6 +131,51 @@ body {
   width: min(720px, 92vw);
   max-height: 85vh;
   overflow: auto;
+}
+
+.alert-panel {
+  width: min(520px, 90vw);
+  display: grid;
+  gap: 16px;
+}
+
+.alert-message {
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.alert-actions {
+  justify-content: flex-end;
+}
+
+.alert-panel[data-action-order="confirm-alt-cancel"] .alert-action.confirm {
+  order: 1;
+}
+
+.alert-panel[data-action-order="confirm-alt-cancel"] .alert-action.alt {
+  order: 2;
+}
+
+.alert-panel[data-action-order="confirm-alt-cancel"] .alert-action.cancel {
+  order: 3;
+}
+
+.alert-panel[data-action-order="cancel-alt-confirm"] .alert-action.cancel {
+  order: 1;
+}
+
+.alert-panel[data-action-order="cancel-alt-confirm"] .alert-action.alt {
+  order: 2;
+}
+
+.alert-panel[data-action-order="cancel-alt-confirm"] .alert-action.confirm {
+  order: 3;
+}
+
+body.modal-open .info-card {
+  filter: blur(4px);
+  opacity: 0.35;
 }
 
 .form-header {
@@ -790,6 +835,10 @@ body {
   cursor: pointer;
 }
 
+.primary.danger {
+  background: #b4493f;
+}
+
 .form-status {
   font-size: 12px;
   color: var(--muted);
@@ -1150,6 +1199,26 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  position: relative;
+  padding-right: 18px;
+}
+
+.info-close {
+  position: absolute;
+  right: 0;
+  top: 0;
+  border: none;
+  background: transparent;
+  color: #b4493f;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.info-close:hover {
+  background: rgba(180, 73, 63, 0.12);
 }
 
 .info-star {

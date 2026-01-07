@@ -68,6 +68,23 @@
         </section>
       </div>
 
+      <div class="modal" id="alertModal" aria-hidden="true">
+        <div class="modal-backdrop" id="alertBackdrop"></div>
+        <section class="panel modal-panel alert-panel" id="alertPanel" role="dialog" aria-modal="true">
+          <div class="form-header">
+            <div>
+              <div class="form-title" id="alertTitle">Notice</div>
+            </div>
+          </div>
+          <div class="alert-message" id="alertMessage"></div>
+          <div class="form-actions alert-actions">
+            <button type="button" class="ghost alert-action cancel" id="alertCancelBtn">Cancel</button>
+            <button type="button" class="ghost alert-action alt" id="alertAltBtn">Delete</button>
+            <button type="button" class="primary alert-action confirm" id="alertConfirmBtn">OK</button>
+          </div>
+        </section>
+      </div>
+
       <section class="panel form-panel" id="formPanel">
         <div class="form-header">
           <div>

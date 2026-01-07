@@ -6,6 +6,7 @@ import {
   runSchedule,
   updateRecurrence,
 } from "./api.js";
+import { alertDialog, bindDialogEvents, confirmDialog } from "./popups.js";
 import { bindFormHandlers, openEditForm, resetFormMode, toggleForm, toggleSettings } from "./forms.js";
 import {
   clearInfoCardLock,
@@ -198,8 +199,9 @@ async function extendOccurrenceByMinutes(minutes) {
   const nextEnd = new Date(effective.end.getTime() + nextAdded * 60000);
   let schedulableEndOverride = null;
   if (nextEnd > schedEnd) {
-    const confirmed = window.confirm(
-      "This extends beyond the schedulable window. Continue anyway?"
+    const confirmed = await confirmDialog(
+      "This extends beyond the schedulable window. Continue anyway?",
+      { confirmText: "Extend", cancelText: "Cancel" }
     );
     if (!confirmed) return;
     schedulableEndOverride = nextEnd;
@@ -228,7 +230,7 @@ async function extendOccurrenceByMinutes(minutes) {
     state.loadedRange = null;
     await refreshView(state.view);
   } catch (error) {
-    window.alert(error?.message || "Failed to update occurrence.");
+    await alertDialog(error?.message || "Failed to update occurrence.");
   }
 }
 
@@ -266,7 +268,7 @@ async function handleFinishNow() {
       await handleRunSchedule();
     }
   } catch (error) {
-    window.alert(error?.message || "Failed to finish occurrence.");
+    await alertDialog(error?.message || "Failed to finish occurrence.");
   }
 }
 
@@ -421,6 +423,10 @@ window.addEventListener("keydown", (event) => {
 });
 
 resetFormMode();
+bindDialogEvents();
+window.addEventListener("elastisched:refresh", () => {
+  refreshView(state.view);
+});
 const savedView = loadView();
 refreshView(savedView || "day");
 window.setInterval(() => {
