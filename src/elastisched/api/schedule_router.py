@@ -16,6 +16,7 @@ from elastisched.api.models import (
 from elastisched.api.recurrence_router import (
     _coerce_timerange,
     _exclusion_set,
+    _payload_end_datetime,
     _recurrence_from_payload,
     _recurrence_tzinfo,
     _to_occurrence_schema,
@@ -198,10 +199,17 @@ async def run_schedule(
         recurrence_obj = _recurrence_from_payload(recurrence.type, recurrence.payload)
         recurrence_tz = _recurrence_tzinfo(recurrence_obj)
         recurrence_range = _coerce_timerange(timerange, recurrence_tz)
+        end_date = _payload_end_datetime(recurrence.payload or {}, recurrence_tz)
+        if end_date and end_date < recurrence_range.start:
+            continue
+        if end_date and end_date < recurrence_range.end:
+            recurrence_range = TimeRange(start=recurrence_range.start, end=end_date)
         for blob in recurrence_obj.all_occurrences(recurrence_range):
             if not recurrence_range.contains(blob.get_schedulable_timerange()):
                 continue
             sched_start = blob.get_schedulable_timerange().start
+            if end_date and sched_start > end_date:
+                continue
             if sched_start.tzinfo is None:
                 sched_start = sched_start.replace(tzinfo=timezone.utc)
             if int(sched_start.timestamp()) in exclusions:

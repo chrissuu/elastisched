@@ -130,6 +130,12 @@
               Repeats annually on the default start date.
             </div>
           </div>
+          <div class="recurrence-extras">
+            <label>
+              Recurrence ends
+              <input type="datetime-local" name="recurrenceEnd" />
+            </label>
+          </div>
           <div class="non-weekly-field weekly-slot single-slot">
             <div class="weekly-slot-row">
               <label>
@@ -197,7 +203,7 @@
             <div class="dependency-suggestions" id="dependencySuggestions"></div>
             <div class="dependency-list" id="dependencyList"></div>
           </div>
-          <div class="tag-field">
+          <div class="tag-field" id="recurrenceTagField">
             <span class="tag-label">Tags</span>
             <div class="tag-input-row">
               <input
@@ -219,6 +225,41 @@
             </div>
             <div class="tag-suggestions" id="tagSuggestions"></div>
             <div class="tag-list" id="tagList"></div>
+          </div>
+          <div class="color-field">
+            <span class="color-label">Color</span>
+            <div class="color-swatches" role="radiogroup" aria-label="Recurrence color">
+              <label class="color-swatch">
+                <input
+                  type="radio"
+                  name="recurrenceColor"
+                  value="default"
+                  checked
+                  aria-label="Default"
+                />
+                <span class="swatch swatch-default"></span>
+              </label>
+              <label class="color-swatch">
+                <input type="radio" name="recurrenceColor" value="sand" aria-label="Sand" />
+                <span class="swatch swatch-sand"></span>
+              </label>
+              <label class="color-swatch">
+                <input type="radio" name="recurrenceColor" value="sage" aria-label="Sage" />
+                <span class="swatch swatch-sage"></span>
+              </label>
+              <label class="color-swatch">
+                <input type="radio" name="recurrenceColor" value="mist" aria-label="Mist" />
+                <span class="swatch swatch-mist"></span>
+              </label>
+              <label class="color-swatch">
+                <input type="radio" name="recurrenceColor" value="clay" aria-label="Clay" />
+                <span class="swatch swatch-clay"></span>
+              </label>
+              <label class="color-swatch">
+                <input type="radio" name="recurrenceColor" value="moss" aria-label="Moss" />
+                <span class="swatch swatch-moss"></span>
+              </label>
+            </div>
           </div>
           <div class="form-actions">
             <button type="button" class="ghost star edit-only" id="starOccurrenceBtn">

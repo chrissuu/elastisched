@@ -247,7 +247,7 @@ function shiftAnchorDate(view, anchorDate, direction) {
 
 function getWeekStart(date) {
   const dayOfWeek = date.getDay();
-  return addDays(startOfDay(date), dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+  return addDays(startOfDay(date), -dayOfWeek);
 }
 
 function getViewRange(view, anchorDate) {
@@ -257,8 +257,7 @@ function getViewRange(view, anchorDate) {
   }
   if (view === "week") {
     const dayOfWeek = anchorDate.getDay();
-    const monday = addDays(anchorDate, dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
-    const start = startOfDay(monday);
+    const start = addDays(startOfDay(anchorDate), -dayOfWeek);
     return { start, end: addDays(start, 7) };
   }
   if (view === "month") {
@@ -335,6 +334,7 @@ export {
   getViewRange,
   getWeekStart,
   getLocalTimeZone,
+  getTimeZoneParts,
   formatDateTimeLocalInTimeZone,
   formatIsoInTimeZone,
   toProjectIsoFromLocalInput,

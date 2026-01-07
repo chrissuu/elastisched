@@ -107,19 +107,26 @@ document.addEventListener("click", async (event) => {
   }, 1200);
 });
 
-document.addEventListener("contextmenu", (event) => {
-  const target = event.target.closest("[data-blob-id]");
-  if (!target) return;
-  if (dom.formPanel.classList.contains("active")) {
-    return;
-  }
-  event.preventDefault();
-  const blobId = target.getAttribute("data-blob-id");
-  const blob = state.blobs.find((item) => item.id === blobId);
-  if (blob) {
-    openEditForm(blob);
-  }
-});
+document.addEventListener(
+  "click",
+  (event) => {
+    if (!event.shiftKey) return;
+    const target = event.target.closest("[data-blob-id]");
+    if (!target) return;
+    if (event.target.closest(".star-toggle")) return;
+    if (dom.formPanel.classList.contains("active")) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const blobId = target.getAttribute("data-blob-id");
+    const blob = state.blobs.find((item) => item.id === blobId);
+    if (blob) {
+      openEditForm(blob);
+    }
+  },
+  true
+);
 
 document.addEventListener("click", (event) => {
   if (!dom.formPanel.classList.contains("active")) return;

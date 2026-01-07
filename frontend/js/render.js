@@ -4,7 +4,9 @@ import {
   addDays,
   clampToGranularity,
   formatTimeRangeInTimeZone,
+  getWeekStart,
   getTagType,
+  getTimeZoneParts,
   layoutBlocks,
   overlaps,
   startOfDay,
@@ -78,6 +80,58 @@ function renderPolicyBadges(policy, { compact = false } = {}) {
     .join("");
 }
 
+function getRecurrenceColorClass(blob) {
+  const color = blob?.recurrence_payload?.color;
+  return color ? `palette-${color}` : "";
+}
+
+function getBlobTimeZone(blob) {
+  return blob?.tz || appConfig.userTimeZone;
+}
+
+function getZonedParts(value, timeZone) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : toDate(value);
+  if (!date || Number.isNaN(date.getTime())) return null;
+  return getTimeZoneParts(date, timeZone);
+}
+
+function partsToDayStamp(parts) {
+  return Date.UTC(parts.year, parts.month - 1, parts.day);
+}
+
+function minutesFromParts(parts) {
+  return parts.hour * 60 + parts.minute + (parts.second || 0) / 60;
+}
+
+function getClampedMinutes(startParts, endParts, viewDayStamp) {
+  const startStamp = partsToDayStamp(startParts);
+  const endStamp = partsToDayStamp(endParts);
+  const startMin = minutesFromParts(startParts);
+  const endMin = minutesFromParts(endParts);
+  const overlapsDay =
+    (startStamp < viewDayStamp || (startStamp === viewDayStamp && startMin < 1440)) &&
+    (endStamp > viewDayStamp || (endStamp === viewDayStamp && endMin > 0));
+  if (!overlapsDay) return null;
+  const clampedStart = startStamp < viewDayStamp ? 0 : startMin;
+  const clampedEnd = endStamp > viewDayStamp ? 1440 : endMin;
+  if (clampedEnd <= clampedStart) return null;
+  return { startMin: clampedStart, endMin: clampedEnd };
+}
+
+function formatRecurrenceEnd(value) {
+  if (!value) return "";
+  const end = toZonedDate(toDate(value), appConfig.userTimeZone);
+  if (!end || Number.isNaN(end.getTime())) return "";
+  return end.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function getInfoCard() {
   if (dom.infoCard) return dom.infoCard;
   const card = document.createElement("div");
@@ -115,6 +169,7 @@ function showInfoCard(blob, anchorRect) {
   if (state.infoCardLocked) return;
   const recurrenceName = blob.recurrence_payload?.recurrence_name;
   const recurrenceDescription = blob.recurrence_payload?.recurrence_description;
+  const recurrenceEnd = blob.recurrence_payload?.end_date;
   const recurrenceType = blob.recurrence_type || "single";
   const recurrenceTypeLabel = recurrenceType
     ? `${recurrenceType.charAt(0).toUpperCase()}${recurrenceType.slice(1)}`
@@ -126,7 +181,7 @@ function showInfoCard(blob, anchorRect) {
   const timeLabel = formatTimeRangeInTimeZone(
     blob.realized_timerange?.start || blob.default_scheduled_timerange?.start,
     blob.realized_timerange?.end || blob.default_scheduled_timerange?.end,
-    appConfig.userTimeZone
+    getBlobTimeZone(blob)
   );
   const policyBadges = renderPolicyBadges(blob.policy);
   const tags = Array.isArray(blob.tags)
@@ -149,6 +204,14 @@ function showInfoCard(blob, anchorRect) {
         ${recurrenceDescription ? `<div class="info-text">${recurrenceDescription}</div>` : ""}
       `
       : "";
+  const recurrenceEndLabel = formatRecurrenceEnd(recurrenceEnd);
+  const recurrenceEndBlock = recurrenceEndLabel
+    ? `
+        <div class="info-divider"></div>
+        <div class="info-label">Recurrence ends</div>
+        <div class="info-text">${recurrenceEndLabel}</div>
+      `
+    : "";
   const tagBlock =
     tags.length > 0
       ? `
@@ -189,6 +252,7 @@ function showInfoCard(blob, anchorRect) {
     ${blobDescription ? `<div class="info-text">${blobDescription}</div>` : ""}
     ${recurrenceTypeBlock}
     ${recurrenceBlock}
+    ${recurrenceEndBlock}
     ${tagBlock}
     ${idBlock}
     <div class="info-divider"></div>
@@ -321,7 +385,8 @@ async function toggleStarFromCalendar(blob) {
 
 function renderDay() {
   const dayStart = startOfDay(state.anchorDate);
-  const dayEnd = addDays(dayStart, 1);
+  const viewDayParts = getZonedParts(state.anchorDate, appConfig.userTimeZone);
+  const viewDayStamp = viewDayParts ? partsToDayStamp(viewDayParts) : null;
   const hourHeight = 44;
   const hours = Array.from({ length: 24 }, (_, idx) => {
     const hour = idx % 24;
@@ -332,52 +397,43 @@ function renderDay() {
 
   const blocks = state.blobs
     .map((blob) => {
-      const start = toZonedDate(
-        toDate(
-        blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
-      ),
-        appConfig.userTimeZone
+      const blobTimeZone = getBlobTimeZone(blob);
+      if (!viewDayStamp) return null;
+      const startParts = getZonedParts(
+        blob.realized_timerange?.start || blob.default_scheduled_timerange?.start,
+        blobTimeZone
       );
-      const end = toZonedDate(
-        toDate(
-        blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
-      ),
-        appConfig.userTimeZone
+      const endParts = getZonedParts(
+        blob.realized_timerange?.end || blob.default_scheduled_timerange?.end,
+        blobTimeZone
       );
-      const schedStart = toZonedDate(
-        toDate(blob.schedulable_timerange?.start),
-        appConfig.userTimeZone
-      );
-      const schedEnd = toZonedDate(
-        toDate(blob.schedulable_timerange?.end),
-        appConfig.userTimeZone
-      );
-      if (!start || !end) return null;
-      if (!overlaps(dayStart, dayEnd, start, end)) return null;
-      const clampedStart = start < dayStart ? dayStart : start;
-      const clampedEnd = end > dayEnd ? dayEnd : end;
-      const minutes = (clampedEnd - clampedStart) / 60000;
-      if (minutes <= 0) return null;
-      const startMin = (clampedStart - dayStart) / 60000;
-      const endMin = (clampedEnd - dayStart) / 60000;
-      const showContent = start >= dayStart;
+      const schedStartParts = getZonedParts(blob.schedulable_timerange?.start, blobTimeZone);
+      const schedEndParts = getZonedParts(blob.schedulable_timerange?.end, blobTimeZone);
+      if (!startParts || !endParts) return null;
+      const clamped = getClampedMinutes(startParts, endParts, viewDayStamp);
+      if (!clamped) return null;
+      const minutes = clamped.endMin - clamped.startMin;
+      const showContent = partsToDayStamp(startParts) === viewDayStamp;
       return {
         id: blob.id,
         title: blob.name,
         time: formatTimeRangeInTimeZone(
           blob.realized_timerange?.start || blob.default_scheduled_timerange.start,
           blob.realized_timerange?.end || blob.default_scheduled_timerange.end,
-          appConfig.userTimeZone
+          blobTimeZone
         ),
         type: getTagType(blob.tags),
+        colorClass: getRecurrenceColorClass(blob),
         policy: blob.policy,
         starred: isOccurrenceStarred(blob),
-        top: (startMin / 60) * hourHeight,
+        top: (clamped.startMin / 60) * hourHeight,
         height: Math.max(18, (minutes / 60) * hourHeight),
-        startMin,
-        endMin,
-        schedStart,
-        schedEnd,
+        startMin: clamped.startMin,
+        endMin: clamped.endMin,
+        schedStartIso: blob.schedulable_timerange?.start || "",
+        schedEndIso: blob.schedulable_timerange?.end || "",
+        schedStartParts,
+        schedEndParts,
         showContent,
       };
     })
@@ -392,7 +448,7 @@ function renderDay() {
       (block) => {
         const policyBadges = renderPolicyBadges(block.policy, { compact: true });
         return `
-        <div class="day-block ${block.type} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
+        <div class="day-block ${block.type} ${block.colorClass} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStartIso}" data-sched-end="${block.schedEndIso}">
           ${
             block.showContent
               ? `
@@ -453,24 +509,28 @@ function renderDay() {
 
   const applyInfoCardAndOverlay = (blockEl) => {
     const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
+    const blobTimeZone = getBlobTimeZone(blob);
     showInfoCard(blob, blockEl.getBoundingClientRect());
-    const schedStart = toZonedDate(
-      toDate(blockEl.getAttribute("data-sched-start")),
-      appConfig.userTimeZone
+    const viewParts = getZonedParts(state.anchorDate, blobTimeZone);
+    if (!viewParts) return;
+    const viewStamp = partsToDayStamp(viewParts);
+    const schedStartParts = getZonedParts(
+      blockEl.getAttribute("data-sched-start"),
+      blobTimeZone
     );
-    const schedEnd = toZonedDate(
-      toDate(blockEl.getAttribute("data-sched-end")),
-      appConfig.userTimeZone
+    const schedEndParts = getZonedParts(
+      blockEl.getAttribute("data-sched-end"),
+      blobTimeZone
     );
-    if (!schedStart || !schedEnd) return;
-    const overlayStart = schedStart < dayStart ? dayStart : schedStart;
-    const overlayEnd = schedEnd > dayEnd ? dayEnd : schedEnd;
-    const minutes = (overlayEnd - overlayStart) / 60000;
-    const top = (overlayStart - dayStart) / 60000;
+    if (!schedStartParts || !schedEndParts) return;
+    const clamped = getClampedMinutes(schedStartParts, schedEndParts, viewStamp);
+    if (!clamped) return;
+    const minutes = clamped.endMin - clamped.startMin;
+    const top = clamped.startMin;
     overlay.style.top = `${(top / 60) * hourHeight}px`;
     overlay.style.height = `${Math.max(18, (minutes / 60) * hourHeight)}px`;
-    overlay.classList.toggle("overflow-top", schedStart < dayStart);
-    overlay.classList.toggle("overflow-bottom", schedEnd > dayEnd);
+    overlay.classList.toggle("overflow-top", partsToDayStamp(schedStartParts) < viewStamp);
+    overlay.classList.toggle("overflow-bottom", partsToDayStamp(schedEndParts) > viewStamp);
     overlay.classList.add("active");
   };
 
@@ -486,6 +546,7 @@ function renderDay() {
       hideInfoCard();
     });
     blockEl.addEventListener("click", (event) => {
+      if (event.shiftKey) return;
       if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
       if (event.target.closest(".star-toggle")) return;
       clearActiveBlocks();
@@ -651,9 +712,8 @@ function renderDay() {
 }
 
 function renderWeek() {
-  const dayOfWeek = state.anchorDate.getDay();
-  const monday = addDays(state.anchorDate, dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
-  const days = Array.from({ length: 7 }, (_, idx) => addDays(monday, idx));
+  const weekStart = getWeekStart(state.anchorDate);
+  const days = Array.from({ length: 7 }, (_, idx) => addDays(weekStart, idx));
   const hourHeight = 44;
   const hours = Array.from({ length: 24 }, (_, idx) => {
     const hour = idx % 24;
@@ -664,56 +724,47 @@ function renderWeek() {
 
   const columns = days
     .map((date) => {
-      const dayStart = startOfDay(date);
-      const dayEnd = addDays(dayStart, 1);
       const blocks = state.blobs
         .map((blob) => {
-          const start = toZonedDate(
-            toDate(
-            blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
-          ),
-            appConfig.userTimeZone
+          const blobTimeZone = getBlobTimeZone(blob);
+          const viewParts = getZonedParts(date, blobTimeZone);
+          const viewStamp = viewParts ? partsToDayStamp(viewParts) : null;
+          if (!viewStamp) return null;
+          const startParts = getZonedParts(
+            blob.realized_timerange?.start || blob.default_scheduled_timerange?.start,
+            blobTimeZone
           );
-          const end = toZonedDate(
-            toDate(
-            blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
-          ),
-            appConfig.userTimeZone
+          const endParts = getZonedParts(
+            blob.realized_timerange?.end || blob.default_scheduled_timerange?.end,
+            blobTimeZone
           );
-          const schedStart = toZonedDate(
-            toDate(blob.schedulable_timerange?.start),
-            appConfig.userTimeZone
-          );
-          const schedEnd = toZonedDate(
-            toDate(blob.schedulable_timerange?.end),
-            appConfig.userTimeZone
-          );
-          if (!start || !end) return null;
-          if (!overlaps(dayStart, dayEnd, start, end)) return null;
-          const clampedStart = start < dayStart ? dayStart : start;
-          const clampedEnd = end > dayEnd ? dayEnd : end;
-          const minutes = (clampedEnd - clampedStart) / 60000;
-          if (minutes <= 0) return null;
-          const startMin = (clampedStart - dayStart) / 60000;
-          const endMin = (clampedEnd - dayStart) / 60000;
-          const showContent = start >= dayStart;
+          const schedStartParts = getZonedParts(blob.schedulable_timerange?.start, blobTimeZone);
+          const schedEndParts = getZonedParts(blob.schedulable_timerange?.end, blobTimeZone);
+          if (!startParts || !endParts) return null;
+          const clamped = getClampedMinutes(startParts, endParts, viewStamp);
+          if (!clamped) return null;
+          const minutes = clamped.endMin - clamped.startMin;
+          const showContent = partsToDayStamp(startParts) === viewStamp;
           return {
             id: blob.id,
             title: blob.name,
             time: formatTimeRangeInTimeZone(
               blob.realized_timerange?.start || blob.default_scheduled_timerange.start,
               blob.realized_timerange?.end || blob.default_scheduled_timerange.end,
-              appConfig.userTimeZone
+              blobTimeZone
             ),
             type: getTagType(blob.tags),
+            colorClass: getRecurrenceColorClass(blob),
             policy: blob.policy,
             starred: isOccurrenceStarred(blob),
-            top: (startMin / 60) * hourHeight,
+            top: (clamped.startMin / 60) * hourHeight,
             height: Math.max(18, (minutes / 60) * hourHeight),
-            startMin,
-            endMin,
-            schedStart,
-            schedEnd,
+            startMin: clamped.startMin,
+            endMin: clamped.endMin,
+            schedStartIso: blob.schedulable_timerange?.start || "",
+            schedEndIso: blob.schedulable_timerange?.end || "",
+            schedStartParts,
+            schedEndParts,
             showContent,
           };
         })
@@ -727,7 +778,7 @@ function renderWeek() {
           (block) => {
             const policyBadges = renderPolicyBadges(block.policy, { compact: true });
             return `
-            <div class="day-block ${block.type} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStart?.toISOString() || ""}" data-sched-end="${block.schedEnd?.toISOString() || ""}">
+            <div class="day-block ${block.type} ${block.colorClass} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStartIso}" data-sched-end="${block.schedEndIso}">
               ${
                 block.showContent
                   ? `
@@ -788,17 +839,12 @@ function renderWeek() {
     weekTimeline.style.setProperty("--week-label-offset", `${labelHeight + gap}px`);
   }
 
-  const weekStart = startOfDay(monday);
-  const weekEnd = addDays(weekStart, 7);
   const dayColumns = Array.from(dom.views.week.querySelectorAll(".week-day-column"));
   const dayTracks = dayColumns.map((column, index) => {
-    const dayStart = startOfDay(days[index]);
-    const dayEnd = addDays(dayStart, 1);
     return {
       track: column.querySelector(".week-day-track"),
       overlay: column.querySelector(".schedulable-overlay"),
-      dayStart,
-      dayEnd,
+      dayDate: days[index],
     };
   });
 
@@ -811,35 +857,34 @@ function renderWeek() {
 
       const applyInfoCardAndOverlay = () => {
         const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
+        const blobTimeZone = getBlobTimeZone(blob);
         showInfoCard(blob, blockEl.getBoundingClientRect());
-        const schedStart = toZonedDate(
-          toDate(blockEl.getAttribute("data-sched-start")),
-          appConfig.userTimeZone
+        const schedStartParts = getZonedParts(
+          blockEl.getAttribute("data-sched-start"),
+          blobTimeZone
         );
-        const schedEnd = toZonedDate(
-          toDate(blockEl.getAttribute("data-sched-end")),
-          appConfig.userTimeZone
+        const schedEndParts = getZonedParts(
+          blockEl.getAttribute("data-sched-end"),
+          blobTimeZone
         );
-        if (!schedStart || !schedEnd) return;
-        dayTracks.forEach(({ overlay, dayStart, dayEnd }) => {
-          const overlapStart = schedStart < dayStart ? dayStart : schedStart;
-          const overlapEnd = schedEnd > dayEnd ? dayEnd : schedEnd;
-          if (overlapEnd <= overlapStart) {
+        if (!schedStartParts || !schedEndParts) return;
+        const schedStartStamp = partsToDayStamp(schedStartParts);
+        const schedEndStamp = partsToDayStamp(schedEndParts);
+        dayTracks.forEach(({ overlay, dayDate }) => {
+          const viewParts = getZonedParts(dayDate, blobTimeZone);
+          const viewStamp = viewParts ? partsToDayStamp(viewParts) : null;
+          if (!viewStamp) return;
+          const clamped = getClampedMinutes(schedStartParts, schedEndParts, viewStamp);
+          if (!clamped) {
             overlay.classList.remove("active", "overflow-top", "overflow-bottom");
             return;
           }
-          const minutes = (overlapEnd - overlapStart) / 60000;
-          const top = (overlapStart - dayStart) / 60000;
+          const minutes = clamped.endMin - clamped.startMin;
+          const top = clamped.startMin;
           overlay.style.top = `${(top / 60) * hourHeight}px`;
           overlay.style.height = `${Math.max(18, (minutes / 60) * hourHeight)}px`;
-          overlay.classList.toggle(
-            "overflow-top",
-            schedStart < weekStart && dayStart.getTime() === weekStart.getTime()
-          );
-          overlay.classList.toggle(
-            "overflow-bottom",
-            schedEnd > weekEnd && dayEnd.getTime() === weekEnd.getTime()
-          );
+          overlay.classList.toggle("overflow-top", schedStartStamp < viewStamp);
+          overlay.classList.toggle("overflow-bottom", schedEndStamp > viewStamp);
           overlay.classList.add("active");
         });
       };
@@ -857,6 +902,7 @@ function renderWeek() {
         hideInfoCard();
       });
       blockEl.addEventListener("click", (event) => {
+        if (event.shiftKey) return;
         if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
         if (event.target.closest(".star-toggle")) return;
         dayColumns.forEach((col) =>
@@ -1092,7 +1138,7 @@ function renderWeek() {
     window.addEventListener("resize", state.selectionScrollHandler);
   }
 
-  setDateLabel(formatWeekLabel(monday));
+  setDateLabel(formatWeekLabel(weekStart));
 }
 
 function renderMonth() {
@@ -1118,13 +1164,14 @@ function renderMonth() {
   const starredKeys = new Set();
   state.blobs.forEach((blob) => {
     if (!isOccurrenceStarred(blob)) return;
+    const blobTimeZone = getBlobTimeZone(blob);
     const start = toZonedDate(
       toDate(blob.realized_timerange?.start || blob.default_scheduled_timerange?.start),
-      appConfig.userTimeZone
+      blobTimeZone
     );
     const end = toZonedDate(
       toDate(blob.realized_timerange?.end || blob.default_scheduled_timerange?.end),
-      appConfig.userTimeZone
+      blobTimeZone
     );
     if (!start || !end) return;
     if (!overlaps(gridStart, gridEnd, start, end)) return;
@@ -1217,17 +1264,18 @@ function renderYear() {
       const monthEnd = new Date(year, monthStart.getMonth() + 1, 1);
       const events = state.blobs.filter((blob) => {
         if (!isOccurrenceStarred(blob)) return false;
+        const blobTimeZone = getBlobTimeZone(blob);
         const start = toZonedDate(
           toDate(
           blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
         ),
-          appConfig.userTimeZone
+          blobTimeZone
         );
         const end = toZonedDate(
           toDate(
           blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
         ),
-          appConfig.userTimeZone
+          blobTimeZone
         );
         return start && end && overlaps(monthStart, monthEnd, start, end);
       });

@@ -27,6 +27,7 @@ from elastisched.recurrence import (
 )
 from elastisched.timerange import TimeRange
 from elastisched.constants import DEFAULT_TZ
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from engine import Tag
 
 
@@ -80,6 +81,15 @@ def _parse_timerange(data: dict, tzinfo) -> TimeRange:
     return TimeRange(start=start, end=end)
 
 
+def _resolve_payload_tz(value: str | None):
+    if not value:
+        return DEFAULT_TZ
+    try:
+        return ZoneInfo(value)
+    except ZoneInfoNotFoundError:
+        return DEFAULT_TZ
+
+
 def _serialize_tags(raw_tags) -> list[str]:
     tags = []
     for tag in raw_tags or []:
@@ -100,8 +110,23 @@ def _serialize_tags(raw_tags) -> list[str]:
     return tags
 
 
+def _payload_end_datetime(payload: dict, tzinfo) -> datetime | None:
+    if not payload:
+        return None
+    raw = payload.get("end_date")
+    if not raw:
+        return None
+    end_date = _parse_datetime(raw)
+    if tzinfo:
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=tzinfo)
+        else:
+            end_date = end_date.astimezone(tzinfo)
+    return end_date
+
+
 def _blob_from_payload(data: dict) -> Blob:
-    tzinfo = DEFAULT_TZ
+    tzinfo = _resolve_payload_tz(data.get("tz"))
     default_tr = _parse_timerange(data.get("default_scheduled_timerange", {}), tzinfo)
     schedulable_tr = _parse_timerange(data.get("schedulable_timerange", {}), tzinfo)
     return Blob(
@@ -118,6 +143,8 @@ def _blob_from_payload(data: dict) -> Blob:
 
 def _recurrence_from_payload(recurrence_type: str, payload: dict):
     payload = payload or {}
+    if payload.get("end_date"):
+        _parse_datetime(payload.get("end_date"))
     if recurrence_type == "single":
         blob = _blob_from_payload(payload.get("blob") or {})
         return SingleBlobOccurrence(blob=blob)
@@ -323,8 +350,15 @@ async def list_occurrences(
         recurrence_obj = _recurrence_from_payload(recurrence.type, recurrence.payload)
         recurrence_tz = _recurrence_tzinfo(recurrence_obj)
         recurrence_range = _coerce_timerange(timerange, recurrence_tz)
+        end_date = _payload_end_datetime(recurrence.payload or {}, recurrence_tz)
+        if end_date and end_date < recurrence_range.start:
+            continue
+        if end_date and end_date < recurrence_range.end:
+            recurrence_range = TimeRange(start=recurrence_range.start, end=end_date)
         for blob in recurrence_obj.all_occurrences(recurrence_range):
             start = blob.get_schedulable_timerange().start
+            if end_date and start > end_date:
+                continue
             if start.tzinfo is None:
                 start = start.replace(tzinfo=timezone.utc)
             if int(start.timestamp()) in exclusions:
