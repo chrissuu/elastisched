@@ -711,6 +711,15 @@ function clearWeeklySlots() {
 
 function createWeeklySlot(slotData = {}) {
   if (!dom.weeklySlots) return;
+  const lastSlot = dom.weeklySlots.querySelector(".weekly-slot:last-of-type");
+  const lastValues = lastSlot
+    ? {
+        defaultStart: lastSlot.querySelector('[name="slotDefaultStart"]')?.value,
+        defaultEnd: lastSlot.querySelector('[name="slotDefaultEnd"]')?.value,
+        schedStart: lastSlot.querySelector('[name="slotSchedStart"]')?.value,
+        schedEnd: lastSlot.querySelector('[name="slotSchedEnd"]')?.value,
+      }
+    : null;
   const slot = document.createElement("div");
   slot.className = "weekly-slot";
   const slotId = typeof crypto !== "undefined" && crypto.randomUUID
@@ -718,10 +727,10 @@ function createWeeklySlot(slotData = {}) {
     : `slot-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   slot.dataset.slotId = slotId;
   const dayValue = slotData.day ?? 0;
-  const defaultStart = slotData.defaultStart || "09:00";
-  const defaultEnd = slotData.defaultEnd || "10:00";
-  const schedStart = slotData.schedStart || "08:30";
-  const schedEnd = slotData.schedEnd || "10:30";
+  const defaultStart = slotData.defaultStart || lastValues?.defaultStart || "09:00";
+  const defaultEnd = slotData.defaultEnd || lastValues?.defaultEnd || "10:00";
+  const schedStart = slotData.schedStart || lastValues?.schedStart || "08:30";
+  const schedEnd = slotData.schedEnd || lastValues?.schedEnd || "10:30";
   const nameValue = slotData.name || "";
   const descriptionValue = slotData.description || "";
   const tagsValue = slotData.tags || [];
@@ -729,15 +738,15 @@ function createWeeklySlot(slotData = {}) {
   const policyFlags = getPolicyFlagsFromPolicy(slotData.policy ?? fallbackPolicy);
   slot.innerHTML = `
     <div class="weekly-slot-row">
-      <label>
-        Day
-        <select name="slotDay">
+      <div class="slot-day-field">
+        <span class="slot-day-label">Day</span>
+        <div class="slot-day-toggle" role="group" aria-label="Day of week">
           ${WEEK_DAYS.map(
             (day, index) =>
-              `<option value="${index}" ${index === dayValue ? "selected" : ""}>${day}</option>`
+              `<button type="button" class="day-pill ${index === dayValue ? "active" : ""}" data-day="${index}" aria-pressed="${index === dayValue ? "true" : "false"}">${day.charAt(0)}</button>`
           ).join("")}
-        </select>
-      </label>
+        </div>
+      </div>
       <label>
         Default start
         <input type="time" name="slotDefaultStart" value="${defaultStart}" required />
@@ -819,8 +828,20 @@ function createWeeklySlot(slotData = {}) {
   });
   slotTagStore.set(slot, Array.isArray(tagsValue) ? tagsValue : []);
   renderSlotTagList(slot);
-  slot.querySelectorAll("input, select").forEach((field) => {
+  slot.querySelectorAll("input").forEach((field) => {
     field.addEventListener("change", () => {
+      updateRecurrenceUI();
+      validateWeeklySlots();
+    });
+  });
+  slot.querySelectorAll(".day-pill").forEach((button) => {
+    button.addEventListener("click", () => {
+      slot.querySelectorAll(".day-pill").forEach((pill) => {
+        pill.classList.remove("active");
+        pill.setAttribute("aria-pressed", "false");
+      });
+      button.classList.add("active");
+      button.setAttribute("aria-pressed", "true");
       updateRecurrenceUI();
       validateWeeklySlots();
     });
@@ -880,7 +901,8 @@ function getWeeklySlots() {
   if (!dom.weeklySlots) return [];
   const slots = [];
   dom.weeklySlots.querySelectorAll(".weekly-slot").forEach((slot) => {
-    const day = Number(slot.querySelector('[name="slotDay"]').value);
+    const dayButton = slot.querySelector(".day-pill.active");
+    const day = Number(dayButton?.dataset.day);
     const splittable = Boolean(slot.querySelector('[name="slotPolicySplittable"]')?.checked);
     const overlappable = Boolean(slot.querySelector('[name="slotPolicyOverlappable"]')?.checked);
     const invisible = Boolean(slot.querySelector('[name="slotPolicyInvisible"]')?.checked);
