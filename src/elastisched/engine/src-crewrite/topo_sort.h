@@ -1,4 +1,8 @@
+#ifndef ELASTISCHED_TOPO_SORT_H
+#define ELASTISCHED_TOPO_SORT_H
 
+#include <stdbool.h>
+#include <stddef.h>
 #include "constants.h"
 #include "dll.h"
 #include "map.h"
@@ -13,6 +17,8 @@ typedef struct DependencyViolation {
 
 typedef struct DependencyViolationContainer {
     DependencyViolation* dependency_violations;
+    size_t size;
+    size_t capacity;
 } DependencyViolationContainer;
 
 typedef struct DependencyCheckResult {
@@ -23,3 +29,4 @@ typedef struct DependencyCheckResult {
 
 DependencyCheckResult* check_dependency_violations(const Schedule* schedule);
 
+#endif

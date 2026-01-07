@@ -1,6 +1,12 @@
+#ifndef ELASTISCHED_VEC_H
+#define ELASTISCHED_VEC_H
+
+#include <stdlib.h>
+#include "constants.h"
+
 /**
  * vec.h
- * 
+ *
  * Macros for working with arbitrary C vectors
  */
 
@@ -22,4 +28,6 @@
 #define vec_clear(vec) \
         do { \
             vec->size = 0; \
-        } while (0) 
+        } while (0)
+
+#endif

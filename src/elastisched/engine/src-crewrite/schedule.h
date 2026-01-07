@@ -1,5 +1,5 @@
-#ifndef SCHEDULE_H
-#define SCHEDULE_H
+#ifndef ELASTISCHED_SCHEDULE_H
+#define ELASTISCHED_SCHEDULE_H
 
 #include "job.h"
 #include "utils.h"

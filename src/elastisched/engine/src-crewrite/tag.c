@@ -1,4 +1,5 @@
 #include "tag.h"
+#include "hash.h"
 
 bool tag_eq(const Tag* U, const Tag* V) {
     return strcmp(U->name, V->name) == 0;
@@ -10,14 +11,29 @@ int tag_cmp(const Tag* U, const Tag* V) {
     return (c > 0) - (c < 0);
 }
 
+uint64_t tag_hash(const Tag* U) {
+    return string_hash(U ? U->name : NULL);
+}
+
+int tag_cmp_void(const void* U, const void* V) {
+    return tag_cmp((const Tag*)U, (const Tag*)V);
+}
+
+uint64_t tag_hash_void(const void* U) {
+    return tag_hash((const Tag*)U);
+}
+
 TagContainer* mk_tag_container(size_t capacity) {
     TagContainer* tag_set = malloc(sizeof(TagContainer));
     if (!tag_set) return NULL;
 
-    Tag* data = malloc(capacity * sizeof(Tag));
-    if (!data) {
-        free(tag_set);
-        return NULL;
+    Tag* data = NULL;
+    if (capacity != 0) {
+        data = malloc(capacity * sizeof(Tag));
+        if (!data) {
+            free(tag_set);
+            return NULL;
+        }
     }
 
     tag_set->size = 0;
@@ -28,12 +44,13 @@ TagContainer* mk_tag_container(size_t capacity) {
 }
 
 void tag_container_free(TagContainer* container) {
+    if (!container) return;
     free((void*)container->data);
     free(container);
-    return;
 }
 
 bool tag_container_resize(TagContainer* container) {
+    if (!container) return false;
     size_t new_capacity = (container->capacity == 0) ? 
         INITIAL_TAGCONTAINER_CAPACITY : container->capacity * 2;
     Tag* new_data = realloc(container->data, new_capacity * sizeof(Tag));
@@ -125,7 +142,6 @@ TagContainer* ts_union(TagContainer* U, TagContainer* V) {
                 v_ptr++;
                 break;
         }
-        set_union->size++;
     }
 
     while (u_ptr < U->size) set_union->data[insert_ind++] = U->data[u_ptr++];
@@ -143,7 +159,7 @@ TagContainer* ts_intersection(TagContainer* U, TagContainer* V) {
     TagContainer* anchor = U->size > V->size ? V : U;
     TagContainer* ot = U->size > V->size ? U : V;
     size_t insert_ind = 0;
-    for (int i = 0; i < anchor->size; i++) {
+    for (size_t i = 0; i < anchor->size; i++) {
         if (ts_in(ot, anchor->data[i])) {
             set_intersection->data[insert_ind++] = anchor->data[i];
         }

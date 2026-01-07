@@ -1,43 +1,132 @@
 #include "map.h"
+#include "hash.h"
+#include <stdio.h>
 
 /**
  * @brief Struct which manages map buckets
- * in chaining hash-map. 
- * 
- * Note: that size may not always equal 
- * num_items since there may be collisions.
+ * in chaining hash-map.
+ *
+ * Note: size is number of occupied buckets; num_items is total entries.
  */
 typedef struct bucket_vec {
-    size_t size; /// num of occupied data
-    size_t capacity; /// length of data
+    size_t size;
+    size_t capacity;
     size_t num_items;
     dll** data;
 } bucket_vec;
 
 struct map {
-    uint64_t (*hash_fn)(void* e);
-    int (*cmp_fn)(void* u, void* v);
+    uint64_t (*hash_fn)(const void* e);
+    int (*cmp_fn)(const void* u, const void* v);
     void (*free_fn)(void* e);
     bucket_vec* buckets;
 };
 
-map* mk_map(uint64_t (*hash_fn)(void* e), 
-    int (*cmp_fn)(void* u, void* v), 
-    void (*free_fn)(void* e)) 
+static bucket_vec* mk_buckets(size_t capacity) {
+    bucket_vec* buckets = malloc(sizeof(bucket_vec));
+    if (!buckets) return NULL;
+
+    buckets->data = calloc(capacity, sizeof(dll*));
+    if (!buckets->data) {
+        free(buckets);
+        return NULL;
+    }
+
+    buckets->size = 0;
+    buckets->num_items = 0;
+    buckets->capacity = capacity;
+    return buckets;
+}
+
+static void free_item_value(void* value, void (*free_fn)(void*)) {
+    item* kv = (item*)value;
+    if (free_fn) free_fn(kv->value);
+    free(kv);
+}
+
+static size_t bucket_index(map* dict, void* key) {
+    size_t h = (size_t)dict->hash_fn(key);
+    return mix64_hash(h) & (dict->buckets->capacity - 1);
+}
+
+static bool map_insert_bucket(map* dict, void* key, void* value) {
+    size_t index = bucket_index(dict, key);
+    dll* deque = dict->buckets->data[index];
+
+    item* kv = malloc(sizeof(item));
+    if (!kv) return false;
+    kv->key = key;
+    kv->value = value;
+
+    if (!deque) {
+        deque = mk_dll();
+        if (!deque) {
+            free(kv);
+            return false;
+        }
+        dict->buckets->data[index] = deque;
+        dict->buckets->size++;
+    }
+
+    dll_append(deque, (void*)kv);
+    dict->buckets->num_items++;
+    return true;
+}
+
+static dll_node* map_find_node(map* dict, void* key) {
+    size_t index = bucket_index(dict, key);
+    dll* deque = dict->buckets->data[index];
+    if (!deque) return NULL;
+
+    dll_node* curr = dll_head(deque);
+    while (curr) {
+        item* curr_item = (item*)dll_node_get_value(curr);
+        if (dict->cmp_fn(key, curr_item->key) == 0) return curr;
+        curr = dll_next(curr);
+    }
+    return NULL;
+}
+
+static void map_rebuild(map* dict, size_t new_capacity) {
+    bucket_vec* new_buckets = mk_buckets(new_capacity);
+    if (!new_buckets) {
+        fprintf(stderr, "error: malloc failed during map rebuild\n");
+        return;
+    }
+
+    bucket_vec* old_buckets = dict->buckets;
+    dict->buckets = new_buckets;
+
+    for (size_t i = 0; i < old_buckets->capacity; i++) {
+        dll* deque = old_buckets->data[i];
+        if (!deque) continue;
+
+        while (dll_size(deque)) {
+            item* kv = (item*)dll_popleft(deque);
+            map_insert_bucket(dict, kv->key, kv->value);
+            free(kv);
+        }
+
+        free(deque);
+    }
+
+    free(old_buckets->data);
+    free(old_buckets);
+}
+
+map* mk_map(uint64_t (*hash_fn)(const void* e),
+    int (*cmp_fn)(const void* u, const void* v),
+    void (*free_fn)(void* e))
 {
+    if (!hash_fn || !cmp_fn) return NULL;
     map* dict = malloc(sizeof(map));
     if (!dict) return NULL;
 
-    dict->buckets = malloc(INITIAL_MAP_CAPACITY * sizeof(bucket_vec));
+    dict->buckets = mk_buckets(INITIAL_MAP_CAPACITY);
     if (!dict->buckets) {
         free(dict);
         return NULL;
     }
-
-    dict->buckets->size = 0;
-    dict->buckets->num_items = 0;
-    dict->buckets->capacity = INITIAL_MAP_CAPACITY;
-    dict->buckets->data = NULL;
 
     dict->hash_fn = hash_fn;
     dict->cmp_fn = cmp_fn;
@@ -47,150 +136,100 @@ map* mk_map(uint64_t (*hash_fn)(void* e),
 }
 
 void map_free(map* dict) {
-    return;
-}
+    if (!dict) return;
 
-void _map_insert(map* dict, void* key, void* value) {
-    size_t h = (size_t)dict->hash_fn(key);
-    size_t insert_index = mix64_hash(h) & (dict->buckets->capacity - 1);
-    dll* deque = dict->buckets->data[insert_index];
-
-    if (deque) {
-        item* kv = malloc(sizeof(item));
-        if (!kv) return;
-
-        kv->key = key; kv->value = value;
-        dll_append(deque, (void*)kv);
-    } else {
-        item* kv = malloc(sizeof(item));
-        if (!kv) return;
-
-        kv->key = key; kv->value = value;
-        dll* bucket = mk_dll();
-        dll_append(bucket, (void*)kv);
-        *(&deque) = bucket;
-        dict->buckets->size++;
-    }
-
-    dict->buckets->num_items++;
-    return;
-}
-
-void rebuild_map(map* dict) {
-    map* temp_dict = malloc(sizeof(map));
-    if (!temp_dict) {
-        fprintf(stderr, "error: malloc failed during map rebuild\n");
-        return;
-    }
-
-    temp_dict->hash_fn = dict->hash_fn;
-    temp_dict->cmp_fn = dict->cmp_fn;
-    temp_dict->free_fn = dict->free_fn;
-    
     for (size_t i = 0; i < dict->buckets->capacity; i++) {
         dll* deque = dict->buckets->data[i];
-        if (deque) {
-            dll_node* curr = dll_head(deque);
-            while (curr) {
-                item* curr_item = (item*)dll_node_get_value(curr);
-                _map_insert(temp_dict, (void*)curr_item->key, 
-                    (void*)curr_item->value);
-                curr = dll_next(curr);
-            }
+        if (!deque) continue;
 
-            dll_free(deque, NULL);
+        while (dll_size(deque)) {
+            item* kv = (item*)dll_popleft(deque);
+            free_item_value(kv, dict->free_fn);
         }
+
+        free(deque);
     }
 
-    dict = temp_dict;
-    return;
+    free(dict->buckets->data);
+    free(dict->buckets);
+    free(dict);
 }
 
 void map_insert(map* dict, void* key, void* value) {
-    if (map_in(dict, key)) return;
+    if (!dict) return;
 
-    if (alpha_meets_threshold(dict->buckets->num_items, 
-        dict->buckets->size)) {
-        dict->buckets->capacity *= 2;
-        rebuild_map(dict);
+    dll_node* existing = map_find_node(dict, key);
+    if (existing) {
+        item* kv = (item*)dll_node_get_value(existing);
+        if (dict->free_fn) dict->free_fn(kv->value);
+        kv->value = value;
+        return;
     }
-    _map_insert(dict, key, value);
-    return;
+
+    if (alpha_meets_threshold(dict->buckets->num_items, dict->buckets->capacity)) {
+        map_rebuild(dict, dict->buckets->capacity * 2);
+    }
+
+    map_insert_bucket(dict, key, value);
 }
 
 bool map_in(map* dict, void* key) {
-    size_t h = (size_t)dict->hash_fn(key);
-    size_t index = mix64_hash(h) & (dict->buckets->capacity - 1);
-    dll* deque = dict->buckets->data[index];
-
-    if (deque) {
-        dll_node* curr = dll_head(deque);
-        while (curr) {
-            item* curr_item = (item*)dll_node_get_value(curr);
-            if (dict->cmp_fn(key, curr_item->key) == 0) {
-                return true;
-            }
-            curr = dll_next(curr);
-        }
-    }
-    return false;
+    return map_find_node(dict, key) != NULL;
 }
 
 void* map_get(map* dict, void* key) {
-    size_t h = (size_t)dict->hash_fn(key);
-    size_t index = mix64_hash(h) & (dict->buckets->capacity - 1);
-    dll* deque = dict->buckets->data[index];
-
-    if (deque) {
-        dll_node* curr = dll_head(deque);
-        while (curr) {
-            item* curr_item = (item*)dll_node_get_value(curr);
-            if (dict->cmp_fn(key, curr_item->key) == 0) {
-                return curr_item->value;
-            }
-            curr = dll_next(curr);
-        }
-    }
-    return NULL;
+    dll_node* node = map_find_node(dict, key);
+    if (!node) return NULL;
+    item* kv = (item*)dll_node_get_value(node);
+    return kv->value;
 }
 
 void map_delete(map* dict, void* key) {
-    size_t h = (size_t)dict->hash_fn(key);
-    size_t index = mix64_hash(h) & (dict->buckets->capacity - 1);
+    if (!dict) return;
+    size_t index = bucket_index(dict, key);
     dll* deque = dict->buckets->data[index];
+    if (!deque) return;
 
-    if (deque) {
-        dll_node* curr = dll_head(deque);
-        while (curr) {
-            item* curr_item = (item*)dll_node_get_value(curr);
-            if (dict->cmp_fn(key, curr_item->key) == 0) {
-                dll_remove(deque, curr);
-                return;
-                // TODO: need to free something here
+    dll_node* curr = dll_head(deque);
+    while (curr) {
+        item* curr_item = (item*)dll_node_get_value(curr);
+        if (dict->cmp_fn(key, curr_item->key) == 0) {
+            free_item_value(curr_item, dict->free_fn);
+            dll_remove(deque, curr);
+            dict->buckets->num_items--;
+            if (dll_size(deque) == 0) {
+                dict->buckets->data[index] = NULL;
+                dict->buckets->size--;
+                free(deque);
             }
-            curr = dll_next(curr);
+            return;
         }
+        curr = dll_next(curr);
     }
-    return;
 }
 
 size_t map_size(map* dict) {
-    return dict->buckets->num_items;
+    return dict ? dict->buckets->num_items : 0;
 }
 
 vec_items* map_items(map* dict) {
+    if (!dict) return NULL;
     vec_items* items = malloc(sizeof(vec_items));
     if (!items) return NULL;
 
+    items->size = 0;
+    items->capacity = 0;
+    items->data = NULL;
+
     for (size_t i = 0; i < dict->buckets->capacity; i++) {
         dll* deque = dict->buckets->data[i];
-        if (deque) {
-            dll_node* curr = dll_head(deque);
-            while (curr) {
-                item* curr_item = (item*)dll_node_get_value(curr);
-                vec_pushback(items, curr_item);
-                curr = dll_next(curr);
-            }
+        if (!deque) continue;
+
+        dll_node* curr = dll_head(deque);
+        while (curr) {
+            item* curr_item = (item*)dll_node_get_value(curr);
+            vec_pushback(items, curr_item);
+            curr = dll_next(curr);
         }
     }
 

@@ -1,5 +1,5 @@
-#ifndef MAP_H
-#define MAP_H
+#ifndef ELASTISCHED_MAP_H
+#define ELASTISCHED_MAP_H
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -23,8 +23,8 @@ typedef struct vec_items {
     item** data;
 } vec_items;
 
-map* mk_map(uint64_t (*hash_fn)(void* e), 
-    int (*cmp_fn)(void* u, void* v),
+map* mk_map(uint64_t (*hash_fn)(const void* e),
+    int (*cmp_fn)(const void* u, const void* v),
     void (*free_fn)(void* e));
 
 void map_free(map* dict);

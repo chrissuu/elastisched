@@ -1,5 +1,21 @@
 #include "interval.h"
 
+static sec_t node_max(Node* node) {
+    return node ? node->max : 0;
+}
+
+static void update_max(Node* node) {
+    if (!node || !node->interval) return;
+    sec_t left_max = node_max(node->left);
+    sec_t right_max = node_max(node->right);
+    sec_t interval_high = node->interval->high;
+
+    sec_t max = interval_high;
+    if (left_max > max) max = left_max;
+    if (right_max > max) max = right_max;
+    node->max = max;
+}
+
 bool interval_eq(const Interval* U, const Interval* V) {
     return (U->low == V->low) && (U->high == V->high);
 }
@@ -64,7 +80,37 @@ IntervalMap* mk_intmap(Node* root) {
 }
 
 void intmap_insert(IntervalMap* map, Interval* key, void* value) {
-    return;
+    if (!map || !key) return;
+    if (!interval_is_valid(key)) return;
+
+    if (!map->root) {
+        map->root = mk_leaf_node(NULL, key, value, key->high, BLACK);
+        return;
+    }
+
+    Node* curr = map->root;
+    Node* parent = NULL;
+    while (curr) {
+        parent = curr;
+        if (key->low < curr->interval->low) {
+            curr = curr->left;
+        } else {
+            curr = curr->right;
+        }
+    }
+
+    Node* node = mk_leaf_node(parent, key, value, key->high, BLACK);
+    if (!node) return;
+
+    if (key->low < parent->interval->low) {
+        parent->left = node;
+    } else {
+        parent->right = node;
+    }
+
+    for (Node* n = parent; n; n = n->parent) {
+        update_max(n);
+    }
 }
 
 void intmap_delete(IntervalMap* map) {
@@ -72,7 +118,46 @@ void intmap_delete(IntervalMap* map) {
 }
 
 void intmap_free(IntervalMap* map) {
-    return;
+    if (!map) return;
+    if (!map->root) {
+        free(map);
+        return;
+    }
+
+    size_t capacity = 32;
+    size_t top = 0;
+    Node** stack = malloc(capacity * sizeof(Node*));
+    if (!stack) {
+        free(map);
+        return;
+    }
+    stack[top++] = map->root;
+
+    while (top > 0) {
+        Node* node = stack[--top];
+        if (node->left) {
+            if (top == capacity) {
+                capacity *= 2;
+                Node** new_stack = realloc(stack, capacity * sizeof(Node*));
+                if (!new_stack) break;
+                stack = new_stack;
+            }
+            stack[top++] = node->left;
+        }
+        if (node->right) {
+            if (top == capacity) {
+                capacity *= 2;
+                Node** new_stack = realloc(stack, capacity * sizeof(Node*));
+                if (!new_stack) break;
+                stack = new_stack;
+            }
+            stack[top++] = node->right;
+        }
+        free(node);
+    }
+
+    free(stack);
+    free(map);
 }
 
 void intmap_left_rotate(IntervalMap* map, Node* x) {
@@ -110,4 +195,3 @@ void intmap_right_rotate(IntervalMap* map, Node* y) {
     x->right = y;
     y->parent = x;
 }
-

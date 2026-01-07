@@ -1,4 +1,5 @@
 #include "dll.h"
+#include <stdlib.h>
 
 typedef struct dll_node dll_node;
 
@@ -39,16 +40,17 @@ void dll_free(dll* deque, void (*free_fn)(void *)) {
 }
 
 dll_node* dll_head(dll* deque) {
-    if (!deque->head) return NULL;
+    if (!deque) return NULL;
     return deque->head;
 }
 
 dll_node* dll_tail(dll* deque) {
-    if (!deque->tail) return NULL;
+    if (!deque) return NULL;
     return deque->tail;
 }
 
 void dll_append(dll* deque, void* e) {
+    if (!deque) return;
     dll_node* new_tail = malloc(sizeof(dll_node));
     if (!new_tail) return;
     new_tail->value = e;
@@ -60,6 +62,7 @@ void dll_append(dll* deque, void* e) {
     } else {
         new_tail->prev = deque->tail;
         new_tail->next = NULL;
+        deque->tail->next = new_tail;
         deque->tail = new_tail;
     }
     deque->size++;
@@ -67,6 +70,7 @@ void dll_append(dll* deque, void* e) {
 }
 
 void dll_prepend(dll* deque, void* e) {
+    if (!deque) return;
     dll_node* new_head = malloc(sizeof(dll_node));
     if (!new_head) return;
     new_head->value = e;
@@ -78,66 +82,66 @@ void dll_prepend(dll* deque, void* e) {
     } else {
         new_head->prev = NULL;
         new_head->next = deque->head;
+        deque->head->prev = new_head;
         deque->head = new_head;
     }
     deque->size++;
     return;
 }
 
-dll_node* dll_popleft(dll* deque) {
-    if (deque->size == 0) return NULL;
+void* dll_popleft(dll* deque) {
+    if (!deque || deque->size == 0) return NULL;
 
     dll_node* temp = deque->head;
+    void* value = temp->value;
 
     if (deque->size == 1) {
         deque->head = NULL;
         deque->tail = NULL;
     } else {
         deque->head = deque->head->next;
-        deque->head->next->prev = NULL;
+        deque->head->prev = NULL;
     }
 
     deque->size--;
     free(temp);
-    return temp;
+    return value;
 }
 
-dll_node* dll_popright(dll* deque) {
-    if (deque->size == 0) return NULL;
+void* dll_popright(dll* deque) {
+    if (!deque || deque->size == 0) return NULL;
 
     dll_node* temp = deque->tail;
+    void* value = temp->value;
 
     if (deque->size == 1) {
         deque->head = NULL;
         deque->tail = NULL;
-    }
-    else {
+    } else {
         deque->tail = deque->tail->prev;
-        deque->tail->prev->next = NULL;
+        deque->tail->next = NULL;
     }
 
     deque->size--;
     free(temp);
-    return temp;
+    return value;
 }
 
 size_t dll_size(dll* deque) {
-    return deque->size;
+    return deque ? deque->size : 0;
 }
 
 void dll_remove(dll* deque, dll_node* node) {
-    if (node == deque->head) deque->head = deque->head->next;
-    if (node == deque->tail) deque->tail = deque->tail->prev;
+    if (!deque || !node) return;
 
-    if (node->prev) {
-        node->prev->next = node->next;
-    }
+    if (node == deque->head) deque->head = node->next;
+    if (node == deque->tail) deque->tail = node->prev;
 
-    if (node->next) {
-        node->next->prev = node->prev;
-    }
+    if (node->prev) node->prev->next = node->next;
+    if (node->next) node->next->prev = node->prev;
 
-    return;
+    deque->size--;
+    free(node);
 }
 
 dll_node* dll_next(dll_node* node) {

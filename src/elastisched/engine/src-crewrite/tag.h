@@ -55,6 +55,8 @@ bool tag_eq(const Tag* U, const Tag* V);
 int tag_cmp(const Tag* U, const Tag* V);
 
 uint64_t tag_hash(const Tag* U);
+int tag_cmp_void(const void* U, const void* V);
+uint64_t tag_hash_void(const void* U);
 
 /**
  * @brief constructs a TagContainer with capacity ```capacity```
