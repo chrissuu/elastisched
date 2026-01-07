@@ -21,12 +21,17 @@ const state = {
   scheduleDirty: true,
   scheduleLastRun: null,
   scheduleRunning: false,
+  currentOccurrenceId: null,
 };
 
 const defaultConfig = {
   scheduleName: window.APP_CONFIG?.scheduleName || "Elastisched",
   subtitle: window.APP_CONFIG?.subtitle || "Schedule at a glance",
   minuteGranularity: Math.max(1, Number(window.APP_CONFIG?.minuteGranularity || 5)),
+  finishEarlyBufferMinutes: Math.max(
+    1,
+    Number(window.APP_CONFIG?.finishEarlyBufferMinutes || 15)
+  ),
   projectTimeZone: window.APP_CONFIG?.projectTimeZone || "UTC",
   lookaheadSeconds: Math.max(
     1,

@@ -45,6 +45,10 @@
               <input type="number" name="minuteGranularity" min="1" step="1" />
             </label>
             <label>
+              Finish early buffer (minutes)
+              <input type="number" name="finishEarlyBufferMinutes" min="1" step="1" />
+            </label>
+            <label>
               Lookahead seconds
               <input type="number" name="lookaheadSeconds" min="1" step="1" />
             </label>
@@ -293,6 +297,48 @@
             <button class="ghost" id="goTodayBtn">Today</button>
             <button class="ghost icon" id="nextDayBtn" title="Next day">&#8594;</button>
           </div>
+        </div>
+        <div class="now-panel" id="nowPanel">
+          <div class="now-meta">
+            <div class="now-label">Now</div>
+            <div class="now-time" id="nowTime">--:--</div>
+            <div class="now-date" id="nowDate">--</div>
+          </div>
+          <div class="now-actions">
+            <button class="ghost" id="finishNowBtn" disabled>Finish</button>
+            <div class="add-time-menu">
+              <button class="ghost" id="addTimeBtn" disabled>Add time</button>
+              <div class="add-time-popover" id="addTimePopover" role="menu">
+                <button class="add-time-option" type="button" data-add-minutes="1">
+                  +1 min
+                </button>
+                <button class="add-time-option" type="button" data-add-minutes="5">
+                  +5 min
+                </button>
+                <button class="add-time-option" type="button" data-add-minutes="10">
+                  +10 min
+                </button>
+                <button class="add-time-option" type="button" data-add-minutes="30">
+                  +30 min
+                </button>
+                <button class="add-time-option" type="button" data-add-minutes="60">
+                  +60 min
+                </button>
+                <form class="add-time-form" id="addTimeForm">
+                  <input
+                    type="number"
+                    name="addMinutes"
+                    min="1"
+                    step="1"
+                    placeholder="Custom"
+                    aria-label="Add minutes"
+                  />
+                  <button type="submit" class="ghost small">Apply</button>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div class="now-events" id="nowEvents"></div>
         </div>
         <div class="view-header">
           <div class="date-label" id="dateLabel">Tuesday, May 21</div>

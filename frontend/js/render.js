@@ -4,6 +4,7 @@ import {
   addDays,
   clampToGranularity,
   formatTimeRangeInTimeZone,
+  getEffectiveOccurrenceRange,
   getWeekStart,
   getTagType,
   getTimeZoneParts,
@@ -104,6 +105,25 @@ function minutesFromParts(parts) {
   return parts.hour * 60 + parts.minute + (parts.second || 0) / 60;
 }
 
+function updateNowLine(trackEl, hourHeight, viewDate) {
+  if (!trackEl) return;
+  const lineEl = trackEl.querySelector(".current-time-line");
+  if (!lineEl) return;
+  const nowParts = getZonedParts(new Date(), appConfig.userTimeZone);
+  const viewParts = getZonedParts(viewDate, appConfig.userTimeZone);
+  if (!nowParts || !viewParts) {
+    lineEl.classList.remove("active");
+    return;
+  }
+  if (partsToDayStamp(nowParts) !== partsToDayStamp(viewParts)) {
+    lineEl.classList.remove("active");
+    return;
+  }
+  const minutes = Math.min(1440, Math.max(0, minutesFromParts(nowParts)));
+  lineEl.style.top = `${(minutes / 60) * hourHeight}px`;
+  lineEl.classList.add("active");
+}
+
 function getClampedMinutes(startParts, endParts, viewDayStamp) {
   const startStamp = partsToDayStamp(startParts);
   const endStamp = partsToDayStamp(endParts);
@@ -178,11 +198,14 @@ function showInfoCard(blob, anchorRect) {
   const blobName = blob.name || "Untitled";
   const blobDescription = blob.description;
   const blobId = blob.id;
-  const timeLabel = formatTimeRangeInTimeZone(
-    blob.realized_timerange?.start || blob.default_scheduled_timerange?.start,
-    blob.realized_timerange?.end || blob.default_scheduled_timerange?.end,
-    getBlobTimeZone(blob)
-  );
+  const effectiveRange = getEffectiveOccurrenceRange(blob);
+  const timeLabel = effectiveRange
+    ? formatTimeRangeInTimeZone(
+        effectiveRange.start,
+        effectiveRange.effectiveEnd,
+        getBlobTimeZone(blob)
+      )
+    : "";
   const policyBadges = renderPolicyBadges(blob.policy);
   const tags = Array.isArray(blob.tags)
     ? blob.tags.map((tag) => (typeof tag === "string" ? tag.trim() : "")).filter(Boolean)
@@ -399,14 +422,10 @@ function renderDay() {
     .map((blob) => {
       const blobTimeZone = getBlobTimeZone(blob);
       if (!viewDayStamp) return null;
-      const startParts = getZonedParts(
-        blob.realized_timerange?.start || blob.default_scheduled_timerange?.start,
-        blobTimeZone
-      );
-      const endParts = getZonedParts(
-        blob.realized_timerange?.end || blob.default_scheduled_timerange?.end,
-        blobTimeZone
-      );
+      const effectiveRange = getEffectiveOccurrenceRange(blob);
+      if (!effectiveRange) return null;
+      const startParts = getZonedParts(effectiveRange.start, blobTimeZone);
+      const endParts = getZonedParts(effectiveRange.effectiveEnd, blobTimeZone);
       const schedStartParts = getZonedParts(blob.schedulable_timerange?.start, blobTimeZone);
       const schedEndParts = getZonedParts(blob.schedulable_timerange?.end, blobTimeZone);
       if (!startParts || !endParts) return null;
@@ -414,12 +433,19 @@ function renderDay() {
       if (!clamped) return null;
       const minutes = clamped.endMin - clamped.startMin;
       const showContent = partsToDayStamp(startParts) === viewDayStamp;
+      const baseRange = blob.realized_timerange || blob.default_scheduled_timerange || {};
+      const baseStart = toDate(baseRange.start);
+      const baseEnd = toDate(baseRange.end);
+      const isAdjusted =
+        baseEnd &&
+        !Number.isNaN(baseEnd.getTime()) &&
+        effectiveRange.effectiveEnd.getTime() !== baseEnd.getTime();
       return {
         id: blob.id,
         title: blob.name,
         time: formatTimeRangeInTimeZone(
-          blob.realized_timerange?.start || blob.default_scheduled_timerange.start,
-          blob.realized_timerange?.end || blob.default_scheduled_timerange.end,
+          effectiveRange.start,
+          effectiveRange.effectiveEnd,
           blobTimeZone
         ),
         type: getTagType(blob.tags),
@@ -432,6 +458,9 @@ function renderDay() {
         endMin: clamped.endMin,
         schedStartIso: blob.schedulable_timerange?.start || "",
         schedEndIso: blob.schedulable_timerange?.end || "",
+        originalStartIso: baseRange.start || "",
+        originalEndIso: baseRange.end || "",
+        adjusted: Boolean(isAdjusted),
         schedStartParts,
         schedEndParts,
         showContent,
@@ -448,7 +477,7 @@ function renderDay() {
       (block) => {
         const policyBadges = renderPolicyBadges(block.policy, { compact: true });
         return `
-        <div class="day-block ${block.type} ${block.colorClass} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStartIso}" data-sched-end="${block.schedEndIso}">
+        <div class="day-block ${block.type} ${block.colorClass} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStartIso}" data-sched-end="${block.schedEndIso}" data-original-start="${block.originalStartIso}" data-original-end="${block.originalEndIso}" data-adjusted="${block.adjusted ? "true" : "false"}">
           ${
             block.showContent
               ? `
@@ -476,12 +505,15 @@ function renderDay() {
         <div class="selection-overlay schedulable-range" id="selectionOverlaySchedulable"></div>
         <div class="selection-caret default-range" id="selectionCaretDefault"></div>
         <div class="selection-caret schedulable-range" id="selectionCaretSchedulable"></div>
+        <div class="original-overlay" id="originalOverlay"></div>
+        <div class="current-time-line"></div>
         ${blockHtml || "<div class='day-empty'>No events yet</div>"}
       </div>
     </div>
   `;
 
   const overlay = dom.views.day.querySelector("#schedulableOverlay");
+  const originalOverlay = dom.views.day.querySelector("#originalOverlay");
   const dayTrack = dom.views.day.querySelector(".day-track");
   const selectionOverlayDefault = dom.views.day.querySelector("#selectionOverlayDefault");
   const selectionOverlaySchedulable = dom.views.day.querySelector(
@@ -514,12 +546,21 @@ function renderDay() {
     const viewParts = getZonedParts(state.anchorDate, blobTimeZone);
     if (!viewParts) return;
     const viewStamp = partsToDayStamp(viewParts);
+    originalOverlay?.classList.remove("active");
     const schedStartParts = getZonedParts(
       blockEl.getAttribute("data-sched-start"),
       blobTimeZone
     );
     const schedEndParts = getZonedParts(
       blockEl.getAttribute("data-sched-end"),
+      blobTimeZone
+    );
+    const origStartParts = getZonedParts(
+      blockEl.getAttribute("data-original-start"),
+      blobTimeZone
+    );
+    const origEndParts = getZonedParts(
+      blockEl.getAttribute("data-original-end"),
       blobTimeZone
     );
     if (!schedStartParts || !schedEndParts) return;
@@ -532,6 +573,23 @@ function renderDay() {
     overlay.classList.toggle("overflow-top", partsToDayStamp(schedStartParts) < viewStamp);
     overlay.classList.toggle("overflow-bottom", partsToDayStamp(schedEndParts) > viewStamp);
     overlay.classList.add("active");
+    if (
+      blockEl.getAttribute("data-adjusted") === "true" &&
+      origStartParts &&
+      origEndParts
+    ) {
+      const origClamped = getClampedMinutes(origStartParts, origEndParts, viewStamp);
+      if (origClamped) {
+        const origMinutes = origClamped.endMin - origClamped.startMin;
+        const origTop = origClamped.startMin;
+        originalOverlay.style.top = `${(origTop / 60) * hourHeight}px`;
+        originalOverlay.style.height = `${Math.max(
+          18,
+          (origMinutes / 60) * hourHeight
+        )}px`;
+        originalOverlay.classList.add("active");
+      }
+    }
   };
 
   blocksEls.forEach((blockEl) => {
@@ -543,6 +601,7 @@ function renderDay() {
     blockEl.addEventListener("mouseleave", () => {
       if (state.infoCardLocked) return;
       overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+      originalOverlay?.classList.remove("active");
       hideInfoCard();
     });
     blockEl.addEventListener("click", (event) => {
@@ -572,6 +631,7 @@ function renderDay() {
     if (event.target.closest(".info-card")) return;
     clearActiveBlocks();
     overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+    originalOverlay?.classList.remove("active");
     hideInfoCard();
     clearLockedInfoCard();
   };
@@ -709,6 +769,7 @@ function renderDay() {
   }
 
   setDateLabel(formatDayLabel(state.anchorDate));
+  updateNowLine(dayTrack, hourHeight, state.anchorDate);
 }
 
 function renderWeek() {
@@ -730,14 +791,10 @@ function renderWeek() {
           const viewParts = getZonedParts(date, blobTimeZone);
           const viewStamp = viewParts ? partsToDayStamp(viewParts) : null;
           if (!viewStamp) return null;
-          const startParts = getZonedParts(
-            blob.realized_timerange?.start || blob.default_scheduled_timerange?.start,
-            blobTimeZone
-          );
-          const endParts = getZonedParts(
-            blob.realized_timerange?.end || blob.default_scheduled_timerange?.end,
-            blobTimeZone
-          );
+          const effectiveRange = getEffectiveOccurrenceRange(blob);
+          if (!effectiveRange) return null;
+          const startParts = getZonedParts(effectiveRange.start, blobTimeZone);
+          const endParts = getZonedParts(effectiveRange.effectiveEnd, blobTimeZone);
           const schedStartParts = getZonedParts(blob.schedulable_timerange?.start, blobTimeZone);
           const schedEndParts = getZonedParts(blob.schedulable_timerange?.end, blobTimeZone);
           if (!startParts || !endParts) return null;
@@ -745,12 +802,19 @@ function renderWeek() {
           if (!clamped) return null;
           const minutes = clamped.endMin - clamped.startMin;
           const showContent = partsToDayStamp(startParts) === viewStamp;
+          const baseRange = blob.realized_timerange || blob.default_scheduled_timerange || {};
+          const baseStart = toDate(baseRange.start);
+          const baseEnd = toDate(baseRange.end);
+          const isAdjusted =
+            baseEnd &&
+            !Number.isNaN(baseEnd.getTime()) &&
+            effectiveRange.effectiveEnd.getTime() !== baseEnd.getTime();
           return {
             id: blob.id,
             title: blob.name,
             time: formatTimeRangeInTimeZone(
-              blob.realized_timerange?.start || blob.default_scheduled_timerange.start,
-              blob.realized_timerange?.end || blob.default_scheduled_timerange.end,
+              effectiveRange.start,
+              effectiveRange.effectiveEnd,
               blobTimeZone
             ),
             type: getTagType(blob.tags),
@@ -763,6 +827,9 @@ function renderWeek() {
             endMin: clamped.endMin,
             schedStartIso: blob.schedulable_timerange?.start || "",
             schedEndIso: blob.schedulable_timerange?.end || "",
+            originalStartIso: baseRange.start || "",
+            originalEndIso: baseRange.end || "",
+            adjusted: Boolean(isAdjusted),
             schedStartParts,
             schedEndParts,
             showContent,
@@ -778,7 +845,7 @@ function renderWeek() {
           (block) => {
             const policyBadges = renderPolicyBadges(block.policy, { compact: true });
             return `
-            <div class="day-block ${block.type} ${block.colorClass} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStartIso}" data-sched-end="${block.schedEndIso}">
+            <div class="day-block ${block.type} ${block.colorClass} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStartIso}" data-sched-end="${block.schedEndIso}" data-original-start="${block.originalStartIso}" data-original-end="${block.originalEndIso}" data-adjusted="${block.adjusted ? "true" : "false"}">
               ${
                 block.showContent
                   ? `
@@ -798,7 +865,7 @@ function renderWeek() {
         .join("");
 
       return `
-        <div class="week-day-column" style="--hour-height: ${hourHeight}px;">
+        <div class="week-day-column" style="--hour-height: ${hourHeight}px;" data-date="${date.toISOString()}">
           <div class="week-day-label">
             <button data-date="${date.toISOString()}">
               ${date.toLocaleDateString(undefined, {
@@ -810,10 +877,12 @@ function renderWeek() {
           </div>
           <div class="week-day-track">
             <div class="schedulable-overlay"></div>
+            <div class="original-overlay"></div>
             <div class="selection-overlay default-range"></div>
             <div class="selection-overlay schedulable-range"></div>
             <div class="selection-caret default-range"></div>
             <div class="selection-caret schedulable-range"></div>
+            <div class="current-time-line"></div>
             ${blockHtml || "<div class='day-empty'>No events yet</div>"}
           </div>
         </div>
@@ -844,6 +913,7 @@ function renderWeek() {
     return {
       track: column.querySelector(".week-day-track"),
       overlay: column.querySelector(".schedulable-overlay"),
+      originalOverlay: column.querySelector(".original-overlay"),
       dayDate: days[index],
     };
   });
@@ -867,16 +937,25 @@ function renderWeek() {
           blockEl.getAttribute("data-sched-end"),
           blobTimeZone
         );
+        const origStartParts = getZonedParts(
+          blockEl.getAttribute("data-original-start"),
+          blobTimeZone
+        );
+        const origEndParts = getZonedParts(
+          blockEl.getAttribute("data-original-end"),
+          blobTimeZone
+        );
         if (!schedStartParts || !schedEndParts) return;
         const schedStartStamp = partsToDayStamp(schedStartParts);
         const schedEndStamp = partsToDayStamp(schedEndParts);
-        dayTracks.forEach(({ overlay, dayDate }) => {
+        dayTracks.forEach(({ overlay, originalOverlay, dayDate }) => {
           const viewParts = getZonedParts(dayDate, blobTimeZone);
           const viewStamp = viewParts ? partsToDayStamp(viewParts) : null;
           if (!viewStamp) return;
           const clamped = getClampedMinutes(schedStartParts, schedEndParts, viewStamp);
           if (!clamped) {
             overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+            originalOverlay?.classList.remove("active");
             return;
           }
           const minutes = clamped.endMin - clamped.startMin;
@@ -886,6 +965,23 @@ function renderWeek() {
           overlay.classList.toggle("overflow-top", schedStartStamp < viewStamp);
           overlay.classList.toggle("overflow-bottom", schedEndStamp > viewStamp);
           overlay.classList.add("active");
+          if (
+            blockEl.getAttribute("data-adjusted") === "true" &&
+            origStartParts &&
+            origEndParts
+          ) {
+            const origClamped = getClampedMinutes(origStartParts, origEndParts, viewStamp);
+            if (origClamped) {
+              const origMinutes = origClamped.endMin - origClamped.startMin;
+              const origTop = origClamped.startMin;
+              originalOverlay.style.top = `${(origTop / 60) * hourHeight}px`;
+              originalOverlay.style.height = `${Math.max(
+                18,
+                (origMinutes / 60) * hourHeight
+              )}px`;
+              originalOverlay.classList.add("active");
+            }
+          }
         });
       };
 
@@ -896,8 +992,9 @@ function renderWeek() {
       });
       blockEl.addEventListener("mouseleave", () => {
         if (state.infoCardLocked) return;
-        dayTracks.forEach(({ overlay }) => {
+        dayTracks.forEach(({ overlay, originalOverlay }) => {
           overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+          originalOverlay?.classList.remove("active");
         });
         hideInfoCard();
       });
@@ -932,8 +1029,9 @@ function renderWeek() {
     dayColumns.forEach((col) =>
       col.querySelectorAll(".day-block").forEach((el) => el.classList.remove("active"))
     );
-    dayTracks.forEach(({ overlay }) => {
+    dayTracks.forEach(({ overlay, originalOverlay }) => {
       overlay.classList.remove("active", "overflow-top", "overflow-bottom");
+      originalOverlay?.classList.remove("active");
     });
     hideInfoCard();
     state.infoCardLocked = false;
@@ -1139,6 +1237,9 @@ function renderWeek() {
   }
 
   setDateLabel(formatWeekLabel(weekStart));
+  dayTracks.forEach(({ track, dayDate }) => {
+    updateNowLine(track, hourHeight, dayDate);
+  });
 }
 
 function renderMonth() {
@@ -1165,14 +1266,10 @@ function renderMonth() {
   state.blobs.forEach((blob) => {
     if (!isOccurrenceStarred(blob)) return;
     const blobTimeZone = getBlobTimeZone(blob);
-    const start = toZonedDate(
-      toDate(blob.realized_timerange?.start || blob.default_scheduled_timerange?.start),
-      blobTimeZone
-    );
-    const end = toZonedDate(
-      toDate(blob.realized_timerange?.end || blob.default_scheduled_timerange?.end),
-      blobTimeZone
-    );
+    const effectiveRange = getEffectiveOccurrenceRange(blob);
+    if (!effectiveRange) return;
+    const start = toZonedDate(effectiveRange.start, blobTimeZone);
+    const end = toZonedDate(effectiveRange.effectiveEnd, blobTimeZone);
     if (!start || !end) return;
     if (!overlaps(gridStart, gridEnd, start, end)) return;
     let cursor = startOfDay(start < gridStart ? gridStart : start);
@@ -1265,18 +1362,10 @@ function renderYear() {
       const events = state.blobs.filter((blob) => {
         if (!isOccurrenceStarred(blob)) return false;
         const blobTimeZone = getBlobTimeZone(blob);
-        const start = toZonedDate(
-          toDate(
-          blob.realized_timerange?.start || blob.default_scheduled_timerange?.start
-        ),
-          blobTimeZone
-        );
-        const end = toZonedDate(
-          toDate(
-          blob.realized_timerange?.end || blob.default_scheduled_timerange?.end
-        ),
-          blobTimeZone
-        );
+        const effectiveRange = getEffectiveOccurrenceRange(blob);
+        if (!effectiveRange) return false;
+        const start = toZonedDate(effectiveRange.start, blobTimeZone);
+        const end = toZonedDate(effectiveRange.effectiveEnd, blobTimeZone);
         return start && end && overlaps(monthStart, monthEnd, start, end);
       });
       return `
@@ -1299,6 +1388,23 @@ function renderAll() {
   renderWeek();
   renderMonth();
   renderYear();
+}
+
+function updateNowIndicators() {
+  if (state.view === "day") {
+    const dayTrack = dom.views.day?.querySelector(".day-track");
+    updateNowLine(dayTrack, 44, state.anchorDate);
+  } else if (state.view === "week") {
+    const columns = dom.views.week?.querySelectorAll(".week-day-column") || [];
+    columns.forEach((column) => {
+      const dateIso = column.getAttribute("data-date");
+      if (!dateIso) return;
+      const dayDate = new Date(dateIso);
+      if (Number.isNaN(dayDate.getTime())) return;
+      const track = column.querySelector(".week-day-track");
+      updateNowLine(track, 44, dayDate);
+    });
+  }
 }
 
 function setActive(view) {
@@ -1351,4 +1457,5 @@ export {
   renderYear,
   setActive,
   startInteractiveCreate,
+  updateNowIndicators,
 };

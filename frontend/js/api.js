@@ -65,4 +65,24 @@ async function runSchedule(granularityMinutes, lookaheadSeconds) {
   return response.json();
 }
 
-export { ensureOccurrences, fetchOccurrences, fetchScheduleStatus, runSchedule };
+async function updateRecurrence(recurrenceId, type, payload) {
+  const response = await fetch(`${API_BASE}/recurrences/${recurrenceId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, payload }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to update recurrence";
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      detail = data.detail || detail;
+    } else {
+      detail = (await response.text()) || detail;
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+export { ensureOccurrences, fetchOccurrences, fetchScheduleStatus, runSchedule, updateRecurrence };
