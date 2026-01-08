@@ -3,9 +3,11 @@ import { dom } from "./dom.js";
 import {
   ensureOccurrences,
   fetchScheduleStatus,
+  getRecurrence,
   runSchedule,
   updateRecurrence,
 } from "./api.js";
+import { pushHistoryAction, redoHistoryAction, undoHistoryAction } from "./history.js";
 import { alertDialog, bindDialogEvents, confirmDialog } from "./popups.js";
 import { bindFormHandlers, openEditForm, resetFormMode, toggleForm, toggleSettings } from "./forms.js";
 import {
@@ -17,7 +19,6 @@ import {
 import {
   formatTimeRangeInTimeZone,
   getEffectiveOccurrenceRange,
-  getOccurrenceOverride,
   getViewRange,
   shiftAnchorDate,
   toProjectIsoFromDate,
@@ -30,7 +31,7 @@ bindFormHandlers(refreshView);
 
 async function refreshView(nextView = state.view) {
   const view = nextView || state.view;
-  setActive(view);
+  setActive(view, { deferRender: true });
   const range = getViewRange(view, state.anchorDate);
   await ensureOccurrences(range.start, range.end);
   setActive(view);
@@ -187,12 +188,19 @@ async function extendOccurrenceByMinutes(minutes) {
   if (Number.isNaN(schedEnd.getTime())) return;
   const occurrenceKey = blob.schedulable_timerange?.start;
   if (!occurrenceKey) return;
-  const payload = blob.recurrence_payload || {};
+  let previous = null;
+  try {
+    previous = await getRecurrence(blob.recurrence_id);
+  } catch (error) {
+    await alertDialog(error?.message || "Unable to load recurrence.");
+    return;
+  }
+  const payload = previous.payload || {};
   const overrides =
     payload.occurrence_overrides && typeof payload.occurrence_overrides === "object"
       ? { ...payload.occurrence_overrides }
       : {};
-  const currentOverride = getOccurrenceOverride(blob);
+  const currentOverride = overrides[occurrenceKey] || {};
   let currentAdded = Number(currentOverride?.added_minutes || 0);
   if (!Number.isFinite(currentAdded)) currentAdded = 0;
   const nextAdded = currentAdded + minutes;
@@ -220,13 +228,23 @@ async function extendOccurrenceByMinutes(minutes) {
     delete nextOverride.finished_at;
   }
   overrides[occurrenceKey] = nextOverride;
+  const nextPayload = { ...payload, occurrence_overrides: overrides };
 
   try {
     await updateRecurrence(
       blob.recurrence_id,
-      blob.recurrence_type || "single",
-      { ...payload, occurrence_overrides: overrides }
+      blob.recurrence_type || previous.type || "single",
+      nextPayload
     );
+    pushHistoryAction({
+      type: "update-recurrence",
+      data: {
+        recurrenceId: blob.recurrence_id,
+        recurrenceType: blob.recurrence_type || previous.type || "single",
+        beforePayload: payload,
+        afterPayload: nextPayload,
+      },
+    });
     state.loadedRange = null;
     await refreshView(state.view);
   } catch (error) {
@@ -246,22 +264,39 @@ async function handleFinishNow() {
   const now = new Date();
   const occurrenceKey = blob.schedulable_timerange?.start;
   if (!occurrenceKey) return;
-  const payload = blob.recurrence_payload || {};
+  let previous = null;
+  try {
+    previous = await getRecurrence(blob.recurrence_id);
+  } catch (error) {
+    await alertDialog(error?.message || "Unable to load recurrence.");
+    return;
+  }
+  const payload = previous.payload || {};
   const overrides =
     payload.occurrence_overrides && typeof payload.occurrence_overrides === "object"
       ? { ...payload.occurrence_overrides }
       : {};
-  const currentOverride = getOccurrenceOverride(blob);
+  const currentOverride = overrides[occurrenceKey] || {};
   overrides[occurrenceKey] = {
     ...(currentOverride || {}),
     finished_at: toProjectIsoFromDate(now, appConfig.projectTimeZone),
   };
+  const nextPayload = { ...payload, occurrence_overrides: overrides };
   try {
     await updateRecurrence(
       blob.recurrence_id,
-      blob.recurrence_type || "single",
-      { ...payload, occurrence_overrides: overrides }
+      blob.recurrence_type || previous.type || "single",
+      nextPayload
     );
+    pushHistoryAction({
+      type: "update-recurrence",
+      data: {
+        recurrenceId: blob.recurrence_id,
+        recurrenceType: blob.recurrence_type || previous.type || "single",
+        beforePayload: payload,
+        afterPayload: nextPayload,
+      },
+    });
     state.loadedRange = null;
     await refreshView(state.view);
     if (now < threshold) {
@@ -381,6 +416,21 @@ document.addEventListener("click", (event) => {
 
 window.addEventListener("keydown", (event) => {
   if (isTypingInField(event.target)) return;
+  const hasMod = event.ctrlKey || event.metaKey;
+  if (hasMod && event.key.toLowerCase() === "z") {
+    event.preventDefault();
+    if (event.shiftKey) {
+      redoHistoryAction();
+    } else {
+      undoHistoryAction();
+    }
+    return;
+  }
+  if (hasMod && event.key.toLowerCase() === "y") {
+    event.preventDefault();
+    redoHistoryAction();
+    return;
+  }
   const isArrowLeft =
     event.key === "ArrowLeft" ||
     event.key === "Left" ||
@@ -424,8 +474,12 @@ window.addEventListener("keydown", (event) => {
 
 resetFormMode();
 bindDialogEvents();
-window.addEventListener("elastisched:refresh", () => {
+window.elastischedRefresh = () => {
+  state.loadedRange = null;
   refreshView(state.view);
+};
+window.addEventListener("elastisched:refresh", () => {
+  window.elastischedRefresh?.();
 });
 const savedView = loadView();
 refreshView(savedView || "day");

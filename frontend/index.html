@@ -154,32 +154,118 @@
             <div class="recurrence-note subtle">
               Repeats annually on the default start date.
             </div>
+            <label>
+              Annual date
+              <div class="datetime-field" data-mode="date">
+                <input
+                  type="text"
+                  class="datetime-display"
+                  placeholder="Select date"
+                  readonly
+                />
+                <button type="button" class="ghost small datetime-trigger" aria-label="Pick date">
+                  📅
+                </button>
+                <input type="hidden" name="annualDate" data-datetime-input />
+              </div>
+            </label>
           </div>
           <div class="recurrence-extras">
             <label>
               Recurrence ends
-              <input type="datetime-local" name="recurrenceEnd" />
+              <div class="datetime-field">
+                <input
+                  type="text"
+                  class="datetime-display"
+                  placeholder="Select date/time"
+                  readonly
+                />
+                <button type="button" class="ghost small datetime-trigger" aria-label="Pick date">
+                  📅
+                </button>
+                <input type="hidden" name="recurrenceEnd" data-datetime-input />
+              </div>
             </label>
           </div>
           <div class="non-weekly-field weekly-slot single-slot">
             <div class="weekly-slot-row time-range-row">
               <label>
                 Default start
-                <input type="datetime-local" name="defaultStart" required />
+                <div class="datetime-field">
+                  <input
+                    type="text"
+                    class="datetime-display"
+                    placeholder="Select date/time"
+                    readonly
+                  />
+                  <button
+                    type="button"
+                    class="ghost small datetime-trigger"
+                    aria-label="Pick date"
+                  >
+                    📅
+                  </button>
+                  <input type="hidden" name="defaultStart" required data-datetime-input />
+                </div>
               </label>
               <label>
                 Default end
-                <input type="datetime-local" name="defaultEnd" required />
+                <div class="datetime-field">
+                  <input
+                    type="text"
+                    class="datetime-display"
+                    placeholder="Select date/time"
+                    readonly
+                  />
+                  <button
+                    type="button"
+                    class="ghost small datetime-trigger"
+                    aria-label="Pick date"
+                  >
+                    📅
+                  </button>
+                  <input type="hidden" name="defaultEnd" required data-datetime-input />
+                </div>
               </label>
             </div>
             <div class="weekly-slot-row time-range-row">
               <label>
                 Schedulable start
-                <input type="datetime-local" name="schedulableStart" required />
+                <div class="datetime-field">
+                  <input
+                    type="text"
+                    class="datetime-display"
+                    placeholder="Select date/time"
+                    readonly
+                  />
+                  <button
+                    type="button"
+                    class="ghost small datetime-trigger"
+                    aria-label="Pick date"
+                  >
+                    📅
+                  </button>
+                  <input type="hidden" name="schedulableStart" required data-datetime-input />
+                </div>
               </label>
               <label>
                 Schedulable end
-                <input type="datetime-local" name="schedulableEnd" required />
+                <div class="datetime-field">
+                  <input
+                    type="text"
+                    class="datetime-display"
+                    placeholder="Select date/time"
+                    readonly
+                  />
+                  <button
+                    type="button"
+                    class="ghost small datetime-trigger"
+                    aria-label="Pick date"
+                  >
+                    📅
+                  </button>
+                  <input type="hidden" name="schedulableEnd" required data-datetime-input />
+                </div>
               </label>
             </div>
             <div class="weekly-slot-row slot-meta">

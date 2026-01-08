@@ -66,6 +66,59 @@ async function runSchedule(granularityMinutes, lookaheadSeconds) {
   return response.json();
 }
 
+async function getRecurrence(recurrenceId) {
+  const response = await fetch(`${API_BASE}/recurrences/${recurrenceId}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch recurrence");
+  }
+  return response.json();
+}
+
+async function createRecurrence(type, payload) {
+  const response = await fetch(`${API_BASE}/recurrences`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, payload }),
+  });
+  if (!response.ok) {
+    let detail = "Failed to create recurrence";
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      detail = data.detail || detail;
+    } else {
+      detail = (await response.text()) || detail;
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+async function deleteRecurrence(recurrenceId) {
+  let response = null;
+  try {
+    response = await fetch(`${API_BASE}/recurrences/${recurrenceId}`, {
+      method: "DELETE",
+    });
+  } catch (error) {
+    throw new Error("Failed to delete recurrence. Network error.");
+  }
+  if (!response.ok) {
+    if (response.status === 404) {
+      return;
+    }
+    let detail = "Failed to delete recurrence";
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      detail = data.detail || detail;
+    } else {
+      detail = (await response.text()) || detail;
+    }
+    throw new Error(detail);
+  }
+}
+
 async function updateRecurrence(recurrenceId, type, payload) {
   const response = await fetch(`${API_BASE}/recurrences/${recurrenceId}`, {
     method: "PUT",
@@ -86,4 +139,13 @@ async function updateRecurrence(recurrenceId, type, payload) {
   return response.json();
 }
 
-export { ensureOccurrences, fetchOccurrences, fetchScheduleStatus, runSchedule, updateRecurrence };
+export {
+  ensureOccurrences,
+  fetchOccurrences,
+  fetchScheduleStatus,
+  runSchedule,
+  getRecurrence,
+  createRecurrence,
+  deleteRecurrence,
+  updateRecurrence,
+};

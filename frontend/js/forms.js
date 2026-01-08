@@ -10,6 +10,8 @@ import {
 } from "./utils.js";
 import { startInteractiveCreate } from "./render.js";
 import { confirmDialog } from "./popups.js";
+import { bindDateTimePickers, syncDateTimeDisplays } from "./datetime_picker.js";
+import { deleteOccurrenceWithUndo, deleteRecurrenceWithUndo } from "./actions.js";
 
 let refreshView = null;
 const recurrenceFieldGroups = document.querySelectorAll(".recurrence-fields");
@@ -620,6 +622,7 @@ function updateRecurrenceUI() {
     group.classList.toggle("active", matches);
   });
   dom.formPanel.classList.toggle("weekly-mode", type === "weekly");
+  dom.formPanel.classList.toggle("date-mode", type === "date");
   const weeklyWrapper = dom.weeklySlots?.closest(".weekly-slots");
   if (weeklyWrapper) {
     weeklyWrapper.classList.toggle("per-slot", Boolean(dom.weeklyPerSlot?.checked));
@@ -631,12 +634,35 @@ function updateRecurrenceUI() {
     );
   }
   document.querySelectorAll(".non-weekly-field input").forEach((field) => {
-    const shouldDisable = type === "weekly";
     const isCheckbox = field.type === "checkbox";
     const isOptional = field.name === "blobDescription";
-    field.disabled = shouldDisable;
-    field.required = !shouldDisable && !isCheckbox && !isOptional;
+    const isTimeRangeField = [
+      "defaultStart",
+      "defaultEnd",
+      "schedulableStart",
+      "schedulableEnd",
+    ].includes(field.name);
+    if (type === "weekly") {
+      field.disabled = true;
+      field.required = false;
+    } else if (type === "date") {
+      if (isTimeRangeField) {
+        field.disabled = true;
+        field.required = false;
+      } else {
+        field.disabled = false;
+        field.required = !isCheckbox && !isOptional;
+      }
+    } else {
+      field.disabled = false;
+      field.required = !isCheckbox && !isOptional;
+    }
   });
+  const annualDateField = dom.blobForm.annualDate;
+  if (annualDateField) {
+    annualDateField.disabled = type !== "date";
+    annualDateField.required = type === "date";
+  }
   if (dom.recurrenceEnd) {
     dom.recurrenceEnd.disabled = type === "single";
     if (type === "single") {
@@ -645,15 +671,18 @@ function updateRecurrenceUI() {
   }
 
   const defaultStart = dom.blobForm.defaultStart.value;
-  const startDate = defaultStart
-    ? new Date(
-        toProjectIsoFromLocalInput(
-          defaultStart,
-          appConfig.userTimeZone,
-          appConfig.projectTimeZone
+  const annualDate = dom.blobForm.annualDate?.value || "";
+  const startDate = annualDate
+    ? new Date(`${annualDate}T00:00:00`)
+    : defaultStart
+      ? new Date(
+          toProjectIsoFromLocalInput(
+            defaultStart,
+            appConfig.userTimeZone,
+            appConfig.projectTimeZone
+          )
         )
-      )
-    : state.anchorDate;
+      : state.anchorDate;
   if (Number.isNaN(startDate.getTime())) {
     dom.recurrenceSummary.textContent = "Set a default start time to preview the cadence.";
     return;
@@ -667,6 +696,10 @@ function updateRecurrenceUI() {
     const unit = dom.blobForm.deltaUnit.value || "days";
     dom.recurrenceSummary.textContent = `Repeats every ${value} ${unit}.`;
   } else if (type === "date") {
+    if (!annualDate) {
+      dom.recurrenceSummary.textContent = "Select an annual date.";
+      return;
+    }
     const dateLabel = startDate.toLocaleDateString(undefined, {
       month: "long",
       day: "numeric",
@@ -1045,6 +1078,7 @@ function resetFormMode() {
     caret.classList.remove("active");
     caret.style.top = "";
   });
+  syncDateTimeDisplays();
 }
 
 function openEditForm(blob) {
@@ -1066,22 +1100,31 @@ function openEditForm(blob) {
   setDependencies(Array.isArray(blob.dependencies) ? blob.dependencies : []);
   setTags(Array.isArray(blob.tags) ? blob.tags : []);
   const blobTimeZone = blob.tz || appConfig.userTimeZone;
-  dom.blobForm.defaultStart.value = toLocalInputValueInTimeZone(
-    blob.default_scheduled_timerange?.start,
-    blobTimeZone
-  );
-  dom.blobForm.defaultEnd.value = toLocalInputValueInTimeZone(
-    blob.default_scheduled_timerange?.end,
-    blobTimeZone
-  );
-  dom.blobForm.schedulableStart.value = toLocalInputValueInTimeZone(
-    blob.schedulable_timerange?.start,
-    blobTimeZone
-  );
-  dom.blobForm.schedulableEnd.value = toLocalInputValueInTimeZone(
-    blob.schedulable_timerange?.end,
-    blobTimeZone
-  );
+  if (recurrenceType !== "date") {
+    dom.blobForm.defaultStart.value = toLocalInputValueInTimeZone(
+      blob.default_scheduled_timerange?.start,
+      blobTimeZone
+    );
+    dom.blobForm.defaultEnd.value = toLocalInputValueInTimeZone(
+      blob.default_scheduled_timerange?.end,
+      blobTimeZone
+    );
+    dom.blobForm.schedulableStart.value = toLocalInputValueInTimeZone(
+      blob.schedulable_timerange?.start,
+      blobTimeZone
+    );
+    dom.blobForm.schedulableEnd.value = toLocalInputValueInTimeZone(
+      blob.schedulable_timerange?.end,
+      blobTimeZone
+    );
+  }
+  if (dom.blobForm.annualDate) {
+    const dateValue = toLocalInputValueInTimeZone(
+      blob.default_scheduled_timerange?.start,
+      blobTimeZone
+    );
+    dom.blobForm.annualDate.value = dateValue ? dateValue.split("T")[0] : "";
+  }
   clearWeeklySlots();
   if (blob.recurrence_payload?.interval && dom.blobForm.weeklyInterval) {
     dom.blobForm.weeklyInterval.value = blob.recurrence_payload.interval;
@@ -1166,6 +1209,7 @@ function openEditForm(blob) {
   updateStarButtons();
   dom.formStatus.textContent = "";
   toggleForm(true);
+  syncDateTimeDisplays();
 }
 
 async function deleteRecurrence() {
@@ -1178,17 +1222,11 @@ async function deleteRecurrence() {
   if (!confirmed) return;
   dom.formStatus.textContent = "Deleting recurrence...";
   try {
-    const response = await fetch(`${API_BASE}/recurrences/${state.editingRecurrenceId}`, {
-      method: "DELETE",
-    });
-    if (!response.ok) {
-      throw new Error("Failed to delete recurrence");
-    }
+    await deleteRecurrenceWithUndo(state.editingRecurrenceId);
     dom.formStatus.textContent = "Deleted.";
     toggleForm(false);
     resetFormMode();
     await refreshCalendar();
-    window.dispatchEvent(new CustomEvent("elastisched:refresh"));
   } catch (error) {
     dom.formStatus.textContent = error?.message || "Error deleting recurrence.";
   }
@@ -1211,29 +1249,21 @@ async function deleteOccurrence() {
     destructive: true,
   });
   if (!confirmed) return;
-  const existing = Array.isArray(state.editingRecurrencePayload?.exclusions)
-    ? state.editingRecurrencePayload.exclusions
-    : [];
-  const nextExclusions = Array.from(new Set([...existing, occurrenceStart]));
-  const payload = {
-    type: state.editingRecurrenceType,
-    payload: { ...state.editingRecurrencePayload, exclusions: nextExclusions },
-  };
   dom.formStatus.textContent = "Deleting occurrence...";
   try {
-    const response = await fetch(`${API_BASE}/recurrences/${state.editingRecurrenceId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      throw new Error("Failed to delete occurrence");
-    }
+    const blob = state.blobs.find((item) => item.recurrence_id === state.editingRecurrenceId);
+    await deleteOccurrenceWithUndo(
+      blob || {
+        recurrence_id: state.editingRecurrenceId,
+        recurrence_type: state.editingRecurrenceType,
+        recurrence_payload: state.editingRecurrencePayload,
+        schedulable_timerange: { start: occurrenceStart },
+      }
+    );
     dom.formStatus.textContent = "Deleted.";
     toggleForm(false);
     resetFormMode();
     await refreshCalendar();
-    window.dispatchEvent(new CustomEvent("elastisched:refresh"));
   } catch (error) {
     dom.formStatus.textContent = error?.message || "Error deleting occurrence.";
   }
@@ -1293,7 +1323,7 @@ async function handleBlobSubmit(event) {
   const perSlot = recurrenceType === "weekly" && Boolean(dom.weeklyPerSlot?.checked);
   const recurrenceColor = getRecurrenceColor();
   const recurrenceEnd = getRecurrenceEndValue();
-  const baseBlob = {
+  let baseBlob = {
     name: formData.get("blobName"),
     description: formData.get("blobDescription") || null,
     tz: appConfig.userTimeZone,
@@ -1410,6 +1440,32 @@ async function handleBlobSubmit(event) {
       start_blob: baseBlob,
     };
   } else if (recurrenceType === "date") {
+    const annualDate = formData.get("annualDate")?.toString().trim() || "";
+    if (!annualDate) {
+      dom.formStatus.textContent = "Select an annual date.";
+      return;
+    }
+    const dayStart = toProjectIsoFromLocalInput(
+      `${annualDate}T00:00`,
+      appConfig.userTimeZone,
+      appConfig.projectTimeZone
+    );
+    const dayEnd = toProjectIsoFromLocalInput(
+      `${annualDate}T23:59`,
+      appConfig.userTimeZone,
+      appConfig.projectTimeZone
+    );
+    baseBlob = {
+      ...baseBlob,
+      default_scheduled_timerange: {
+        start: dayStart,
+        end: dayEnd,
+      },
+      schedulable_timerange: {
+        start: dayStart,
+        end: dayEnd,
+      },
+    };
     recurrencePayload = {
       recurrence_name: formData.get("recurrenceName") || null,
       recurrence_description: formData.get("recurrenceDescription") || null,
@@ -1509,6 +1565,7 @@ function handleAddClick() {
   resetFormMode();
   toggleForm(true);
   startInteractiveCreate();
+  syncDateTimeDisplays();
 }
 
 function handleSettingsClick() {
@@ -1625,6 +1682,7 @@ function bindFormHandlers(onRefresh) {
     dom.starOccurrenceBtn.addEventListener("click", toggleStarOccurrence);
   }
   bindDraggableForm();
+  bindDateTimePickers();
   dom.toggleFormBtn.addEventListener("click", handleAddClick);
   dom.settingsBtn.addEventListener("click", handleSettingsClick);
   dom.closeSettingsBtn.addEventListener("click", handleCloseSettings);

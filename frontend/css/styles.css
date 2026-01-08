@@ -249,6 +249,120 @@ body.modal-open .info-card {
   grid-column: 1 / -1;
 }
 
+.blob-form label > .datetime-field {
+  grid-column: 1 / -1;
+}
+
+.datetime-field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.datetime-display {
+  border: 1px solid #dfd2c2;
+  background: #fffaf2;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.datetime-trigger {
+  padding: 6px 10px;
+}
+
+.datetime-popover {
+  position: fixed;
+  min-width: 260px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid #e0d3c1;
+  background: #fffaf2;
+  box-shadow: 0 18px 30px rgba(27, 26, 22, 0.2);
+  z-index: 45;
+  display: grid;
+  gap: 10px;
+}
+
+.datetime-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.datetime-title {
+  font-weight: 700;
+  font-size: 14px;
+  text-align: center;
+}
+
+.datetime-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.datetime-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.datetime-day {
+  border: 1px solid #e0d3c1;
+  background: #f7efe4;
+  border-radius: 10px;
+  padding: 6px 0;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.datetime-day.other {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.datetime-day.active {
+  background: #1b1a16;
+  color: #f7f2e8;
+  border-color: #1b1a16;
+}
+
+.datetime-time {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.datetime-time label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.datetime-time select {
+  border: 1px solid #dfd2c2;
+  background: #fffaf2;
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-family: inherit;
+}
+
+.datetime-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .blob-form input {
   border: 1px solid #dfd2c2;
   background: #fffaf2;
@@ -679,6 +793,10 @@ body.modal-open .info-card {
 }
 
 .form-panel.weekly-mode .non-weekly-field {
+  display: none;
+}
+
+.form-panel.date-mode .non-weekly-field .time-range-row {
   display: none;
 }
 
@@ -1248,12 +1366,21 @@ body.modal-open .info-card {
   background: rgba(180, 73, 63, 0.12);
 }
 
+.info-star-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
 .info-star {
   font-size: 14px;
   color: rgba(27, 26, 22, 0.3);
 }
 
-.info-star.active {
+.info-star-btn.active .info-star {
   color: #f2b340;
 }
 
@@ -1391,6 +1518,11 @@ body.modal-open .info-card {
   --hour-height: 44px;
 }
 
+.day-column {
+  display: grid;
+  gap: 8px;
+}
+
 .hours {
   display: grid;
   grid-template-rows: repeat(24, var(--hour-height));
@@ -1421,6 +1553,112 @@ body.modal-open .info-card {
     transparent 1px
   );
   background-size: 100% var(--hour-height);
+}
+
+.all-day-row {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.all-day-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding-top: 4px;
+}
+
+.full-day-events {
+  display: grid;
+  gap: 6px;
+}
+
+.full-day-chip {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(27, 26, 22, 0.08);
+  border: 1px solid rgba(27, 26, 22, 0.12);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.full-day-chip-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.full-day-chip-button span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.full-day-star-toggle {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: rgba(27, 26, 22, 0.35);
+  cursor: pointer;
+  padding: 0;
+}
+
+.full-day-star-toggle.active {
+  color: #f2b340;
+}
+
+.full-day-chip.placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.full-day-chip.focus {
+  background: #f7d89b;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.full-day-chip.deep {
+  background: #cbd8cc;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.full-day-chip.admin {
+  background: #c7d7db;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.full-day-chip.palette-sand {
+  background: var(--palette-sand);
+}
+
+.full-day-chip.palette-sage {
+  background: var(--palette-sage);
+}
+
+.full-day-chip.palette-mist {
+  background: var(--palette-mist);
+}
+
+.full-day-chip.palette-clay {
+  background: var(--palette-clay);
+}
+
+.full-day-chip.palette-moss {
+  background: var(--palette-moss);
 }
 
 .schedulable-overlay {
@@ -1767,25 +2005,71 @@ body.modal-open .info-card {
 .week-timeline {
   display: grid;
   grid-template-columns: 80px 1fr;
+  grid-template-rows: auto auto 1fr;
   gap: 12px;
   align-items: start;
 }
 
+.week-hours-spacer {
+  grid-column: 1;
+}
+
 .week-hours {
+  grid-column: 1;
+  grid-row: 3;
   display: grid;
   grid-template-rows: repeat(24, var(--hour-height));
   color: var(--muted);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding-top: var(--week-label-offset, 0px);
   box-sizing: border-box;
 }
 
-.week-days {
+.week-days-labels,
+.week-all-day,
+.week-days-tracks {
   display: grid;
   grid-template-columns: repeat(7, minmax(140px, 1fr));
   gap: 12px;
+}
+
+.week-days-labels {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.week-all-day {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.week-days-tracks {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.week-all-day-label {
+  grid-column: 1;
+  grid-row: 2;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding-top: 4px;
+}
+
+.week-all-day-label.empty,
+.week-all-day.empty {
+  height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.week-all-day-column {
+  display: grid;
+  align-content: start;
 }
 
 .week-day-column {

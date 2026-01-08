@@ -1,6 +1,7 @@
-import { API_BASE, appConfig, minuteGranularity, saveView, state } from "./core.js";
+import { appConfig, minuteGranularity, saveView, state } from "./core.js";
 import { dom } from "./dom.js";
-import { choiceDialog } from "./popups.js";
+import { alertDialog, choiceDialog } from "./popups.js";
+import { deleteOccurrenceWithUndo, deleteRecurrenceWithUndo } from "./actions.js";
 import {
   addDays,
   clampToGranularity,
@@ -287,11 +288,21 @@ function showInfoCard(blob, anchorRect) {
       `
       : "";
 
+  const showTime = recurrenceType !== "date";
+  const timeBlock = showTime
+    ? `
+    <div class="info-divider"></div>
+    <div class="info-label">Time</div>
+    <div class="info-text">${timeLabel}</div>
+  `
+    : "";
   const html = `
     <div class="info-title">
       ${blobName}
       <button class="info-close" type="button" aria-label="Delete options">×</button>
-      <span class="info-star ${starred ? "active" : ""}" aria-hidden="true">★</span>
+      <button class="info-star-btn ${starred ? "active" : ""}" type="button" aria-label="${starred ? "Unstar" : "Star"}">
+        <span class="info-star" aria-hidden="true">★</span>
+      </button>
     </div>
     ${blobDescription ? `<div class="info-text">${blobDescription}</div>` : ""}
     ${recurrenceTypeBlock}
@@ -299,9 +310,7 @@ function showInfoCard(blob, anchorRect) {
     ${recurrenceEndBlock}
     ${tagBlock}
     ${idBlock}
-    <div class="info-divider"></div>
-    <div class="info-label">Time</div>
-    <div class="info-text">${timeLabel}</div>
+    ${timeBlock}
     ${adjustmentsBlock}
     ${policyBadges ? `<div class="info-label">Policy</div><div class="policy-badges">${policyBadges}</div>` : ""}
   `;
@@ -326,11 +335,17 @@ function clearInfoCardLock() {
   state.lockedBlobId = null;
   if (state.view === "day") {
     dom.views.day?.querySelectorAll(".day-block").forEach((el) => el.classList.remove("active"));
+    dom.views.day
+      ?.querySelectorAll(".full-day-chip")
+      .forEach((el) => el.classList.remove("active"));
     const overlay = dom.views.day?.querySelector("#schedulableOverlay");
     overlay?.classList.remove("active", "overflow-top", "overflow-bottom");
   } else if (state.view === "week") {
     dom.views.week
       ?.querySelectorAll(".day-block")
+      .forEach((el) => el.classList.remove("active"));
+    dom.views.week
+      ?.querySelectorAll(".full-day-chip")
       .forEach((el) => el.classList.remove("active"));
     dom.views.week
       ?.querySelectorAll(".schedulable-overlay")
@@ -422,7 +437,9 @@ async function toggleStarFromCalendar(blob) {
   setActive(state.view);
   if (wasLocked && lockedId === blob.id) {
     const viewRoot = state.view === "week" ? dom.views.week : dom.views.day;
-    const blockEl = viewRoot?.querySelector(`.day-block[data-blob-id="${lockedId}"]`);
+    const blockEl =
+      viewRoot?.querySelector(`.day-block[data-blob-id="${lockedId}"]`) ||
+      viewRoot?.querySelector(`.full-day-chip[data-blob-id="${lockedId}"]`);
     const updatedBlob = state.blobs.find((item) => item.id === lockedId);
     if (blockEl && updatedBlob) {
       state.infoCardLocked = false;
@@ -467,59 +484,20 @@ async function handleInfoCardDelete(event) {
     actionOrder: "confirm-alt-cancel",
   });
   if (!choice) return;
-  if (choice === "occurrence" && blob.recurrence_type === "single") {
-    await deleteRecurrence(blob.recurrence_id);
-    return;
-  }
-  if (choice === "occurrence") {
-    await deleteOccurrence(blob);
-    return;
-  }
-  if (choice === "recurrence") {
-    await deleteRecurrence(blob.recurrence_id);
-  }
-}
-
-async function deleteRecurrence(recurrenceId) {
-  if (!recurrenceId) return;
   try {
-    const response = await fetch(`${API_BASE}/recurrences/${recurrenceId}`, {
-      method: "DELETE",
-    });
-    if (!response.ok) {
-      throw new Error("Failed to delete recurrence");
+    if (choice === "occurrence" && blob.recurrence_type === "single") {
+      await deleteRecurrenceWithUndo(blob.recurrence_id);
+      return;
     }
-    clearInfoCardLock();
-    window.dispatchEvent(new CustomEvent("elastisched:refresh"));
-  } catch (error) {
-    // No-op for now; alerts handled elsewhere.
-  }
-}
-
-async function deleteOccurrence(blob) {
-  if (!blob?.recurrence_id) return;
-  const occurrenceStart = blob.schedulable_timerange?.start;
-  if (!occurrenceStart) return;
-  const payload = blob.recurrence_payload || {};
-  const existing = Array.isArray(payload.exclusions) ? payload.exclusions : [];
-  const nextExclusions = Array.from(new Set([...existing, occurrenceStart]));
-  const nextPayload = { ...payload, exclusions: nextExclusions };
-  try {
-    const response = await fetch(`${API_BASE}/recurrences/${blob.recurrence_id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: blob.recurrence_type || "single",
-        payload: nextPayload,
-      }),
-    });
-    if (!response.ok) {
-      throw new Error("Failed to delete occurrence");
+    if (choice === "occurrence") {
+      await deleteOccurrenceWithUndo(blob);
+      return;
     }
-    clearInfoCardLock();
-    window.dispatchEvent(new CustomEvent("elastisched:refresh"));
+    if (choice === "recurrence") {
+      await deleteRecurrenceWithUndo(blob.recurrence_id);
+    }
   } catch (error) {
-    // No-op for now; alerts handled elsewhere.
+    await alertDialog(error?.message || "Unable to delete.");
   }
 }
 
@@ -535,6 +513,7 @@ function renderDay() {
     return `${labelHour} ${suffix}`;
   });
 
+  const fullDayEvents = [];
   const blocks = state.blobs
     .map((blob) => {
       const blobTimeZone = getBlobTimeZone(blob);
@@ -546,6 +525,24 @@ function renderDay() {
       const schedStartParts = getZonedParts(blob.schedulable_timerange?.start, blobTimeZone);
       const schedEndParts = getZonedParts(blob.schedulable_timerange?.end, blobTimeZone);
       if (!startParts || !endParts) return null;
+      const startStamp = partsToDayStamp(startParts);
+      const endStamp = partsToDayStamp(endParts);
+      const fullDay =
+        startStamp === endStamp &&
+        startParts.hour === 0 &&
+        startParts.minute === 0 &&
+        endParts.hour === 23 &&
+        endParts.minute >= 59;
+      if (fullDay && startStamp === viewDayStamp) {
+        fullDayEvents.push({
+          id: blob.id,
+          title: blob.name,
+          type: getTagType(blob.tags),
+          colorClass: getRecurrenceColorClass(blob),
+          starred: isOccurrenceStarred(blob),
+        });
+        return null;
+      }
       const clamped = getClampedMinutes(startParts, endParts, viewDayStamp);
       if (!clamped) return null;
       const minutes = clamped.endMin - clamped.startMin;
@@ -589,6 +586,27 @@ function renderDay() {
   layoutBlocks(blocks);
 
   const hoursHtml = hours.map((hour) => `<div class="hour">${hour}</div>`).join("");
+  const fullDayHtml = fullDayEvents.length
+    ? `
+      <div class="all-day-row">
+        <div class="all-day-label">All day</div>
+        <div class="full-day-events">
+          ${fullDayEvents
+            .map(
+              (event) => `
+              <div class="full-day-chip ${event.type} ${event.colorClass}" data-blob-id="${event.id}">
+                <button class="full-day-chip-button" type="button" title="${event.title || "Untitled"}">
+                  <span>${event.title || "Untitled"}</span>
+                </button>
+                <button class="full-day-star-toggle ${event.starred ? "active" : ""}" type="button" aria-label="${event.starred ? "Unstar" : "Star"}">★</button>
+              </div>
+            `
+            )
+            .join("")}
+        </div>
+      </div>
+    `
+    : "";
   const blockHtml = blocks
     .map(
       (block) => {
@@ -616,7 +634,9 @@ function renderDay() {
   dom.views.day.innerHTML = `
     <div class="day-grid" style="--hour-height: ${hourHeight}px;">
       <div class="hours">${hoursHtml}</div>
-      <div class="day-track">
+      <div class="day-column">
+        ${fullDayHtml}
+        <div class="day-track">
         <div class="schedulable-overlay" id="schedulableOverlay"></div>
         <div class="selection-overlay default-range" id="selectionOverlayDefault"></div>
         <div class="selection-overlay schedulable-range" id="selectionOverlaySchedulable"></div>
@@ -625,6 +645,7 @@ function renderDay() {
         <div class="original-overlay" id="originalOverlay"></div>
         <div class="current-time-line"></div>
         ${blockHtml || "<div class='day-empty'>No events yet</div>"}
+      </div>
       </div>
     </div>
   `;
@@ -641,6 +662,7 @@ function renderDay() {
     "#selectionCaretSchedulable"
   );
   const blocksEls = dom.views.day.querySelectorAll(".day-block");
+  const fullDayEls = dom.views.day.querySelectorAll(".full-day-chip");
 
   const clearActiveBlocks = () => {
     blocksEls.forEach((el) => el.classList.remove("active"));
@@ -742,12 +764,48 @@ function renderDay() {
       });
     }
   });
+  fullDayEls.forEach((chipEl) => {
+    if (!chipEl.dataset.blobId) return;
+    const starBtn = chipEl.querySelector(".full-day-star-toggle");
+    if (starBtn) {
+      starBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
+        toggleStarFromCalendar(blob);
+      });
+    }
+    chipEl.addEventListener("mouseenter", () => {
+      if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
+      if (state.infoCardLocked) return;
+      const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
+      showInfoCard(blob, chipEl.getBoundingClientRect());
+    });
+    chipEl.addEventListener("mouseleave", () => {
+      if (state.infoCardLocked) return;
+      hideInfoCard();
+    });
+    chipEl.addEventListener("click", (event) => {
+      if (event.shiftKey) return;
+      if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
+      if (event.target.closest(".full-day-star-toggle")) return;
+      if (state.infoCardLocked) {
+        clearLockedInfoCard();
+      }
+      fullDayEls.forEach((el) => el.classList.remove("active"));
+      chipEl.classList.add("active");
+      const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
+      showInfoCard(blob, chipEl.getBoundingClientRect());
+      state.infoCardLocked = true;
+      state.lockedBlobId = chipEl.dataset.blobId || null;
+    });
+  });
   if (state.activeBlockClickHandler) {
     document.removeEventListener("click", state.activeBlockClickHandler);
   }
   state.activeBlockClickHandler = (event) => {
     if (event.button !== 0) return;
     if (event.target.closest(".day-block")) return;
+    if (event.target.closest(".full-day-chip")) return;
     if (event.target.closest(".info-card")) return;
     clearActiveBlocks();
     overlay.classList.remove("active", "overflow-top", "overflow-bottom");
@@ -762,6 +820,13 @@ function renderDay() {
   state.infoCardActionHandler = (event) => {
     if (event.target.closest(".info-close")) {
       handleInfoCardDelete(event);
+      return;
+    }
+    if (event.target.closest(".info-star-btn")) {
+      const blobId = dom.infoCard?.dataset?.blobId || state.lockedBlobId;
+      if (!blobId) return;
+      const blob = state.blobs.find((item) => item.id === blobId);
+      toggleStarFromCalendar(blob);
     }
   };
   document.addEventListener("click", state.infoCardActionHandler);
@@ -799,6 +864,9 @@ function renderDay() {
           dom.blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
           dom.blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
           dom.blobForm.defaultStart.dispatchEvent(new Event("change", { bubbles: true }));
+          dom.blobForm.defaultEnd.dispatchEvent(new Event("change", { bubbles: true }));
+          dom.blobForm.schedulableStart.dispatchEvent(new Event("change", { bubbles: true }));
+          dom.blobForm.schedulableEnd.dispatchEvent(new Event("change", { bubbles: true }));
         }
         dom.formStatus.textContent = "Ranges captured. Fill details and create.";
       }
@@ -912,63 +980,134 @@ function renderWeek() {
     return `${labelHour} ${suffix}`;
   });
 
-  const columns = days
-    .map((date) => {
-      const blocks = state.blobs
-        .map((blob) => {
-          const blobTimeZone = getBlobTimeZone(blob);
-          const viewParts = getZonedParts(date, blobTimeZone);
-          const viewStamp = viewParts ? partsToDayStamp(viewParts) : null;
-          if (!viewStamp) return null;
-          const effectiveRange = getEffectiveOccurrenceRange(blob);
-          if (!effectiveRange) return null;
-          const startParts = getZonedParts(effectiveRange.start, blobTimeZone);
-          const endParts = getZonedParts(effectiveRange.effectiveEnd, blobTimeZone);
-          const schedStartParts = getZonedParts(blob.schedulable_timerange?.start, blobTimeZone);
-          const schedEndParts = getZonedParts(blob.schedulable_timerange?.end, blobTimeZone);
-          if (!startParts || !endParts) return null;
-          const clamped = getClampedMinutes(startParts, endParts, viewStamp);
-          if (!clamped) return null;
-          const minutes = clamped.endMin - clamped.startMin;
-          const showContent = partsToDayStamp(startParts) === viewStamp;
-          const baseRange = blob.realized_timerange || blob.default_scheduled_timerange || {};
-          const baseStart = toDate(baseRange.start);
-          const baseEnd = toDate(baseRange.end);
-          const isAdjusted =
-            baseEnd &&
-            !Number.isNaN(baseEnd.getTime()) &&
-            effectiveRange.effectiveEnd.getTime() !== baseEnd.getTime();
-          return {
-            id: blob.id,
-            title: blob.name,
-            time: formatTimeRangeInTimeZone(
-              effectiveRange.start,
-              effectiveRange.effectiveEnd,
-              blobTimeZone
-            ),
-            type: getTagType(blob.tags),
-            colorClass: getRecurrenceColorClass(blob),
-            policy: blob.policy,
-            starred: isOccurrenceStarred(blob),
-            top: (clamped.startMin / 60) * hourHeight,
-            height: Math.max(18, (minutes / 60) * hourHeight),
-            startMin: clamped.startMin,
-            endMin: clamped.endMin,
-            schedStartIso: blob.schedulable_timerange?.start || "",
-            schedEndIso: blob.schedulable_timerange?.end || "",
-            originalStartIso: baseRange.start || "",
-            originalEndIso: baseRange.end || "",
-            adjusted: Boolean(isAdjusted),
-            schedStartParts,
-            schedEndParts,
-            showContent,
-          };
-        })
-        .filter(Boolean)
-        .sort((a, b) => a.top - b.top);
+  const dayEntries = days.map((date) => {
+    const fullDayEvents = [];
+    const blocks = state.blobs
+      .map((blob) => {
+        const blobTimeZone = getBlobTimeZone(blob);
+        const viewParts = getZonedParts(date, blobTimeZone);
+        const viewStamp = viewParts ? partsToDayStamp(viewParts) : null;
+        if (!viewStamp) return null;
+        const effectiveRange = getEffectiveOccurrenceRange(blob);
+        if (!effectiveRange) return null;
+        const startParts = getZonedParts(effectiveRange.start, blobTimeZone);
+        const endParts = getZonedParts(effectiveRange.effectiveEnd, blobTimeZone);
+        const schedStartParts = getZonedParts(blob.schedulable_timerange?.start, blobTimeZone);
+        const schedEndParts = getZonedParts(blob.schedulable_timerange?.end, blobTimeZone);
+        if (!startParts || !endParts) return null;
+        const startStamp = partsToDayStamp(startParts);
+        const endStamp = partsToDayStamp(endParts);
+        const fullDay =
+          startStamp === endStamp &&
+          startParts.hour === 0 &&
+          startParts.minute === 0 &&
+          endParts.hour === 23 &&
+          endParts.minute >= 59;
+        if (fullDay && startStamp === viewStamp) {
+          fullDayEvents.push({
+              id: blob.id,
+              title: blob.name,
+              type: getTagType(blob.tags),
+              colorClass: getRecurrenceColorClass(blob),
+              starred: isOccurrenceStarred(blob),
+            });
+          return null;
+        }
+        const clamped = getClampedMinutes(startParts, endParts, viewStamp);
+        if (!clamped) return null;
+        const minutes = clamped.endMin - clamped.startMin;
+        const showContent = partsToDayStamp(startParts) === viewStamp;
+        const baseRange = blob.realized_timerange || blob.default_scheduled_timerange || {};
+        const baseStart = toDate(baseRange.start);
+        const baseEnd = toDate(baseRange.end);
+        const isAdjusted =
+          baseEnd &&
+          !Number.isNaN(baseEnd.getTime()) &&
+          effectiveRange.effectiveEnd.getTime() !== baseEnd.getTime();
+        return {
+          id: blob.id,
+          title: blob.name,
+          time: formatTimeRangeInTimeZone(
+            effectiveRange.start,
+            effectiveRange.effectiveEnd,
+            blobTimeZone
+          ),
+          type: getTagType(blob.tags),
+          colorClass: getRecurrenceColorClass(blob),
+          policy: blob.policy,
+          starred: isOccurrenceStarred(blob),
+          top: (clamped.startMin / 60) * hourHeight,
+          height: Math.max(18, (minutes / 60) * hourHeight),
+          startMin: clamped.startMin,
+          endMin: clamped.endMin,
+          schedStartIso: blob.schedulable_timerange?.start || "",
+          schedEndIso: blob.schedulable_timerange?.end || "",
+          originalStartIso: baseRange.start || "",
+          originalEndIso: baseRange.end || "",
+          adjusted: Boolean(isAdjusted),
+          schedStartParts,
+          schedEndParts,
+          showContent,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.top - b.top);
 
-      layoutBlocks(blocks);
+    layoutBlocks(blocks);
 
+    return { date, fullDayEvents, blocks };
+  });
+
+  const maxFullDayCount = dayEntries.reduce(
+    (max, entry) => Math.max(max, entry.fullDayEvents.length),
+    0
+  );
+
+  const labelColumns = dayEntries
+    .map(
+      ({ date }) => `
+      <div class="week-day-label">
+        <button data-date="${date.toISOString()}">
+          ${date.toLocaleDateString(undefined, {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          })}
+        </button>
+      </div>
+    `
+    )
+    .join("");
+
+  const allDayColumnsHtml = dayEntries
+    .map(({ fullDayEvents }) => {
+      const placeholderCount = Math.max(0, maxFullDayCount - fullDayEvents.length);
+      return `
+        <div class="week-all-day-column">
+          <div class="full-day-events">
+            ${fullDayEvents
+              .map(
+                (event) => `
+                <div class="full-day-chip ${event.type} ${event.colorClass}" data-blob-id="${event.id}">
+                  <button class="full-day-chip-button" type="button" title="${event.title || "Untitled"}">
+                    <span>${event.title || "Untitled"}</span>
+                  </button>
+                  <button class="full-day-star-toggle ${event.starred ? "active" : ""}" type="button" aria-label="${event.starred ? "Unstar" : "Star"}">★</button>
+                </div>
+              `
+              )
+              .join("")}
+            ${Array.from({ length: placeholderCount })
+              .map(() => `<div class="full-day-chip placeholder" aria-hidden="true"></div>`)
+              .join("")}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  const trackColumns = dayEntries
+    .map(({ date, blocks }) => {
       const blockHtml = blocks
         .map(
           (block) => {
@@ -995,15 +1134,6 @@ function renderWeek() {
 
       return `
         <div class="week-day-column" style="--hour-height: ${hourHeight}px;" data-date="${date.toISOString()}">
-          <div class="week-day-label">
-            <button data-date="${date.toISOString()}">
-              ${date.toLocaleDateString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-              })}
-            </button>
-          </div>
           <div class="week-day-track">
             <div class="schedulable-overlay"></div>
             <div class="original-overlay"></div>
@@ -1020,24 +1150,20 @@ function renderWeek() {
     .join("");
 
   const hoursHtml = hours.map((hour) => `<div class="hour">${hour}</div>`).join("");
+  const allDayRowClass = maxFullDayCount > 0 ? "" : "empty";
   dom.views.week.innerHTML = `
     <div class="week-timeline" style="--hour-height: ${hourHeight}px;">
+      <div class="week-hours-spacer"></div>
+      <div class="week-days-labels">${labelColumns}</div>
+      <div class="week-all-day-label ${allDayRowClass}">All day</div>
+      <div class="week-all-day ${allDayRowClass}">${allDayColumnsHtml}</div>
       <div class="week-hours">${hoursHtml}</div>
-      <div class="week-days">${columns}</div>
+      <div class="week-days-tracks">${trackColumns}</div>
     </div>
   `;
 
-  const weekTimeline = dom.views.week.querySelector(".week-timeline");
-  const weekColumn = dom.views.week.querySelector(".week-day-column");
-  const weekLabel = dom.views.week.querySelector(".week-day-label");
-  if (weekTimeline && weekColumn && weekLabel) {
-    const labelHeight = weekLabel.getBoundingClientRect().height;
-    const style = getComputedStyle(weekColumn);
-    const gap = parseFloat(style.rowGap || style.gap || "0");
-    weekTimeline.style.setProperty("--week-label-offset", `${labelHeight + gap}px`);
-  }
-
   const dayColumns = Array.from(dom.views.week.querySelectorAll(".week-day-column"));
+  const allDayColumns = Array.from(dom.views.week.querySelectorAll(".week-all-day-column"));
   const dayTracks = dayColumns.map((column, index) => {
     return {
       track: column.querySelector(".week-day-track"),
@@ -1047,6 +1173,45 @@ function renderWeek() {
     };
   });
 
+  allDayColumns.forEach((column) => {
+    column.querySelectorAll(".full-day-chip").forEach((chipEl) => {
+      if (!chipEl.dataset.blobId) return;
+      const starBtn = chipEl.querySelector(".full-day-star-toggle");
+      if (starBtn) {
+        starBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
+          toggleStarFromCalendar(blob);
+        });
+      }
+      chipEl.addEventListener("mouseenter", () => {
+        if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
+        if (state.infoCardLocked) return;
+        const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
+        showInfoCard(blob, chipEl.getBoundingClientRect());
+      });
+      chipEl.addEventListener("mouseleave", () => {
+        if (state.infoCardLocked) return;
+        hideInfoCard();
+      });
+      chipEl.addEventListener("click", (event) => {
+        if (event.shiftKey) return;
+        if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
+        if (event.target.closest(".full-day-star-toggle")) return;
+        if (state.infoCardLocked) {
+          clearLockedInfoCard();
+        }
+        allDayColumns.forEach((col) =>
+          col.querySelectorAll(".full-day-chip").forEach((el) => el.classList.remove("active"))
+        );
+        chipEl.classList.add("active");
+        const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
+        showInfoCard(blob, chipEl.getBoundingClientRect());
+        state.infoCardLocked = true;
+        state.lockedBlobId = chipEl.dataset.blobId || null;
+      });
+    });
+  });
   dayColumns.forEach((column) => {
     column.querySelectorAll(".day-block").forEach((blockEl) => {
       const setLockedInfoCard = () => {
@@ -1156,9 +1321,13 @@ function renderWeek() {
   state.activeBlockClickHandler = (event) => {
     if (event.button !== 0) return;
     if (event.target.closest(".day-block")) return;
+    if (event.target.closest(".full-day-chip")) return;
     if (event.target.closest(".info-card")) return;
     dayColumns.forEach((col) =>
       col.querySelectorAll(".day-block").forEach((el) => el.classList.remove("active"))
+    );
+    allDayColumns.forEach((col) =>
+      col.querySelectorAll(".full-day-chip").forEach((el) => el.classList.remove("active"))
     );
     dayTracks.forEach(({ overlay, originalOverlay }) => {
       overlay.classList.remove("active", "overflow-top", "overflow-bottom");
@@ -1254,6 +1423,9 @@ function renderWeek() {
           dom.blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
           dom.blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
           dom.blobForm.defaultStart.dispatchEvent(new Event("change", { bubbles: true }));
+          dom.blobForm.defaultEnd.dispatchEvent(new Event("change", { bubbles: true }));
+          dom.blobForm.schedulableStart.dispatchEvent(new Event("change", { bubbles: true }));
+          dom.blobForm.schedulableEnd.dispatchEvent(new Event("change", { bubbles: true }));
         }
         dom.formStatus.textContent = "Ranges captured. Fill details and create.";
         clearSelectionCarets(".selection-caret.schedulable-range");
@@ -1547,7 +1719,7 @@ function updateNowIndicators() {
   }
 }
 
-function setActive(view) {
+function setActive(view, options = {}) {
   state.view = view;
   saveView(view);
   state.infoCardLocked = false;
@@ -1562,6 +1734,10 @@ function setActive(view) {
     const label = labelMap[view] || "day";
     dom.prevDayBtn.title = `Previous ${label}`;
     dom.nextDayBtn.title = `Next ${label}`;
+  }
+
+  if (options.deferRender) {
+    return;
   }
 
   if (view === "day") {
