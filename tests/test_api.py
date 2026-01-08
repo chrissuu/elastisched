@@ -11,8 +11,8 @@ async def api_client(tmp_path_factory):
     db_path = tmp_path_factory.mktemp("db") / "test.db"
     os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{db_path}"
 
-    from elastisched.api import db as db_module
-    from elastisched.api import main as main_module
+    from elastisched_api import db as db_module
+    from elastisched_api import main as main_module
 
     importlib.reload(db_module)
     importlib.reload(main_module)

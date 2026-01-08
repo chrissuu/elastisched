@@ -3,17 +3,17 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from elastisched.api.db import init_db
-from elastisched.api.router import router as blob_router
-from elastisched.api.recurrence_router import (
+from elastisched_api.db import init_db
+from elastisched_api.router import router as blob_router
+from elastisched_api.recurrence_router import (
     occurrence_router,
     recurrence_router,
 )
-from elastisched.api.schedule_router import schedule_router
+from elastisched_api.schedule_router import schedule_router
 
 
 app = FastAPI(title="Elastisched API")
-_UI_DIR = Path(__file__).resolve().parents[3] / "frontend"
+_UI_DIR = Path(__file__).resolve().parents[2] / "frontend"
 if _UI_DIR.exists():
     app.mount("/ui", StaticFiles(directory=_UI_DIR, html=True), name="ui")
 

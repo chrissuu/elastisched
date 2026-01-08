@@ -1,5 +1,5 @@
 :root {
-  --ink: #1b1a16;
+  --ink: #2c2a25;
   --muted: #6b675c;
   --paper: #f6f1e9;
   --cream: #efe4d6;
@@ -386,9 +386,9 @@ body.modal-open .info-card {
 }
 
 .datetime-day.active {
-  background: #1b1a16;
+  background: var(--ink);
   color: #f7f2e8;
-  border-color: #1b1a16;
+  border-color: var(--ink);
 }
 
 .datetime-time {
@@ -634,7 +634,7 @@ body.modal-open .info-card {
 }
 
 .settings-tab.active {
-  background: #1b1a16;
+  background: var(--ink);
   color: #f7f2e8;
 }
 
@@ -651,9 +651,11 @@ body.modal-open .info-card {
 #settingsForm {
   display: grid;
   grid-template-columns: 200px 1fr;
+  grid-template-rows: auto 1fr auto;
   gap: 12px;
   align-items: start;
   align-content: start;
+  height: 100%;
 }
 
 #settingsForm .settings-tabs {
@@ -663,8 +665,10 @@ body.modal-open .info-card {
 }
 
 #settingsForm .form-actions {
-  grid-column: 1 / -1;
-  grid-row: 2;
+  grid-column: 2;
+  grid-row: 3;
+  justify-self: end;
+  align-self: end;
 }
 
 #settingsForm .settings-section {
@@ -1053,9 +1057,9 @@ body.modal-open .info-card {
 }
 
 .day-pill.active {
-  background: #1b1a16;
+  background: var(--ink);
   color: #f7f2e8;
-  border-color: #1b1a16;
+  border-color: var(--ink);
 }
 
 .weekly-slot .slot-meta {
@@ -1105,7 +1109,7 @@ body.modal-open .info-card {
 }
 
 .primary {
-  background: #1b1a16;
+  background: var(--ink);
   color: #f7f2e8;
   border: none;
   padding: 10px 18px;
@@ -1208,7 +1212,7 @@ body.modal-open .info-card {
 }
 
 .tab.active {
-  background: #1b1a16;
+  background: var(--ink);
   color: #f7f2e8;
 }
 
