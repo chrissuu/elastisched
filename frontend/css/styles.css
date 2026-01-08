@@ -152,6 +152,18 @@ body {
   overflow: auto;
 }
 
+#settingsPanel {
+  width: min(720px, 92vw);
+  height: min(620px, 86vh);
+  overflow: hidden;
+}
+
+#settingsPanel .blob-form {
+  height: 100%;
+  overflow: auto;
+  padding-right: 6px;
+}
+
 .alert-panel {
   width: min(520px, 90vw);
   display: grid;
@@ -178,6 +190,49 @@ body {
 
 .alert-panel[data-action-order="confirm-alt-cancel"] .alert-action.cancel {
   order: 3;
+}
+
+.help-panel {
+  width: min(640px, 92vw);
+}
+
+.help-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.help-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(27, 26, 22, 0.12);
+  background: rgba(255, 250, 242, 0.7);
+}
+
+.help-action {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.help-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.help-keys kbd {
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(27, 26, 22, 0.2);
+  background: #fffaf2;
+  color: var(--ink);
 }
 
 .alert-panel[data-action-order="cancel-alt-confirm"] .alert-action.cancel {
@@ -548,6 +603,84 @@ body.modal-open .info-card {
 .settings-toggle input[type="checkbox"] {
   width: 18px;
   height: 18px;
+}
+
+.settings-tabs {
+  display: inline-flex;
+  gap: 8px;
+  padding: 8px 6px 4px;
+  border-radius: 999px;
+  background: rgba(27, 26, 22, 0.06);
+  margin: 0;
+}
+
+.settings-tabs.vertical {
+  flex-direction: column;
+  align-items: stretch;
+  border-radius: 18px;
+  padding: 10px;
+  width: 180px;
+}
+
+.settings-tab {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-tab.active {
+  background: #1b1a16;
+  color: #f7f2e8;
+}
+
+.settings-section {
+  display: none;
+  gap: 14px;
+  grid-column: 1 / -1;
+}
+
+.settings-section.active {
+  display: grid;
+}
+
+#settingsForm {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 12px;
+  align-items: start;
+  align-content: start;
+}
+
+#settingsForm .settings-tabs {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+}
+
+#settingsForm .form-actions {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+#settingsForm .settings-section {
+  grid-column: 2;
+  grid-row: 1;
+  align-content: start;
+  align-items: start;
+}
+
+#settingsForm label {
+  align-items: start;
+}
+
+#settingsForm label > input,
+#settingsForm label > select {
+  width: 100%;
 }
 
 .color-field {
@@ -1058,6 +1191,10 @@ body.modal-open .info-card {
 
 .ghost.icon.settings {
   margin-left: 8px;
+}
+
+.ghost.icon.help {
+  font-weight: 700;
 }
 
 .tab {
