@@ -5,13 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from elastisched.api.db import get_session
-from elastisched.api.models import (
+from elastisched_api.db import get_session
+from elastisched_api.models import (
     RecurrenceModel,
     ScheduledOccurrenceModel,
     ScheduleStateModel,
 )
-from elastisched.api.schemas import (
+from elastisched_api.schemas import (
     OccurrenceRead,
     RecurrenceCreate,
     RecurrenceRead,

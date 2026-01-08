@@ -20,11 +20,19 @@ Elastisched is a scheduling playground built around "blobs": flexible, schedulab
 
 ## Project Layout
 
-- `src/elastisched/api`: FastAPI backend and models
+- `backend/elastisched_api`: FastAPI backend and models
+- `src/elastisched`: core scheduling library + engine
 - `frontend`: UI (HTML/CSS/JS)
 - `tests`: API and recurrence tests
 
 ## Quick Start
+
+### Docker
+
+1. `docker compose up --build`
+2. Open `http://localhost:8000/ui`
+
+### Local (no Docker)
 
 1. Install dependencies.
 2. Run the API.

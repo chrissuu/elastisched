@@ -4,7 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from elastisched.api.config import get_database_url
+from elastisched_api.config import get_database_url
 
 
 DATABASE_URL = get_database_url()
