@@ -171,6 +171,32 @@ def _recurrence_from_payload(recurrence_type: str, payload: dict):
         )
     if recurrence_type == "date":
         blob = _blob_from_payload(payload.get("blob") or {})
+        default_tr = blob.get_default_scheduled_timerange()
+        tzinfo = blob.tz or default_tr.start.tzinfo
+        start_local = default_tr.start.astimezone(tzinfo) if tzinfo else default_tr.start
+        day_start = datetime(
+            year=start_local.year,
+            month=start_local.month,
+            day=start_local.day,
+            hour=0,
+            minute=0,
+            second=0,
+            tzinfo=tzinfo,
+        )
+        day_end = datetime(
+            year=start_local.year,
+            month=start_local.month,
+            day=start_local.day,
+            hour=23,
+            minute=59,
+            second=59,
+            tzinfo=tzinfo,
+        )
+        if default_tr.start.tzinfo:
+            day_start = day_start.astimezone(default_tr.start.tzinfo)
+            day_end = day_end.astimezone(default_tr.start.tzinfo)
+        blob.set_default_scheduled_timerange(TimeRange(start=day_start, end=day_end))
+        blob.set_schedulable_timerange(TimeRange(start=day_start, end=day_end))
         return DateBlobRecurrence(blob=blob)
     raise HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

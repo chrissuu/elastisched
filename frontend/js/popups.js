@@ -2,13 +2,28 @@ import { dom } from "./dom.js";
 
 let resolver = null;
 let actionMap = { confirm: true, cancel: false, alt: null };
+let lastFocusedElement = null;
 
 function setModalActive(active) {
   if (!dom.alertModal || !dom.alertPanel) return;
+  if (active) {
+    lastFocusedElement = document.activeElement;
+  }
   dom.alertModal.classList.toggle("active", active);
   dom.alertPanel.classList.toggle("active", active);
   dom.alertModal.setAttribute("aria-hidden", (!active).toString());
   document.body.classList.toggle("modal-open", active);
+  if (!active) {
+    dom.alertModal.setAttribute("inert", "");
+    if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+      lastFocusedElement.focus();
+    }
+    lastFocusedElement = null;
+  } else {
+    dom.alertModal.removeAttribute("inert");
+    const focusTarget = dom.alertConfirmBtn || dom.alertAltBtn || dom.alertCancelBtn;
+    focusTarget?.focus();
+  }
 }
 
 function closeDialog(result) {
