@@ -9,7 +9,14 @@ import {
 } from "./api.js";
 import { pushHistoryAction, redoHistoryAction, undoHistoryAction } from "./history.js";
 import { alertDialog, bindDialogEvents, confirmDialog } from "./popups.js";
-import { bindFormHandlers, openEditForm, resetFormMode, toggleForm, toggleSettings } from "./forms.js";
+import {
+  bindFormHandlers,
+  openEditForm,
+  resetFormMode,
+  toggleForm,
+  toggleSettings,
+  toggleHelp,
+} from "./forms.js";
 import {
   clearInfoCardLock,
   setActive,
@@ -446,6 +453,9 @@ window.addEventListener("keydown", (event) => {
     if (dom.settingsModal.classList.contains("active")) {
       toggleSettings(false);
       dom.settingsStatus.textContent = "";
+    }
+    if (dom.helpModal?.classList.contains("active")) {
+      toggleHelp(false);
     }
     if (dom.formPanel.classList.contains("active")) {
       toggleForm(false);

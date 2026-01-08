@@ -17,6 +17,8 @@ let refreshView = null;
 const recurrenceFieldGroups = document.querySelectorAll(".recurrence-fields");
 const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const editOnlyElements = document.querySelectorAll(".edit-only");
+const settingsTabs = document.querySelectorAll(".settings-tab");
+const settingsSections = document.querySelectorAll(".settings-section");
 let dependencyIds = [];
 let tagNames = [];
 const slotTagStore = new WeakMap();
@@ -44,6 +46,54 @@ function toggleSettings(show) {
   dom.settingsModal.classList.toggle("active", isActive);
   dom.settingsPanel.classList.toggle("active", isActive);
   dom.settingsModal.setAttribute("aria-hidden", (!isActive).toString());
+  if (isActive) {
+    setActiveSettingsTab(settingsTabs[0]?.dataset?.settingsTab || "general");
+  }
+}
+
+function toggleHelp(show) {
+  const isActive = typeof show === "boolean" ? show : !dom.helpModal.classList.contains("active");
+  dom.helpModal.classList.toggle("active", isActive);
+  dom.helpPanel.classList.toggle("active", isActive);
+  dom.helpModal.setAttribute("aria-hidden", (!isActive).toString());
+}
+
+function setActiveSettingsTab(tabName) {
+  if (!tabName) return;
+  settingsTabs.forEach((tab) => {
+    const isActive = tab.dataset.settingsTab === tabName;
+    tab.classList.toggle("active", isActive);
+    tab.setAttribute("aria-selected", isActive.toString());
+  });
+  settingsSections.forEach((section) => {
+    section.classList.toggle("active", section.dataset.settingsSection === tabName);
+  });
+}
+
+function populateTimeZones() {
+  const select = dom.settingsForm?.userTimeZone;
+  if (!select || select.dataset.populated === "true") return;
+  let zones = [];
+  if (typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
+    zones = Intl.supportedValuesOf("timeZone");
+  }
+  if (!zones.length) {
+    zones = [
+      "UTC",
+      "America/Los_Angeles",
+      "America/Denver",
+      "America/Chicago",
+      "America/New_York",
+      "Europe/London",
+      "Europe/Berlin",
+      "Europe/Paris",
+      "Asia/Tokyo",
+      "Asia/Singapore",
+      "Australia/Sydney",
+    ];
+  }
+  select.innerHTML = zones.map((zone) => `<option value="${zone}">${zone}</option>`).join("");
+  select.dataset.populated = "true";
 }
 
 function hydrateSettingsForm() {
@@ -54,8 +104,11 @@ function hydrateSettingsForm() {
     appConfig.finishEarlyBufferMinutes || 15;
   dom.settingsForm.includeActiveOccurrences.checked =
     appConfig.includeActiveOccurrences !== false;
-  dom.settingsForm.lookaheadSeconds.value =
-    appConfig.lookaheadSeconds || 14 * 24 * 60 * 60;
+  const lookaheadMinutes = Math.max(
+    1,
+    Math.round((appConfig.lookaheadSeconds || 14 * 24 * 60 * 60) / 60)
+  );
+  dom.settingsForm.lookaheadMinutes.value = lookaheadMinutes;
   dom.settingsForm.userTimeZone.value = appConfig.userTimeZone || "";
 }
 
@@ -1536,13 +1589,13 @@ function handleSettingsSubmit(event) {
   );
   const includeActiveOccurrences =
     formData.get("includeActiveOccurrences") === "on";
-  const lookaheadSeconds = Math.max(1, Number(formData.get("lookaheadSeconds") || 1));
+  const lookaheadMinutes = Math.max(1, Number(formData.get("lookaheadMinutes") || 1));
   const userTimeZone = formData.get("userTimeZone")?.toString().trim() || "";
   if (userTimeZone) {
     try {
       Intl.DateTimeFormat("en-US", { timeZone: userTimeZone });
     } catch (error) {
-      dom.settingsStatus.textContent = "Invalid timezone. Use an IANA name.";
+      dom.settingsStatus.textContent = "Invalid timezone. Choose a valid timezone.";
       return;
     }
   }
@@ -1551,7 +1604,7 @@ function handleSettingsSubmit(event) {
   appConfig.minuteGranularity = granularity;
   appConfig.finishEarlyBufferMinutes = finishEarlyBufferMinutes;
   appConfig.includeActiveOccurrences = includeActiveOccurrences;
-  appConfig.lookaheadSeconds = lookaheadSeconds;
+  appConfig.lookaheadSeconds = lookaheadMinutes * 60;
   if (userTimeZone) {
     appConfig.userTimeZone = userTimeZone;
   }
@@ -1570,12 +1623,22 @@ function handleAddClick() {
 
 function handleSettingsClick() {
   toggleSettings(true);
+  populateTimeZones();
   hydrateSettingsForm();
+  dom.settingsStatus.textContent = "";
+}
+
+function handleHelpClick() {
+  toggleHelp(true);
 }
 
 function handleCloseSettings() {
   toggleSettings(false);
   dom.settingsStatus.textContent = "";
+}
+
+function handleCloseHelp() {
+  toggleHelp(false);
 }
 
 function handleCloseForm() {
@@ -1685,8 +1748,17 @@ function bindFormHandlers(onRefresh) {
   bindDateTimePickers();
   dom.toggleFormBtn.addEventListener("click", handleAddClick);
   dom.settingsBtn.addEventListener("click", handleSettingsClick);
+  if (dom.helpBtn) {
+    dom.helpBtn.addEventListener("click", handleHelpClick);
+  }
   dom.closeSettingsBtn.addEventListener("click", handleCloseSettings);
   dom.settingsBackdrop.addEventListener("click", handleCloseSettings);
+  if (dom.closeHelpBtn) {
+    dom.closeHelpBtn.addEventListener("click", handleCloseHelp);
+  }
+  if (dom.helpBackdrop) {
+    dom.helpBackdrop.addEventListener("click", handleCloseHelp);
+  }
   dom.closeFormBtn.addEventListener("click", handleCloseForm);
   dom.prevDayBtn.addEventListener("click", handlePrevDay);
   dom.nextDayBtn.addEventListener("click", handleNextDay);
@@ -1812,7 +1884,14 @@ function bindFormHandlers(onRefresh) {
   if (dom.weeklySlots && dom.weeklySlots.children.length === 0) {
     createWeeklySlot();
   }
+  if (settingsTabs.length) {
+    settingsTabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        setActiveSettingsTab(tab.dataset.settingsTab);
+      });
+    });
+  }
   updateRecurrenceUI();
 }
 
-export { bindFormHandlers, handleAddClick, openEditForm, resetFormMode, toggleForm, toggleSettings };
+export { bindFormHandlers, handleAddClick, openEditForm, resetFormMode, toggleForm, toggleSettings, toggleHelp };

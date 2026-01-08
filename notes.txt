@@ -1,3 +1,0 @@
-Iterating offline:
-
-pip install --no-index --find-links ./offline-packages .

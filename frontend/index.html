@@ -18,6 +18,7 @@
         </div>
         <div class="controls">
           <button class="ghost icon settings" id="settingsBtn" title="Settings">⚙</button>
+          <button class="ghost icon help" id="helpBtn" title="Keyboard shortcuts">?</button>
         </div>
       </header>
 
@@ -32,39 +33,90 @@
             <button class="ghost small" id="closeSettingsBtn">Close</button>
           </div>
           <form id="settingsForm" class="blob-form">
-            <label>
-              Schedule name
-              <input type="text" name="scheduleName" placeholder="Elastisched" />
-            </label>
-            <label>
-              Subtitle
-              <input type="text" name="subtitle" placeholder="Schedule at a glance" />
-            </label>
-            <label>
-              Minute granularity
-              <input type="number" name="minuteGranularity" min="1" step="1" />
-            </label>
-            <label>
-              Finish early buffer (minutes)
-              <input type="number" name="finishEarlyBufferMinutes" min="1" step="1" />
-            </label>
-            <label class="settings-toggle">
-              <span>Reschedule ongoing events</span>
-              <input type="checkbox" name="includeActiveOccurrences" />
-            </label>
-            <label>
-              Lookahead seconds
-              <input type="number" name="lookaheadSeconds" min="1" step="1" />
-            </label>
-            <label>
-              User timezone (IANA)
-              <input type="text" name="userTimeZone" placeholder="America/New_York" />
-            </label>
+            <div class="settings-tabs vertical" role="tablist">
+              <button class="settings-tab active" type="button" data-settings-tab="general">
+                General
+              </button>
+              <button class="settings-tab" type="button" data-settings-tab="scheduling">
+                Scheduling
+              </button>
+            </div>
+            <div class="settings-section active" data-settings-section="general">
+              <label>
+                Schedule name
+                <input type="text" name="scheduleName" placeholder="Elastisched" />
+              </label>
+              <label>
+                Subtitle
+                <input type="text" name="subtitle" placeholder="Schedule at a glance" />
+              </label>
+              <label>
+                User timezone
+                <select name="userTimeZone"></select>
+              </label>
+            </div>
+            <div class="settings-section" data-settings-section="scheduling">
+              <label>
+                Minute granularity
+                <input type="number" name="minuteGranularity" min="1" step="1" />
+              </label>
+              <label>
+                Finish early buffer (minutes)
+                <input type="number" name="finishEarlyBufferMinutes" min="1" step="1" />
+              </label>
+              <label class="settings-toggle">
+                <span>Reschedule ongoing events</span>
+                <input type="checkbox" name="includeActiveOccurrences" />
+              </label>
+              <label>
+                Lookahead minutes
+                <input type="number" name="lookaheadMinutes" min="1" step="1" />
+              </label>
+            </div>
             <div class="form-actions">
               <button type="submit" class="primary">Save</button>
               <span class="form-status" id="settingsStatus"></span>
             </div>
           </form>
+        </section>
+      </div>
+
+      <div class="modal" id="helpModal" aria-hidden="true">
+        <div class="modal-backdrop" id="helpBackdrop"></div>
+        <section class="panel form-panel modal-panel help-panel" id="helpPanel">
+          <div class="form-header">
+            <div>
+              <div class="form-title">Keyboard shortcuts</div>
+              <div class="form-subtitle">Quick actions without leaving the flow</div>
+            </div>
+            <button class="ghost small" id="closeHelpBtn">Close</button>
+          </div>
+          <div class="help-grid">
+            <div class="help-item">
+              <div class="help-action">Undo</div>
+              <div class="help-keys"><kbd>Ctrl</kbd><span>+</span><kbd>Z</kbd></div>
+            </div>
+            <div class="help-item">
+              <div class="help-action">Redo</div>
+              <div class="help-keys"><kbd>Ctrl</kbd><span>+</span><kbd>Y</kbd></div>
+            </div>
+            <div class="help-item">
+              <div class="help-action">Create new recurrence</div>
+              <div class="help-keys"><kbd>N</kbd></div>
+            </div>
+            <div class="help-item">
+              <div class="help-action">Previous / next period</div>
+              <div class="help-keys"><kbd>←</kbd><span>/</span><kbd>→</kbd></div>
+            </div>
+            <div class="help-item">
+              <div class="help-action">Close panels / clear lock</div>
+              <div class="help-keys"><kbd>Esc</kbd></div>
+            </div>
+            <div class="help-item">
+              <div class="help-action">Edit occurrence</div>
+              <div class="help-keys"><kbd>Shift</kbd><span>+</span><kbd>Click</kbd></div>
+            </div>
+          </div>
         </section>
       </div>
 
