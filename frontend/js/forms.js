@@ -742,7 +742,8 @@ function updateRecurrenceUI() {
   }
   if (type === "weekly") {
     const interval = Number(dom.blobForm.weeklyInterval.value || 1);
-    const slotCount = dom.weeklySlots?.querySelectorAll(".weekly-slot").length || 0;
+    const slotSelections = getWeeklySlotSelections();
+    const slotCount = slotSelections.reduce((total, slot) => total + slot.days.length, 0);
     dom.recurrenceSummary.textContent = `Repeats every ${interval} week(s) with ${slotCount} slot(s).`;
   } else if (type === "delta") {
     const value = Number(dom.blobForm.deltaValue.value || 1);
@@ -826,7 +827,9 @@ function createWeeklySlot(slotData = {}) {
     ? crypto.randomUUID()
     : `slot-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   slot.dataset.slotId = slotId;
-  const dayValue = slotData.day ?? 0;
+  const dayValues = Array.isArray(slotData.days)
+    ? slotData.days
+    : [slotData.day ?? 0];
   const defaultStart = slotData.defaultStart || lastValues?.defaultStart || "09:00";
   const defaultEnd = slotData.defaultEnd || lastValues?.defaultEnd || "10:00";
   const schedStart = slotData.schedStart || lastValues?.schedStart || "08:30";
@@ -839,11 +842,11 @@ function createWeeklySlot(slotData = {}) {
   slot.innerHTML = `
     <div class="weekly-slot-row slot-day-row">
       <div class="slot-day-field">
-        <span class="slot-day-label">Day</span>
+        <span class="slot-day-label">Days</span>
         <div class="slot-day-toggle" role="group" aria-label="Day of week">
           ${WEEK_DAYS.map(
             (day, index) =>
-              `<button type="button" class="day-pill ${index === dayValue ? "active" : ""}" data-day="${index}" aria-pressed="${index === dayValue ? "true" : "false"}">${day.charAt(0)}</button>`
+              `<button type="button" class="day-pill ${dayValues.includes(index) ? "active" : ""}" data-day="${index}" aria-pressed="${dayValues.includes(index) ? "true" : "false"}">${day.charAt(0)}</button>`
           ).join("")}
         </div>
       </div>
@@ -940,12 +943,11 @@ function createWeeklySlot(slotData = {}) {
   });
   slot.querySelectorAll(".day-pill").forEach((button) => {
     button.addEventListener("click", () => {
-      slot.querySelectorAll(".day-pill").forEach((pill) => {
-        pill.classList.remove("active");
-        pill.setAttribute("aria-pressed", "false");
-      });
-      button.classList.add("active");
-      button.setAttribute("aria-pressed", "true");
+      button.classList.toggle("active");
+      button.setAttribute(
+        "aria-pressed",
+        button.classList.contains("active") ? "true" : "false"
+      );
       updateRecurrenceUI();
       validateWeeklySlots();
     });
@@ -1001,17 +1003,21 @@ function createWeeklySlot(slotData = {}) {
   validateWeeklySlots();
 }
 
-function getWeeklySlots() {
+function getSelectedDays(slot) {
+  return Array.from(slot.querySelectorAll(".day-pill.active"))
+    .map((pill) => Number(pill.dataset.day))
+    .filter((value) => !Number.isNaN(value));
+}
+
+function getWeeklySlotSelections() {
   if (!dom.weeklySlots) return [];
-  const slots = [];
+  const selections = [];
   dom.weeklySlots.querySelectorAll(".weekly-slot").forEach((slot) => {
-    const dayButton = slot.querySelector(".day-pill.active");
-    const day = Number(dayButton?.dataset.day);
     const splittable = Boolean(slot.querySelector('[name="slotPolicySplittable"]')?.checked);
     const overlappable = Boolean(slot.querySelector('[name="slotPolicyOverlappable"]')?.checked);
     const invisible = Boolean(slot.querySelector('[name="slotPolicyInvisible"]')?.checked);
-    slots.push({
-      day,
+    selections.push({
+      days: getSelectedDays(slot),
       defaultStart: slot.querySelector('[name="slotDefaultStart"]').value,
       defaultEnd: slot.querySelector('[name="slotDefaultEnd"]').value,
       schedStart: slot.querySelector('[name="slotSchedStart"]').value,
@@ -1022,22 +1028,35 @@ function getWeeklySlots() {
       policy: getPolicyPayloadFromFlags(splittable, overlappable, invisible),
     });
   });
+  return selections;
+}
+
+function getWeeklySlots() {
+  const slots = [];
+  getWeeklySlotSelections().forEach((slot) => {
+    slot.days.forEach((day) => {
+      slots.push({ ...slot, day });
+    });
+  });
   return slots;
 }
 
 function validateWeeklySlots() {
   if (!dom.weeklySlotStatus) return true;
-  const slots = getWeeklySlots();
-  if (slots.length === 0) {
+  const selections = getWeeklySlotSelections();
+  if (selections.length === 0) {
     dom.weeklySlotStatus.textContent = "Add at least one weekly slot.";
     return false;
   }
-  const ranges = [];
-  for (const slot of slots) {
-    if (Number.isNaN(slot.day)) {
+  for (const slot of selections) {
+    if (slot.days.length === 0) {
       dom.weeklySlotStatus.textContent = "Weekly slots need a day of week.";
       return false;
     }
+  }
+  const slots = getWeeklySlots();
+  const ranges = [];
+  for (const slot of slots) {
     const defaultStart = timeToMinutes(slot.defaultStart);
     const defaultEnd = timeToMinutes(slot.defaultEnd);
     const schedStart = timeToMinutes(slot.schedStart);
@@ -1206,6 +1225,7 @@ function openEditForm(blob) {
         : null;
       dom.weeklyPerSlot.checked = storedPerSlot !== null ? storedPerSlot : hasCustom;
     }
+    const groupedSlots = new Map();
     blobs.forEach((weeklyBlob) => {
       const slotTimeZone = weeklyBlob.tz || appConfig.userTimeZone;
       const start = new Date(weeklyBlob.default_scheduled_timerange?.start);
@@ -1218,16 +1238,50 @@ function openEditForm(blob) {
       const dayValue = startLocal
         ? weekdayIndexFromDateString(startLocal.split("T")[0])
         : 1;
-      createWeeklySlot({
-        day: dayValue,
+      const tags = Array.isArray(weeklyBlob.tags) ? weeklyBlob.tags : [];
+      const normalizedTags = tags.map((tag) => tagKey(tag)).sort();
+      const policyFlags = getPolicyFlagsFromPolicy(weeklyBlob.policy || {});
+      const slot = {
         defaultStart: timeValueFromDate(start, "09:00", slotTimeZone),
         defaultEnd: timeValueFromDate(end, "10:00", slotTimeZone),
         schedStart: timeValueFromDate(schedStart, "08:30", slotTimeZone),
         schedEnd: timeValueFromDate(schedEnd, "10:30", slotTimeZone),
         name: weeklyBlob.name || "",
         description: weeklyBlob.description || "",
-        tags: Array.isArray(weeklyBlob.tags) ? weeklyBlob.tags : [],
+        tags,
         policy: weeklyBlob.policy || {},
+        days: [dayValue],
+      };
+      const key = JSON.stringify({
+        defaultStart: slot.defaultStart,
+        defaultEnd: slot.defaultEnd,
+        schedStart: slot.schedStart,
+        schedEnd: slot.schedEnd,
+        name: slot.name,
+        description: slot.description,
+        tags: normalizedTags,
+        policy: policyFlags,
+      });
+      const existing = groupedSlots.get(key);
+      if (existing) {
+        if (!existing.days.includes(dayValue)) {
+          existing.days.push(dayValue);
+        }
+      } else {
+        groupedSlots.set(key, slot);
+      }
+    });
+    groupedSlots.forEach((slot) => {
+      createWeeklySlot({
+        days: slot.days,
+        defaultStart: slot.defaultStart,
+        defaultEnd: slot.defaultEnd,
+        schedStart: slot.schedStart,
+        schedEnd: slot.schedEnd,
+        name: slot.name,
+        description: slot.description,
+        tags: slot.tags,
+        policy: slot.policy,
       });
     });
     setDependencies(Array.isArray(blobs[0]?.dependencies) ? blobs[0].dependencies : []);
