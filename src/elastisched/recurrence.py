@@ -128,10 +128,11 @@ class WeeklyBlobRecurrence(BlobRecurrence):
 
             total_days = (current_local - base_start_local).days
             weeks_since_start = max(0, total_days // 7)  # clamp to 0 if before start
+            interval_start = (weeks_since_start // self.interval) * self.interval
 
             candidate_weeks = [
-                weeks_since_start * self.interval,
-                (weeks_since_start + 1) * self.interval,
+                interval_start,
+                interval_start + self.interval,
             ]
 
             for week_offset in candidate_weeks:

@@ -19,20 +19,24 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
 ]
+dependencies = [
+    "aiosqlite",
+    "asyncpg",
+    "fastapi",
+    "greenlet",
+    "pydantic",
+    "scikit-learn",
+    "scipy",
+    "sentence-transformers",
+    "SQLAlchemy",
+    "torch",
+    "tqdm",
+    "transformers",
+    "uvicorn",
+]
 
 [project.optional-dependencies]
 dev = ["pytest", "black"]
-api = [
-    "fastapi",
-    "uvicorn",
-    "SQLAlchemy",
-    "asyncpg",
-    "pydantic",
-    "httpx",
-    "pytest-asyncio",
-    "aiosqlite",
-    "greenlet",
-]
 
 [project.urls]
 Homepage = "https://github.com/chrissuu/elastisched"
