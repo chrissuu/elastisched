@@ -174,10 +174,11 @@ class WeeklyBlobRecurrence(BlobRecurrence):
             if next_blob is None:
                 break
 
-            if not timerange.contains(next_blob.get_schedulable_timerange()):
+            occurrence_range = next_blob.get_schedulable_timerange()
+            if not timerange.overlaps(occurrence_range):
                 break
 
-            next_start = next_blob.get_schedulable_timerange().start
+            next_start = occurrence_range.start
             if next_start > timerange.end:
                 break
 
@@ -230,9 +231,6 @@ class DeltaBlobRecurrence(BlobRecurrence):
                 start_schedulable_timerange.start + intervals_passed * self.delta
             )
 
-            if curr_datetime < start:
-                curr_datetime += self.delta
-
         while curr_datetime <= end:
             time_diff = curr_datetime - start_schedulable_timerange.start
             intervals_passed = time_diff // self.delta
@@ -242,8 +240,12 @@ class DeltaBlobRecurrence(BlobRecurrence):
                 self.start_blob, delta_to_occurrence
             )
 
-            if timerange.contains(blob_copy.get_schedulable_timerange()):
+            occurrence_range = blob_copy.get_schedulable_timerange()
+            if timerange.overlaps(occurrence_range):
                 occurrences.append(blob_copy)
+            elif occurrence_range.end <= start:
+                curr_datetime += self.delta
+                continue
             else:
                 break
 
