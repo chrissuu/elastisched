@@ -503,8 +503,6 @@ async function handleInfoCardDelete(event) {
 
 function renderDay() {
   const dayStart = startOfDay(state.anchorDate);
-  const viewDayParts = getZonedParts(state.anchorDate, appConfig.userTimeZone);
-  const viewDayStamp = viewDayParts ? partsToDayStamp(viewDayParts) : null;
   const hourHeight = 44;
   const hours = Array.from({ length: 24 }, (_, idx) => {
     const hour = idx % 24;
@@ -517,6 +515,8 @@ function renderDay() {
   const blocks = state.blobs
     .map((blob) => {
       const blobTimeZone = getBlobTimeZone(blob);
+      const viewDayParts = getZonedParts(state.anchorDate, blobTimeZone);
+      const viewDayStamp = viewDayParts ? partsToDayStamp(viewDayParts) : null;
       if (!viewDayStamp) return null;
       const effectiveRange = getEffectiveOccurrenceRange(blob);
       if (!effectiveRange) return null;
