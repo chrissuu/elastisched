@@ -28,8 +28,8 @@ from elastisched_api.schemas import (
     ScheduleStatus,
     TimeRangeSchema,
 )
-from elastisched.constants import DEFAULT_TZ
-from elastisched.timerange import TimeRange
+from core.constants import DEFAULT_TZ
+from core.timerange import TimeRange
 
 
 schedule_router = APIRouter(prefix="/schedule", tags=["schedule"])

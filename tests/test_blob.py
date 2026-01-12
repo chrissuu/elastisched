@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from elastisched.blob import Blob
-from elastisched.timerange import TimeRange
+from core.blob import Blob
+from core.timerange import TimeRange
 
 
 def test_different_timezone_le_comparison_normalizes_timezone():

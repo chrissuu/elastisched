@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from elastisched.constants import DEFAULT_TZ
-from elastisched.timerange import TimeRange
+from core.constants import DEFAULT_TZ
+from core.timerange import TimeRange
 
 
 def test_default_timerange_uses_default_timezone():

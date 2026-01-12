@@ -18,15 +18,15 @@ from elastisched_api.schemas import (
     RecurrenceUpdate,
     TimeRangeSchema,
 )
-from elastisched.blob import Blob
-from elastisched.recurrence import (
+from core.blob import Blob
+from core.recurrence import (
     DateBlobRecurrence,
     DeltaBlobRecurrence,
     SingleBlobOccurrence,
     WeeklyBlobRecurrence,
 )
-from elastisched.timerange import TimeRange
-from elastisched.constants import DEFAULT_TZ
+from core.timerange import TimeRange
+from core.constants import DEFAULT_TZ
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from engine import Tag
 

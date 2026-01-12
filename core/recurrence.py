@@ -5,9 +5,9 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 import uuid
 
-from elastisched.blob import Blob
-from elastisched.daytime import daytime
-from elastisched.timerange import TimeRange
+from .blob import Blob
+from .daytime import daytime
+from .timerange import TimeRange
 
 
 def has_overlapping_blobs(blobs: List[Blob]) -> bool:
