@@ -37,7 +37,13 @@ public:
     }
 
     bool overlaps(const Interval& other) const {
-        return !(high < other.getLow() || other.getHigh() < low);
+        if (low == high) {
+            return other.getLow() <= low && low < other.getHigh();
+        }
+        if (other.getLow() == other.getHigh()) {
+            return low <= other.getLow() && other.getLow() < high;
+        }
+        return !(high <= other.getLow() || other.getHigh() <= low);
     }
 
     bool contains(const Interval& other) const {
@@ -48,7 +54,7 @@ public:
         if (!this->overlaps(other)) return 0;
         const T start = std::max(low, other.getLow());
         const T end = std::min(high, other.getHigh());
-        return end - start;
+        return end > start ? end - start : 0;
     }
 
     T length() const {
