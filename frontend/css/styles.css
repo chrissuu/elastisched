@@ -106,7 +106,7 @@ body {
   position: fixed;
   top: 90px;
   right: 32px;
-  width: min(520px, 92vw);
+  width: min(600px, 92vw);
   max-height: calc(100vh - 140px);
   overflow: auto;
   z-index: 35;
@@ -955,6 +955,20 @@ body.modal-open .info-card {
   gap: 6px;
   font-size: 12px;
   color: var(--muted);
+}
+
+.blob-form .slot-policy-advanced .policy-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.blob-form .slot-policy-advanced .policy-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
 }
 
 .blob-form .slot-policy-advanced input[type="number"] {
