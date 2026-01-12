@@ -1,7 +1,7 @@
 import os
 
 
-DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///./elastisched.db"
+DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///./core.db"
 
 
 def get_database_url() -> str:

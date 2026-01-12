@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
-from elastisched.blob import Blob
-from elastisched.constants import DEFAULT_TZ
-from elastisched.timerange import TimeRange
+from .blob import Blob
+from .constants import DEFAULT_TZ
+from .timerange import TimeRange
 from engine import schedule
 from typing import List, Tuple, Dict
 

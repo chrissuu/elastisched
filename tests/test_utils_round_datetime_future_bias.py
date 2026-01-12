@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.elastisched.utils import round_datetime_future_bias
+from core.utils import round_datetime_future_bias
 
 
 def test_round_to_future_minute_future_bias():

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from typing import Tuple
 
-from elastisched.constants import DEFAULT_END_DATE, DEFAULT_START_DATE, DEFAULT_TZ
+from .constants import DEFAULT_END_DATE, DEFAULT_START_DATE, DEFAULT_TZ
 
 
 def validate_timezone_compatibility(func):

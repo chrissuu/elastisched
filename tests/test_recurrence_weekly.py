@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from elastisched.constants import DEFAULT_TZ
-from elastisched.blob import Blob
-from elastisched.recurrence import WeeklyBlobRecurrence
-from elastisched.timerange import TimeRange
+from core.constants import DEFAULT_TZ
+from core.blob import Blob
+from core.recurrence import WeeklyBlobRecurrence
+from core.timerange import TimeRange
 import pytest
 
 
