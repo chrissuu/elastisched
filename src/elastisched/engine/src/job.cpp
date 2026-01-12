@@ -5,6 +5,7 @@ Job::Job(time_t duration, TimeRange schedulableTimeRange, TimeRange scheduledTim
 :   duration(duration),
     schedulableTimeRange(schedulableTimeRange),
     scheduledTimeRange(scheduledTimeRange),
+    scheduledTimeRanges({scheduledTimeRange}),
     id(id),
     policy(policy),
     dependencies(dependencies),
@@ -16,6 +17,17 @@ Job::Job(time_t duration, TimeRange schedulableTimeRange, TimeRange scheduledTim
 bool Job::isRigid() const {
     return duration == schedulableTimeRange.length();
 };
+
+const std::vector<TimeRange>& Job::getScheduledTimeRanges() const {
+    return scheduledTimeRanges;
+}
+
+void Job::setScheduledTimeRanges(std::vector<TimeRange> ranges) {
+    scheduledTimeRanges = std::move(ranges);
+    if (!scheduledTimeRanges.empty()) {
+        scheduledTimeRange = scheduledTimeRanges.front();
+    }
+}
 
 std::string Job::toString() const {
     std::ostringstream oss;
@@ -33,10 +45,14 @@ std::string Job::toString() const {
     
     // Format scheduled time range
     oss << "├─ Scheduled: ";
-    if (scheduledTimeRange.length() > 0) {
-        oss << "[" << scheduledTimeRange.getLow() 
-            << " - " << scheduledTimeRange.getHigh() << "]";
-        oss << " (length: " << scheduledTimeRange.length() << "s)";
+    if (!scheduledTimeRanges.empty() || scheduledTimeRange.length() > 0) {
+        const auto& primary = scheduledTimeRanges.empty() ? scheduledTimeRange : scheduledTimeRanges.front();
+        oss << "[" << primary.getLow() 
+            << " - " << primary.getHigh() << "]";
+        oss << " (length: " << primary.length() << "s)";
+        if (scheduledTimeRanges.size() > 1) {
+            oss << " (split segments: " << scheduledTimeRanges.size() << ")";
+        }
     } else {
         oss << "Not scheduled";
     }
@@ -88,4 +104,3 @@ std::string Job::toString() const {
     
     return oss.str();
 }
-

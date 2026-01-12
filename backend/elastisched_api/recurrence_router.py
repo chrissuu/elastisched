@@ -427,31 +427,42 @@ async def list_occurrences(
                 ScheduledOccurrenceModel.id.in_(occurrence_ids)
             )
         )
-        scheduled = {
-            item.id: item for item in scheduled_result.scalars().all()
-        }
+        scheduled: dict[str, list[ScheduledOccurrenceModel]] = {}
+        for item in scheduled_result.scalars().all():
+            scheduled.setdefault(item.id, []).append(item)
         if scheduled:
             def _coerce_project(value: datetime) -> datetime:
                 if value.tzinfo is None:
                     return value.replace(tzinfo=DEFAULT_TZ)
                 return value.astimezone(DEFAULT_TZ)
 
-            occurrences = [
-                occurrence.model_copy(
-                    update={
-                        "realized_timerange": TimeRangeSchema(
-                            start=_coerce_project(scheduled[occurrence.id].realized_start),
-                            end=_coerce_project(scheduled[occurrence.id].realized_end),
+            expanded = []
+            for occurrence in occurrences:
+                rows = scheduled.get(occurrence.id)
+                if not rows:
+                    expanded.append(occurrence)
+                    continue
+                for row in rows:
+                    realized_start = _coerce_project(row.realized_start)
+                    realized_end = _coerce_project(row.realized_end)
+                    if (
+                        _coerce_project(occurrence.schedulable_timerange.start)
+                        <= realized_start
+                        <= realized_end
+                        <= _coerce_project(occurrence.schedulable_timerange.end)
+                    ):
+                        expanded.append(
+                            occurrence.model_copy(
+                                update={
+                                    "realized_timerange": TimeRangeSchema(
+                                        start=realized_start,
+                                        end=realized_end,
+                                    )
+                                }
+                            )
                         )
-                    }
-                )
-                if occurrence.id in scheduled
-                and _coerce_project(occurrence.schedulable_timerange.start)
-                <= _coerce_project(scheduled[occurrence.id].realized_start)
-                <= _coerce_project(scheduled[occurrence.id].realized_end)
-                <= _coerce_project(occurrence.schedulable_timerange.end)
-                else occurrence
-                for occurrence in occurrences
-            ]
+                    else:
+                        expanded.append(occurrence)
+            occurrences = expanded
     occurrences.sort(key=lambda item: item.default_scheduled_timerange.start)
     return occurrences

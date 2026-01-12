@@ -344,6 +344,20 @@
                 <span>Invisible</span>
               </label>
             </div>
+            <div class="weekly-slot-row slot-policy-advanced is-hidden">
+              <label>
+                Max splits
+                <input type="number" name="policyMaxSplits" min="0" step="1" value="1" />
+              </label>
+              <label>
+                Min split duration (min)
+                <input type="number" name="policyMinSplitDuration" min="0" step="1" value="15" />
+              </label>
+              <label class="policy-option">
+                <input type="checkbox" name="policyRoundToGranularity" />
+                <span>Round to granularity</span>
+              </label>
+            </div>
           </div>
           <div class="dependency-field">
             <span class="dependency-label">Dependencies</span>

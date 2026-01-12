@@ -43,7 +43,7 @@ private:
     }
     
     bool doOverlap(Interval<T>* i1, Interval<T>* i2) const {
-        return (i1->getLow() <= i2->getHigh() && i2->getLow() <= i1->getHigh());
+        return i1->overlaps(*i2);
     }
     
     Node<T, U>* overlapSearch(Node<T, U>* node, Interval<T>& i) const {
