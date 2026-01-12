@@ -156,7 +156,7 @@ double ScheduleCostFunction::busy_saturday_cost() const {
 double ScheduleCostFunction::illegal_schedule_cost() const {
     const std::vector<Job>& scheduledJobs = m_schedule.scheduledJobs;
     IntervalTree<time_t, size_t> nonOverlappableJobs;
-    
+
     for (size_t i = 0; i < scheduledJobs.size(); ++i) {
         const Job& curr = scheduledJobs[i];
         Policy currPolicy = curr.policy;
@@ -189,8 +189,32 @@ double ScheduleCostFunction::illegal_schedule_cost() const {
     return 0.0f;
 }
 
+/**
+ * @brief Adds a cost which helps reduce the amount of overlap that a schedule will accept
+ * 
+ * @return double 
+ */
+double ScheduleCostFunction::overlap_cost() const {
+    const std::vector<Job>& scheduledJobs = m_schedule.scheduledJobs;
+    if (scheduledJobs.size() < 2) {
+        return 0.0f;
+    }
+    const double granularity = m_granularity > 0 ? static_cast<double>(m_granularity) : 1.0;
+    IntervalTree<time_t, size_t> overlapTree;
+    double cost = 0.0f;
+    for (size_t i = 0; i < scheduledJobs.size(); ++i) {
+        const TimeRange& current = scheduledJobs[i].scheduledTimeRange;
+        const auto overlaps = overlapTree.findOverlapping(current);
+        for (const auto* interval : overlaps) {
+            cost += static_cast<double>(current.overlap_length(*interval)) / granularity;
+        }
+        overlapTree.insert(current, i);
+    }
+    return cost;
+}
+
 
 double ScheduleCostFunction::scheduleCost() const {
-    double cost = busy_friday_afternoon_cost() + busy_saturday_cost() + illegal_schedule_cost();
+    double cost = illegal_schedule_cost() + overlap_cost();
     return cost;
 }

@@ -58,6 +58,21 @@ private:
             
         return overlapSearch(node->right.get(), i);
     }
+
+    void findOverlapping(const Node<T, U>* node, const Interval<T>& key, std::vector<const Interval<T>*>& result) const {
+        if (!node) return;
+
+        if (node->interval->overlaps(key)) {
+            result.push_back(node->interval.get());
+        }
+
+        if (node->left && node->left->max >= key.getLow()) {
+            findOverlapping(node->left.get(), key, result);
+        }
+        if (node->right && node->interval->getLow() <= key.getHigh()) {
+            findOverlapping(node->right.get(), key, result);
+        }
+    }
     
     std::unique_ptr<Node<T, U>> cloneNode(const std::unique_ptr<Node<T, U>>& node) const {
         if (!node)
@@ -110,6 +125,12 @@ public:
     
     Interval<T>* searchOverlap(T low, T high) const {
         return searchOverlap(Interval<T>(low, high));
+    }
+
+    std::vector<const Interval<T>*> findOverlapping(const Interval<T>& key) const {
+        std::vector<const Interval<T>*> result;
+        findOverlapping(root.get(), key, result);
+        return result;
     }
     
     U* searchValue(T low, T high) const {

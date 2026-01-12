@@ -1,8 +1,9 @@
 #ifndef INTERVAL_H
 #define INTERVAL_H
 
-#include <stdexcept>
+#include <algorithm>
 #include <iostream>
+#include <stdexcept>
 
 template<typename T>
 class Interval {
@@ -41,6 +42,13 @@ public:
 
     bool contains(const Interval& other) const {
         return low <= other.getLow() && other.getHigh() <= high;
+    }
+
+    T overlap_length(const Interval& other) const {
+        if (!this->overlaps(other)) return 0;
+        const T start = std::max(low, other.getLow());
+        const T end = std::min(high, other.getHigh());
+        return end - start;
     }
 
     T length() const {
