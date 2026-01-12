@@ -1,13 +1,13 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 import uuid
 
 from elastisched.blob import Blob
 from elastisched.daytime import daytime
-from engine import TimeRange
+from elastisched.timerange import TimeRange
 
 
 def has_overlapping_blobs(blobs: List[Blob]) -> bool:
@@ -26,6 +26,124 @@ def _coerce_datetime(value: datetime, tzinfo) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=tzinfo)
     return value.astimezone(tzinfo)
+
+
+def _coerce_datetime_local_naive(value: datetime, tzinfo) -> datetime:
+    if tzinfo is None:
+        return value
+    if value.tzinfo is None:
+        return value.replace(tzinfo=tzinfo).replace(tzinfo=None)
+    return value.astimezone(tzinfo).replace(tzinfo=None)
+
+
+def _resolve_local_datetime(
+    target_local_naive: datetime, tzinfo, reference_project: Optional[datetime] = None
+) -> datetime:
+    if tzinfo is None:
+        return target_local_naive
+
+    candidate0 = target_local_naive.replace(tzinfo=tzinfo, fold=0)
+    candidate1 = target_local_naive.replace(tzinfo=tzinfo, fold=1)
+
+    if candidate0.utcoffset() == candidate1.utcoffset():
+        return candidate0
+
+    roundtrip0 = candidate0.astimezone(timezone.utc).astimezone(tzinfo)
+    roundtrip1 = candidate1.astimezone(timezone.utc).astimezone(tzinfo)
+
+    if roundtrip0 != candidate0 and roundtrip1 != candidate1:
+        # Spring-forward gap: roll forward to the first valid local time.
+        return roundtrip0
+
+    # Fall-back ambiguity: choose the earliest candidate not before the reference.
+    if reference_project is None:
+        return candidate0
+
+    ref = (
+        reference_project
+        if reference_project.tzinfo is not None
+        else reference_project.replace(tzinfo=tzinfo)
+    )
+    cand0_proj = candidate0.astimezone(ref.tzinfo)
+    cand1_proj = candidate1.astimezone(ref.tzinfo)
+
+    if cand0_proj >= ref and cand1_proj >= ref:
+        return candidate0 if cand0_proj <= cand1_proj else candidate1
+    if cand0_proj >= ref:
+        return candidate0
+    if cand1_proj >= ref:
+        return candidate1
+    return candidate1 if cand1_proj >= cand0_proj else candidate0
+
+
+def _delta_from_local(
+    start: datetime,
+    tzinfo,
+    target_local_naive: datetime,
+    reference_project: Optional[datetime] = None,
+) -> timedelta:
+    target_local = _resolve_local_datetime(
+        target_local_naive, tzinfo, reference_project
+    )
+    target_project = (
+        target_local.astimezone(start.tzinfo) if start.tzinfo else target_local
+    )
+    return target_project - start
+
+
+def _project_datetime_from_local(
+    base_project: datetime,
+    tzinfo,
+    target_local_naive: datetime,
+    reference_project: Optional[datetime] = None,
+) -> datetime:
+    target_local = _resolve_local_datetime(
+        target_local_naive, tzinfo, reference_project
+    )
+    if base_project.tzinfo:
+        return target_local.astimezone(base_project.tzinfo)
+    return target_local
+
+
+def _timerange_shift_local(
+    timerange: TimeRange,
+    tzinfo,
+    delta_local: timedelta,
+    reference_project: Optional[datetime] = None,
+) -> TimeRange:
+    start_local = _coerce_datetime_local_naive(timerange.start, tzinfo)
+    end_local = _coerce_datetime_local_naive(timerange.end, tzinfo)
+    local_duration = end_local - start_local
+    target_local_start = start_local + delta_local
+    target_local_end = target_local_start + local_duration
+
+    target_start = _project_datetime_from_local(
+        timerange.start, tzinfo, target_local_start, reference_project
+    )
+    target_end = _project_datetime_from_local(
+        timerange.end, tzinfo, target_local_end, target_start
+    )
+    return TimeRange(start=target_start, end=target_end)
+
+
+def blob_copy_with_local_delta(
+    blob: Blob,
+    tzinfo,
+    delta_local: timedelta,
+    reference_project: Optional[datetime] = None,
+):
+    blob_copy = deepcopy(blob)
+    default_tr = blob_copy.get_default_scheduled_timerange()
+    schedulable_tr = blob_copy.get_schedulable_timerange()
+
+    blob_copy.set_default_scheduled_timerange(
+        _timerange_shift_local(default_tr, tzinfo, delta_local, reference_project)
+    )
+    blob_copy.set_schedulable_timerange(
+        _timerange_shift_local(schedulable_tr, tzinfo, delta_local, reference_project)
+    )
+
+    return blob_copy
 
 
 def blob_copy_with_delta_future(blob: Blob, td: timedelta):
@@ -204,15 +322,21 @@ class DeltaBlobRecurrence(BlobRecurrence):
 
     def next_occurrence(self, current: datetime) -> Optional[Blob]:
         start = self.start_blob.get_schedulable_timerange().start
-        current_local = _coerce_datetime(current, start.tzinfo)
-        if current_local < start:
+        tzinfo = self.start_blob.tz or start.tzinfo
+        current_project = _coerce_datetime(current, start.tzinfo)
+        start_local = _coerce_datetime_local_naive(start, tzinfo)
+        current_local = _coerce_datetime_local_naive(current, tzinfo)
+        if current_local < start_local:
             return deepcopy(self.start_blob)
 
-        time_diff = current_local - start
+        time_diff = current_local - start_local
         intervals_passed = time_diff // self.delta
-        delta_to_occurrence = (intervals_passed + 1) * self.delta
+        target_local = start_local + (intervals_passed + 1) * self.delta
+        delta_local = target_local - start_local
 
-        return blob_copy_with_delta_future(self.start_blob, delta_to_occurrence)
+        return blob_copy_with_local_delta(
+            self.start_blob, tzinfo, delta_local, current_project
+        )
 
     def all_occurrences(self, timerange: TimeRange) -> List[Blob]:
         occurrences = []
@@ -220,36 +344,41 @@ class DeltaBlobRecurrence(BlobRecurrence):
         start_schedulable_timerange = self.start_blob.get_schedulable_timerange()
         start = timerange.start
         end = timerange.end
+        base_start = start_schedulable_timerange.start
+        tzinfo = self.start_blob.tz or base_start.tzinfo
 
         # Determine the first occurrence to consider
-        if start <= start_schedulable_timerange.start:
-            curr_datetime = start_schedulable_timerange.start
+        start_local = _coerce_datetime_local_naive(base_start, tzinfo)
+        range_start_local = _coerce_datetime_local_naive(start, tzinfo)
+        range_end_local = _coerce_datetime_local_naive(end, tzinfo)
+
+        if range_start_local <= start_local:
+            curr_local = start_local
         else:
-            time_diff = start - start_schedulable_timerange.start
+            time_diff = range_start_local - start_local
             intervals_passed = time_diff // self.delta
-            curr_datetime = (
-                start_schedulable_timerange.start + intervals_passed * self.delta
-            )
+            curr_local = start_local + intervals_passed * self.delta
 
-        while curr_datetime <= end:
-            time_diff = curr_datetime - start_schedulable_timerange.start
+        while curr_local <= range_end_local:
+            time_diff = curr_local - start_local
             intervals_passed = time_diff // self.delta
-            delta_to_occurrence = intervals_passed * self.delta
+            target_local = start_local + intervals_passed * self.delta
+            delta_local = target_local - start_local
 
-            blob_copy = blob_copy_with_delta_future(
-                self.start_blob, delta_to_occurrence
+            blob_copy = blob_copy_with_local_delta(
+                self.start_blob, tzinfo, delta_local, start
             )
 
             occurrence_range = blob_copy.get_schedulable_timerange()
             if timerange.overlaps(occurrence_range):
                 occurrences.append(blob_copy)
             elif occurrence_range.end <= start:
-                curr_datetime += self.delta
+                curr_local += self.delta
                 continue
             else:
                 break
 
-            curr_datetime += self.delta
+            curr_local += self.delta
 
         return occurrences
 

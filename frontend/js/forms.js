@@ -1474,7 +1474,10 @@ async function handleBlobSubmit(event) {
     const slots = getWeeklySlots();
     const fallbackName = formData.get("recurrenceName") || "Unnamed Blob";
     const sharedName = perSlot ? formData.get("blobName") : (formData.get("blobName") || fallbackName);
-    const sharedDescription = formData.get("blobDescription") || null;
+    const recurrenceDescription = formData.get("recurrenceDescription") || null;
+    const sharedDescription = perSlot
+      ? (formData.get("blobDescription") || null)
+      : (formData.get("blobDescription") || recurrenceDescription || null);
     const sharedPolicy = policyPayload;
     const blobsOfWeek = slots.map((slot) => {
     const offset = dayOffsetFromSunday(slot.day);
@@ -1523,7 +1526,7 @@ async function handleBlobSubmit(event) {
     recurrencePayload = {
       interval: Math.max(1, Number(formData.get("weeklyInterval") || 1)),
       recurrence_name: formData.get("recurrenceName") || null,
-      recurrence_description: formData.get("recurrenceDescription") || null,
+      recurrence_description: recurrenceDescription,
       end_date: recurrenceEnd,
       color: recurrenceColor,
       weekly_per_slot: perSlot,
