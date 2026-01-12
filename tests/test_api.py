@@ -3,10 +3,11 @@ import importlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def api_client(tmp_path_factory):
     db_path = tmp_path_factory.mktemp("db") / "test.db"
     os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{db_path}"
