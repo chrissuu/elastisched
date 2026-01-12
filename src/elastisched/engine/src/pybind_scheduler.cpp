@@ -33,9 +33,14 @@ PYBIND11_MODULE(engine, m) {
 
     // Policy
     py::class_<Policy>(m, "Policy")
-        .def(py::init<uint8_t, time_t, uint8_t>())
+        .def(py::init<uint8_t, time_t, uint8_t, bool>(),
+             py::arg("max_splits") = 0,
+             py::arg("min_split_duration") = 0,
+             py::arg("scheduling_policies") = 0,
+             py::arg("round_to_granularity") = false)
         .def("getMaxSplits", &Policy::getMaxSplits)
         .def("getMinSplitDuration", &Policy::getMinSplitDuration)
+        .def("getRoundToGranularity", &Policy::getRoundToGranularity)
         .def("getSchedulingPolicies", &Policy::getSchedulingPolicies)
         .def("isSplittable", &Policy::isSplittable)
         .def("isOverlappable", &Policy::isOverlappable)
@@ -59,6 +64,7 @@ PYBIND11_MODULE(engine, m) {
         .def_readwrite("duration", &Job::duration)
         .def_readwrite("schedulableTimeRange", &Job::schedulableTimeRange)
         .def_readwrite("scheduledTimeRange", &Job::scheduledTimeRange)
+        .def_readwrite("scheduledTimeRanges", &Job::scheduledTimeRanges)
         .def_readwrite("id", &Job::id)
         .def_readwrite("policy", &Job::policy)
         .def_readwrite("dependencies", &Job::dependencies)

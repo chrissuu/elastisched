@@ -24,6 +24,13 @@ std::optional<T> safemax(std::optional<T> u, std::optional<T> v) {
     return std::nullopt;
 }
 
+std::vector<TimeRange> getJobScheduledRanges(const Job& job) {
+    if (!job.scheduledTimeRanges.empty()) {
+        return job.scheduledTimeRanges;
+    }
+    return {job.scheduledTimeRange};
+}
+
 /**
  * getTotalJobsLength
  * 
@@ -34,7 +41,9 @@ std::optional<T> safemax(std::optional<T> u, std::optional<T> v) {
 time_t getTotalJobsLength(std::vector<Job> jobs) {
     time_t length = 0;
     for (const auto& job : jobs) {
-        length += job.scheduledTimeRange.length();
+        for (const auto& range : getJobScheduledRanges(job)) {
+            length += range.length();
+        }
     }
     return length;
 }
@@ -47,8 +56,10 @@ m_granularity(granularity)
     if (schedule.scheduledJobs.size() == 0) return;
 
     for (const auto& job : schedule.scheduledJobs) {
-        m_min = safemin<time_t>(m_min, job.scheduledTimeRange.getLow());
-        m_max = safemax<time_t>(m_max, job.scheduledTimeRange.getHigh());
+        for (const auto& range : getJobScheduledRanges(job)) {
+            m_min = safemin<time_t>(m_min, range.getLow());
+            m_max = safemax<time_t>(m_max, range.getHigh());
+        }
     }
 
     TimeRange curr = TimeRange(0, constants::DAY - 1);
@@ -62,10 +73,12 @@ m_granularity(granularity)
     }
 
     for (const auto& job : schedule.scheduledJobs) {
-        TimeRange currInterval = TimeRange(job.scheduledTimeRange.getLow()); // TimeRange representing unit of time
-        std::optional<std::vector<Job>>* currDayJobs = m_dayBasedSchedule.searchValue(currInterval);
-        if (currDayJobs) {
-            currDayJobs->emplace().push_back(job);
+        for (const auto& range : getJobScheduledRanges(job)) {
+            TimeRange currInterval = TimeRange(range.getLow()); // TimeRange representing unit of time
+            std::optional<std::vector<Job>>* currDayJobs = m_dayBasedSchedule.searchValue(currInterval);
+            if (currDayJobs) {
+                currDayJobs->emplace().push_back(job);
+            }
         }
     }
 }
@@ -82,19 +95,18 @@ double ScheduleCostFunction::busy_afternoon_exponential_cost(uint64_t DAYS_SINCE
     double cost = 0;
     while (currDay.getHigh() < m_max.value()) {
         if (currJobs->has_value()) {
-            std::vector<Job> filteredWorkJobs;
             for (const auto& job : currJobs->value()) {
                 bool is_work_type = job.tags.find(constants::WORK_TAG) != job.tags.end();
-                /* scheduledTimeRange.low := DAY * day (since EPOCH) + HOUR * hour + MINUTES * minute + second */
-                bool is_scheduled_in_afternoon = ((job.scheduledTimeRange.getLow() / constants::HOUR) % 24) >= constants::AFTERNOON_START;
-                if (is_work_type && is_scheduled_in_afternoon) {
-                    filteredWorkJobs.push_back(job);
+                if (!is_work_type) {
+                    continue;
                 }
-            }
-            
-            /* Apply greater cost for work type jobs scheduled later in the afternoon */
-            for (const auto& job : filteredWorkJobs) {
-                cost += std::exp(constants::EXP_DOWNFACTOR * ((double)(job.scheduledTimeRange.length()) / constants::HOUR));
+                for (const auto& range : getJobScheduledRanges(job)) {
+                    /* scheduledTimeRange.low := DAY * day (since EPOCH) + HOUR * hour + MINUTES * minute + second */
+                    bool is_scheduled_in_afternoon = ((range.getLow() / constants::HOUR) % 24) >= constants::AFTERNOON_START;
+                    if (is_scheduled_in_afternoon) {
+                        cost += std::exp(constants::EXP_DOWNFACTOR * ((double)(range.length()) / constants::HOUR));
+                    }
+                }
             }
         }
         currDay = TimeRange(currDay.getHigh() + constants::WEEK);
@@ -123,7 +135,9 @@ double ScheduleCostFunction::busy_day_constant_cost(uint64_t DAYS_SINCE_MONDAY) 
             }
             
             for (const auto& job : filteredWorkJobs) {
-                cost += constants::HOURLY_COST_FACTOR * ((double)(job.scheduledTimeRange.length()) / constants::HOUR);
+                for (const auto& range : getJobScheduledRanges(job)) {
+                    cost += constants::HOURLY_COST_FACTOR * ((double)(range.length()) / constants::HOUR);
+                }
             }
         }
         currDay = TimeRange(currDay.getHigh() + constants::WEEK);
@@ -161,23 +175,25 @@ double ScheduleCostFunction::illegal_schedule_cost() const {
         const Job& curr = scheduledJobs[i];
         Policy currPolicy = curr.policy;
 
-        if (!curr.schedulableTimeRange.contains(curr.scheduledTimeRange)) {
-            return constants::ILLEGAL_SCHEDULE_COST;
-        }
-        
-        if (!currPolicy.isOverlappable()) {
-            auto overlappingInterval = nonOverlappableJobs.searchOverlap(
-                curr.scheduledTimeRange
-            );
-            
-            if (overlappingInterval != nullptr) {
+        for (const auto& range : getJobScheduledRanges(curr)) {
+            if (!curr.schedulableTimeRange.contains(range)) {
                 return constants::ILLEGAL_SCHEDULE_COST;
             }
-            
-            nonOverlappableJobs.insert(
-                curr.scheduledTimeRange,
-                i
-            );
+
+            if (!currPolicy.isOverlappable()) {
+                auto overlappingInterval = nonOverlappableJobs.searchOverlap(
+                    range
+                );
+
+                if (overlappingInterval != nullptr) {
+                    return constants::ILLEGAL_SCHEDULE_COST;
+                }
+
+                nonOverlappableJobs.insert(
+                    range,
+                    i
+                );
+            }
         }
     }
     
@@ -203,18 +219,31 @@ double ScheduleCostFunction::overlap_cost() const {
     IntervalTree<time_t, size_t> overlapTree;
     double cost = 0.0f;
     for (size_t i = 0; i < scheduledJobs.size(); ++i) {
-        const TimeRange& current = scheduledJobs[i].scheduledTimeRange;
-        const auto overlaps = overlapTree.findOverlapping(current);
-        for (const auto* interval : overlaps) {
-            cost += static_cast<double>(current.overlap_length(*interval)) / granularity;
+        for (const auto& current : getJobScheduledRanges(scheduledJobs[i])) {
+            const auto overlaps = overlapTree.findOverlapping(current);
+            for (const auto* interval : overlaps) {
+                cost += static_cast<double>(current.overlap_length(*interval)) / granularity;
+            }
+            overlapTree.insert(current, i);
         }
-        overlapTree.insert(current, i);
+    }
+    return cost;
+}
+
+double ScheduleCostFunction::split_cost() const {
+    const std::vector<Job>& scheduledJobs = m_schedule.scheduledJobs;
+    double cost = 0.0f;
+    for (const auto& job : scheduledJobs) {
+        const auto ranges = getJobScheduledRanges(job);
+        if (ranges.size() > 1) {
+            cost += (static_cast<double>(ranges.size() - 1) * constants::SPLIT_COST_FACTOR);
+        }
     }
     return cost;
 }
 
 
 double ScheduleCostFunction::scheduleCost() const {
-    double cost = illegal_schedule_cost() + overlap_cost();
+    double cost = illegal_schedule_cost() + overlap_cost() + split_cost();
     return cost;
 }

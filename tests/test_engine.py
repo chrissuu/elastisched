@@ -102,3 +102,45 @@ def test_scheduler_invariance_cost():
     curr_schedulable_tr = job.schedulableTimeRange
     assert(curr_schedulable_tr.contains(curr_scheduled_tr))
     assert(curr_scheduled_tr.getLow() == tr_scheduled.getLow())
+
+
+def test_force_split_schedule(monkeypatch):
+    monkeypatch.setenv("ELASTISCHED_RNG_SEED", "19")
+    split_policy = engine.Policy(1, HOUR, 1, True)
+    rigid_policy = engine.Policy(0, 0, 0)
+
+    schedulable = engine.TimeRange(Day.MONDAY * DAY + Hour.NINE_AM * HOUR,
+                                   Day.MONDAY * DAY + Hour.ONE_PM * HOUR)
+    rigid_range = engine.TimeRange(Day.MONDAY * DAY + Hour.TEN_AM * HOUR,
+                                   Day.MONDAY * DAY + Hour.TWELVE_PM * HOUR)
+
+    split_job = engine.Job(
+        2 * HOUR,
+        schedulable,
+        engine.TimeRange(Day.MONDAY * DAY + Hour.NINE_AM * HOUR,
+                         Day.MONDAY * DAY + Hour.ELEVEN_AM * HOUR),
+        "split_job",
+        split_policy,
+        set(),
+        set(),
+    )
+
+    rigid_job = engine.Job(
+        2 * HOUR,
+        rigid_range,
+        rigid_range,
+        "rigid_job",
+        rigid_policy,
+        set(),
+        set(),
+    )
+
+    schedule, _ = engine.schedule_jobs([split_job, rigid_job], HOUR, 500.0, 0.01, 20000)
+    scheduled_split = next(job for job in schedule.scheduledJobs if job.id == "split_job")
+    ranges = list(scheduled_split.scheduledTimeRanges)
+
+    assert len(ranges) == 2
+    total_duration = sum(r.getHigh() - r.getLow() for r in ranges)
+    assert total_duration == split_job.duration
+    assert all((r.getHigh() - r.getLow()) >= HOUR for r in ranges)
+    assert all(r.getLow() % HOUR == 0 for r in ranges)

@@ -27,6 +27,7 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
         if conn.dialect.name == "sqlite":
             await _ensure_sqlite_blob_columns(conn)
+            await _ensure_sqlite_scheduled_occurrence_columns(conn)
 
 
 async def _ensure_sqlite_blob_columns(conn) -> None:
@@ -39,3 +40,15 @@ async def _ensure_sqlite_blob_columns(conn) -> None:
         missing.append(("realized_end", "DATETIME"))
     for name, col_type in missing:
         await conn.execute(text(f"ALTER TABLE blobs ADD COLUMN {name} {col_type}"))
+
+
+async def _ensure_sqlite_scheduled_occurrence_columns(conn) -> None:
+    result = await conn.execute(text("PRAGMA table_info(scheduled_occurrences)"))
+    columns = {row[1] for row in result.fetchall()}
+    missing = []
+    if "segment_index" not in columns:
+        missing.append(("segment_index", "INTEGER DEFAULT 0"))
+    for name, col_type in missing:
+        await conn.execute(
+            text(f"ALTER TABLE scheduled_occurrences ADD COLUMN {name} {col_type}")
+        )

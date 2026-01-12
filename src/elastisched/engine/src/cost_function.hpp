@@ -37,6 +37,7 @@ public:
 
     double illegal_schedule_cost() const;
     double overlap_cost() const;
+    double split_cost() const;
     double scheduleCost() const;
     
     ScheduleCostFunction(const Schedule& schedule, time_t granularity);
