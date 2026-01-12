@@ -172,6 +172,9 @@ function markUnsavedChanges() {
   }
 }
 
+const DEFAULT_MAX_SPLITS = 1;
+const DEFAULT_MIN_SPLIT_MINUTES = 15;
+
 function getPolicyFlagsFromPolicy(policy = {}) {
   const rawMask = Number(policy.scheduling_policies);
   const mask = Number.isFinite(rawMask) ? rawMask : 0;
@@ -183,24 +186,30 @@ function getPolicyFlagsFromPolicy(policy = {}) {
       : Boolean(mask & 2);
   const invisible =
     typeof policy.is_invisible === "boolean" ? policy.is_invisible : Boolean(mask & 4);
-  const maxSplits = Number.isFinite(Number(policy.max_splits))
-    ? Math.max(0, Math.round(Number(policy.max_splits)))
-    : 0;
-  const minSplitSeconds = Number(policy.min_split_duration_seconds ?? policy.min_split_duration);
+  const rawMaxSplits = policy.max_splits;
+  const maxSplits = rawMaxSplits == null
+    ? DEFAULT_MAX_SPLITS
+    : Math.max(0, Math.round(Number(rawMaxSplits)));
+  const rawMinSplit = policy.min_split_duration_seconds ?? policy.min_split_duration;
+  const minSplitSeconds = rawMinSplit == null ? null : Number(rawMinSplit);
   const minSplitDurationMinutes = Number.isFinite(minSplitSeconds)
     ? Math.max(0, Math.round(minSplitSeconds / 60))
-    : 0;
+    : DEFAULT_MIN_SPLIT_MINUTES;
   const roundToGranularity = Boolean(policy.round_to_granularity);
   return { splittable, overlappable, invisible, maxSplits, minSplitDurationMinutes, roundToGranularity };
 }
 
 function getPolicyPayloadFromForm() {
-  const maxSplitsValue = Number(dom.blobForm.policyMaxSplits?.value);
-  const minSplitMinutesValue = Number(dom.blobForm.policyMinSplitDuration?.value);
-  const maxSplits = Number.isFinite(maxSplitsValue) ? Math.max(0, Math.round(maxSplitsValue)) : 0;
-  const minSplitMinutes = Number.isFinite(minSplitMinutesValue)
-    ? Math.max(0, Math.round(minSplitMinutesValue))
-    : 0;
+  const maxSplitsRaw = dom.blobForm.policyMaxSplits?.value;
+  const minSplitMinutesRaw = dom.blobForm.policyMinSplitDuration?.value;
+  const maxSplitsValue = Number(maxSplitsRaw);
+  const minSplitMinutesValue = Number(minSplitMinutesRaw);
+  const maxSplits = maxSplitsRaw === "" || !Number.isFinite(maxSplitsValue)
+    ? DEFAULT_MAX_SPLITS
+    : Math.max(0, Math.round(maxSplitsValue));
+  const minSplitMinutes = minSplitMinutesRaw === "" || !Number.isFinite(minSplitMinutesValue)
+    ? DEFAULT_MIN_SPLIT_MINUTES
+    : Math.max(0, Math.round(minSplitMinutesValue));
   const roundToGranularity = Boolean(dom.blobForm.policyRoundToGranularity?.checked);
   return getPolicyPayloadFromFlags(
     Boolean(dom.blobForm.policySplittable?.checked),
@@ -216,8 +225,8 @@ function getPolicyPayloadFromFlags(
   splittable,
   overlappable,
   invisible,
-  maxSplits = 0,
-  minSplitDurationSeconds = 0,
+  maxSplits = DEFAULT_MAX_SPLITS,
+  minSplitDurationSeconds = DEFAULT_MIN_SPLIT_MINUTES * 60,
   roundToGranularity = false
 ) {
   const schedulingPolicies =
@@ -231,6 +240,15 @@ function getPolicyPayloadFromFlags(
     round_to_granularity: roundToGranularity,
     scheduling_policies: schedulingPolicies,
   };
+}
+
+function setPolicyAdvancedVisibility(container, isSplittable) {
+  const scope = container?.closest?.(".weekly-slot")
+    || container?.closest?.("form")
+    || container;
+  const advancedRow = scope?.querySelector?.(".slot-policy-advanced");
+  if (!advancedRow) return;
+  advancedRow.classList.toggle("is-hidden", !isSplittable);
 }
 
 function setDependencies(ids) {
@@ -660,6 +678,7 @@ function applyPolicyToForm(policy) {
   if (dom.blobForm.policyRoundToGranularity) {
     dom.blobForm.policyRoundToGranularity.checked = flags.roundToGranularity;
   }
+  setPolicyAdvancedVisibility(dom.blobForm.policySplittable || dom.blobForm, flags.splittable);
 }
 
 function applyPolicyToSlot(slot, policy) {
@@ -680,6 +699,7 @@ function applyPolicyToSlot(slot, policy) {
   if (roundToGranularityEl) {
     roundToGranularityEl.checked = flags.roundToGranularity;
   }
+  setPolicyAdvancedVisibility(slot, flags.splittable);
 }
 
 function syncSlotPoliciesFromForm() {
@@ -768,6 +788,10 @@ function updateRecurrenceUI() {
     if (type === "single") {
       dom.recurrenceEnd.value = "";
     }
+  }
+
+  if (dom.blobForm?.policySplittable) {
+    setPolicyAdvancedVisibility(dom.blobForm.policySplittable, dom.blobForm.policySplittable.checked);
   }
 
   const defaultStart = dom.blobForm.defaultStart.value;
@@ -971,7 +995,7 @@ function createWeeklySlot(slotData = {}) {
         <span>Invisible</span>
       </label>
     </div>
-    <div class="weekly-slot-row slot-policy-advanced">
+    <div class="weekly-slot-row slot-policy-advanced ${policyFlags.splittable ? "" : "is-hidden"}">
       <label>
         Max splits
         <input
@@ -979,7 +1003,7 @@ function createWeeklySlot(slotData = {}) {
           name="slotPolicyMaxSplits"
           min="0"
           step="1"
-          value="${policyFlags.maxSplits ?? 0}"
+          value="${policyFlags.maxSplits ?? DEFAULT_MAX_SPLITS}"
         />
       </label>
       <label>
@@ -989,7 +1013,7 @@ function createWeeklySlot(slotData = {}) {
           name="slotPolicyMinSplitDuration"
           min="0"
           step="1"
-          value="${policyFlags.minSplitDurationMinutes ?? 0}"
+          value="${policyFlags.minSplitDurationMinutes ?? DEFAULT_MIN_SPLIT_MINUTES}"
         />
       </label>
       <label class="policy-option">
@@ -1014,6 +1038,9 @@ function createWeeklySlot(slotData = {}) {
   renderSlotTagList(slot);
   slot.querySelectorAll("input").forEach((field) => {
     field.addEventListener("change", () => {
+      if (field.name === "slotPolicySplittable") {
+        setPolicyAdvancedVisibility(slot, field.checked);
+      }
       updateRecurrenceUI();
       validateWeeklySlots();
     });
@@ -1093,14 +1120,16 @@ function getWeeklySlotSelections() {
     const splittable = Boolean(slot.querySelector('[name="slotPolicySplittable"]')?.checked);
     const overlappable = Boolean(slot.querySelector('[name="slotPolicyOverlappable"]')?.checked);
     const invisible = Boolean(slot.querySelector('[name="slotPolicyInvisible"]')?.checked);
-    const maxSplitsValue = Number(slot.querySelector('[name="slotPolicyMaxSplits"]')?.value);
-    const minSplitMinutesValue = Number(
-      slot.querySelector('[name="slotPolicyMinSplitDuration"]')?.value
-    );
-    const maxSplits = Number.isFinite(maxSplitsValue) ? Math.max(0, Math.round(maxSplitsValue)) : 0;
-    const minSplitMinutes = Number.isFinite(minSplitMinutesValue)
-      ? Math.max(0, Math.round(minSplitMinutesValue))
-      : 0;
+    const maxSplitsRaw = slot.querySelector('[name="slotPolicyMaxSplits"]')?.value;
+    const minSplitMinutesRaw = slot.querySelector('[name="slotPolicyMinSplitDuration"]')?.value;
+    const maxSplitsValue = Number(maxSplitsRaw);
+    const minSplitMinutesValue = Number(minSplitMinutesRaw);
+    const maxSplits = maxSplitsRaw === "" || !Number.isFinite(maxSplitsValue)
+      ? DEFAULT_MAX_SPLITS
+      : Math.max(0, Math.round(maxSplitsValue));
+    const minSplitMinutes = minSplitMinutesRaw === "" || !Number.isFinite(minSplitMinutesValue)
+      ? DEFAULT_MIN_SPLIT_MINUTES
+      : Math.max(0, Math.round(minSplitMinutesValue));
     const roundToGranularity = Boolean(
       slot.querySelector('[name="slotPolicyRoundToGranularity"]')?.checked
     );
@@ -2027,6 +2056,9 @@ function bindFormHandlers(onRefresh) {
     const field = dom.blobForm?.[name];
     if (field) {
       field.addEventListener("change", () => {
+        if (name === "policySplittable") {
+          setPolicyAdvancedVisibility(field, field.checked);
+        }
         if (!dom.weeklyPerSlot?.checked) {
           syncSlotPoliciesFromForm();
         }
