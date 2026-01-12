@@ -1,4 +1,5 @@
 from typing import AsyncGenerator
+import importlib
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -23,6 +24,9 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
+    # Ensure model metadata is registered on the current Base after reloads.
+    import elastisched_api.models as models  # noqa: F401
+    importlib.reload(models)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         if conn.dialect.name == "sqlite":
