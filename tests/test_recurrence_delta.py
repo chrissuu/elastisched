@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from elastisched.blob import Blob
 from elastisched.constants import DEFAULT_TZ
@@ -104,3 +105,93 @@ def test_delta_all_occurrences_none_in_range():
 
     # Assert that
     assert occurrences == []
+
+
+def test_delta_next_occurrence_dst_agnostic(monkeypatch):
+    tz = ZoneInfo("America/New_York")
+    import elastisched.constants as constants
+    import elastisched.timerange as timerange
+
+    monkeypatch.setattr(constants, "DEFAULT_TZ", tz)
+    monkeypatch.setattr(timerange, "DEFAULT_TZ", tz)
+
+    default_timerange = TimeRange(
+        start=datetime(2024, 3, 9, 9, tzinfo=tz),
+        end=datetime(2024, 3, 9, 10, tzinfo=tz),
+    )
+    schedulable_timerange = TimeRange(
+        start=datetime(2024, 3, 9, 8, tzinfo=tz),
+        end=datetime(2024, 3, 9, 11, tzinfo=tz),
+    )
+    blob = Blob(default_timerange, schedulable_timerange, tz=tz)
+    recurrence = DeltaBlobRecurrence(delta=timedelta(days=1), start_blob=blob)
+
+    dt = datetime(2024, 3, 9, 12, tzinfo=tz)
+    next_occurrence = recurrence.next_occurrence(dt)
+
+    assert next_occurrence.get_schedulable_timerange().start == datetime(
+        2024, 3, 10, 8, tzinfo=tz
+    )
+    assert next_occurrence.get_schedulable_timerange().end == datetime(
+        2024, 3, 10, 11, tzinfo=tz
+    )
+
+
+def test_delta_next_occurrence_dst_fall_back_fold(monkeypatch):
+    tz = ZoneInfo("America/New_York")
+    import elastisched.constants as constants
+    import elastisched.timerange as timerange
+
+    monkeypatch.setattr(constants, "DEFAULT_TZ", tz)
+    monkeypatch.setattr(timerange, "DEFAULT_TZ", tz)
+
+    default_timerange = TimeRange(
+        start=datetime(2024, 11, 2, 1, 30, tzinfo=tz),
+        end=datetime(2024, 11, 2, 2, 30, tzinfo=tz),
+    )
+    schedulable_timerange = TimeRange(
+        start=datetime(2024, 11, 2, 1, 30, tzinfo=tz),
+        end=datetime(2024, 11, 2, 3, 30, tzinfo=tz),
+    )
+    blob = Blob(default_timerange, schedulable_timerange, tz=tz)
+    recurrence = DeltaBlobRecurrence(delta=timedelta(days=1), start_blob=blob)
+
+    dt = datetime(2024, 11, 3, 1, 0, tzinfo=tz, fold=1)
+    next_occurrence = recurrence.next_occurrence(dt)
+
+    assert next_occurrence.get_schedulable_timerange().start == datetime(
+        2024, 11, 3, 1, 30, tzinfo=tz, fold=1
+    )
+    assert next_occurrence.get_schedulable_timerange().end == datetime(
+        2024, 11, 3, 3, 30, tzinfo=tz, fold=1
+    )
+
+
+def test_delta_next_occurrence_dst_spring_forward_duration(monkeypatch):
+    tz = ZoneInfo("America/New_York")
+    import elastisched.constants as constants
+    import elastisched.timerange as timerange
+
+    monkeypatch.setattr(constants, "DEFAULT_TZ", tz)
+    monkeypatch.setattr(timerange, "DEFAULT_TZ", tz)
+
+    default_timerange = TimeRange(
+        start=datetime(2024, 3, 9, 1, tzinfo=tz),
+        end=datetime(2024, 3, 9, 9, tzinfo=tz),
+    )
+    schedulable_timerange = TimeRange(
+        start=datetime(2024, 3, 9, 1, tzinfo=tz),
+        end=datetime(2024, 3, 9, 9, tzinfo=tz),
+    )
+    blob = Blob(default_timerange, schedulable_timerange, tz=tz)
+    recurrence = DeltaBlobRecurrence(delta=timedelta(days=1), start_blob=blob)
+
+    dt = datetime(2024, 3, 9, 12, tzinfo=tz)
+    next_occurrence = recurrence.next_occurrence(dt)
+
+    assert next_occurrence.get_schedulable_timerange().start == datetime(
+        2024, 3, 10, 1, tzinfo=tz
+    )
+    assert next_occurrence.get_schedulable_timerange().end == datetime(
+        2024, 3, 10, 9, tzinfo=tz
+    )

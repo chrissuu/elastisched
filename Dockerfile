@@ -20,7 +20,7 @@ COPY frontend /app/frontend
 
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt \
-    && pip install .
+    && pip install -e .
 
 EXPOSE 8000
 

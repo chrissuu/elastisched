@@ -199,7 +199,7 @@ function showInfoCard(blob, anchorRect) {
     : "Single";
   const starred = isOccurrenceStarred(blob);
   const blobName = blob.name || "Untitled";
-  const blobDescription = blob.description;
+  const blobDescription = blob.description || recurrenceDescription;
   const blobId = blob.id;
   const effectiveRange = getEffectiveOccurrenceRange(blob);
   const timeLabel = effectiveRange
