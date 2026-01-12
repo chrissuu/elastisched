@@ -134,7 +134,13 @@ def _policy_from_payload(policy) -> engine.Policy:
         or policy.get("min_split_duration")
         or 0
     )
-    return engine.Policy(max_splits, min_split_duration, int(scheduling_policies))
+    round_to_granularity = bool(policy.get("round_to_granularity") or False)
+    return engine.Policy(
+        max_splits,
+        min_split_duration,
+        int(scheduling_policies),
+        round_to_granularity,
+    )
 
 
 def _tags_from_payload(raw_tags) -> set:
@@ -186,28 +192,39 @@ def _dependency_violation_message(jobs: list[engine.Job]) -> str | None:
     if len(topo_order) != len(jobs):
         return "Cyclic dependencies detected."
 
-    processed = set()
     for job in jobs:
+        job_ranges = job.scheduledTimeRanges or [job.scheduledTimeRange]
+        earliest_start = min(job_range.getLow() for job_range in job_ranges)
         for dep_id in job.dependencies:
-            if dep_id in job_map and dep_id not in processed:
+            dep_job = job_map.get(dep_id)
+            if dep_job is None:
+                continue
+            dep_ranges = dep_job.scheduledTimeRanges or [dep_job.scheduledTimeRange]
+            latest_end = max(dep_range.getHigh() for dep_range in dep_ranges)
+            if latest_end > earliest_start:
                 return f"Dependency order violation for {job.id}."
-        processed.add(job.id)
     return None
 
 
 def _validate_schedule(schedule: engine.Schedule) -> str | None:
     jobs = list(schedule.scheduledJobs)
     for job in jobs:
-        if not job.schedulableTimeRange.contains(job.scheduledTimeRange):
-            return f"{job.id} scheduled outside schedulable window."
+        job_ranges = job.scheduledTimeRanges or [job.scheduledTimeRange]
+        for job_range in job_ranges:
+            if not job.schedulableTimeRange.contains(job_range):
+                return f"{job.id} scheduled outside schedulable window."
 
     non_overlappable = []
     for job in jobs:
         if job.policy.isOverlappable():
             continue
         for other in non_overlappable:
-            if job.scheduledTimeRange.overlaps(other.scheduledTimeRange):
-                return f"{job.id} overlaps with {other.id}."
+            job_ranges = job.scheduledTimeRanges or [job.scheduledTimeRange]
+            other_ranges = other.scheduledTimeRanges or [other.scheduledTimeRange]
+            for job_range in job_ranges:
+                for other_range in other_ranges:
+                    if job_range.overlaps(other_range):
+                        return f"{job.id} overlaps with {other.id}."
         non_overlappable.append(job)
 
     return _dependency_violation_message(jobs)
@@ -350,21 +367,20 @@ async def run_schedule(
     await session.execute(delete(ScheduledOccurrenceModel))
     scheduled_rows = []
     for job in schedule.scheduledJobs:
-        realized_start_utc = epoch_start_utc + timedelta(
-            seconds=job.scheduledTimeRange.getLow()
-        )
-        realized_end_utc = epoch_start_utc + timedelta(
-            seconds=job.scheduledTimeRange.getHigh()
-        )
-        realized_start = realized_start_utc.astimezone(DEFAULT_TZ)
-        realized_end = realized_end_utc.astimezone(DEFAULT_TZ)
-        scheduled_rows.append(
-            ScheduledOccurrenceModel(
-                id=job.id,
-                realized_start=realized_start,
-                realized_end=realized_end,
+        ranges = job.scheduledTimeRanges or [job.scheduledTimeRange]
+        for segment_index, job_range in enumerate(ranges):
+            realized_start_utc = epoch_start_utc + timedelta(seconds=job_range.getLow())
+            realized_end_utc = epoch_start_utc + timedelta(seconds=job_range.getHigh())
+            realized_start = realized_start_utc.astimezone(DEFAULT_TZ)
+            realized_end = realized_end_utc.astimezone(DEFAULT_TZ)
+            scheduled_rows.append(
+                ScheduledOccurrenceModel(
+                    id=job.id,
+                    segment_index=segment_index,
+                    realized_start=realized_start,
+                    realized_end=realized_end,
+                )
             )
-        )
     if scheduled_rows:
         session.add_all(scheduled_rows)
 
@@ -374,21 +390,28 @@ async def run_schedule(
     await session.commit()
     await session.refresh(state)
 
-    scheduled_map = {row.id: row for row in scheduled_rows}
-    if scheduled_map:
-        occurrences = [
-            occurrence.model_copy(
-                update={
-                    "realized_timerange": TimeRangeSchema(
-                        start=scheduled_map[occurrence.id].realized_start,
-                        end=scheduled_map[occurrence.id].realized_end,
+    if scheduled_rows:
+        scheduled_map: dict[str, list[ScheduledOccurrenceModel]] = {}
+        for row in scheduled_rows:
+            scheduled_map.setdefault(row.id, []).append(row)
+        expanded = []
+        for occurrence in occurrences:
+            rows = scheduled_map.get(occurrence.id)
+            if not rows:
+                expanded.append(occurrence)
+                continue
+            for row in rows:
+                expanded.append(
+                    occurrence.model_copy(
+                        update={
+                            "realized_timerange": TimeRangeSchema(
+                                start=row.realized_start,
+                                end=row.realized_end,
+                            )
+                        }
                     )
-                }
-            )
-            if occurrence.id in scheduled_map
-            else occurrence
-            for occurrence in occurrences
-        ]
+                )
+        occurrences = expanded
 
     return ScheduleResponse(
         occurrences=occurrences,

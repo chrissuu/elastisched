@@ -29,6 +29,7 @@ namespace constants {
 
     constexpr double EXP_DOWNFACTOR = 0.1f;
     constexpr double HOURLY_COST_FACTOR = 1.0f;
+    constexpr double SPLIT_COST_FACTOR = 10.0f;
 
     const Tag WORK_TAG = Tag("ELASTISCHED_WORK_TYPE");
     constexpr double ILLEGAL_SCHEDULE_COST = 1e12f;

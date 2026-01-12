@@ -7,6 +7,7 @@
 #include <vector>
 #include <iostream>
 #include <set>
+#include <algorithm>
 
 #include "../constants.hpp"
 #include "../schedule.hpp"
@@ -43,8 +44,22 @@ inline DependencyCheckResult checkDependencyViolations(const Schedule& schedule)
     }
     
     std::unordered_map<ID, const Job*> jobMap;
+    std::unordered_map<ID, time_t> earliestStart;
+    std::unordered_map<ID, time_t> latestEnd;
     for (const auto& job : schedule.scheduledJobs) {
         jobMap[job.id] = &job;
+        time_t minStart = job.scheduledTimeRange.getLow();
+        time_t maxEnd = job.scheduledTimeRange.getHigh();
+        if (!job.scheduledTimeRanges.empty()) {
+            minStart = job.scheduledTimeRanges.front().getLow();
+            maxEnd = job.scheduledTimeRanges.front().getHigh();
+            for (const auto& range : job.scheduledTimeRanges) {
+                minStart = std::min(minStart, range.getLow());
+                maxEnd = std::max(maxEnd, range.getHigh());
+            }
+        }
+        earliestStart[job.id] = minStart;
+        latestEnd[job.id] = maxEnd;
     }
     
     std::unordered_map<ID, std::vector<ID>> adjList;
@@ -92,15 +107,14 @@ inline DependencyCheckResult checkDependencyViolations(const Schedule& schedule)
         return result;
     }
 
-    std::unordered_set<ID> processedJobs;
-    
     for (const auto& job : schedule.scheduledJobs) {
         std::set<ID> violatedDeps;
         
         for (const ID& depId : job.dependencies) {
-            if (jobMap.find(depId) != jobMap.end() && 
-                processedJobs.find(depId) == processedJobs.end()) {
-                violatedDeps.insert(depId);
+            if (jobMap.find(depId) != jobMap.end()) {
+                if (latestEnd[depId] > earliestStart[job.id]) {
+                    violatedDeps.insert(depId);
+                }
             }
         }
         
@@ -108,8 +122,6 @@ inline DependencyCheckResult checkDependencyViolations(const Schedule& schedule)
             result.violations.emplace_back(job.id, violatedDeps);
             result.hasViolations = true;
         }
-        
-        processedJobs.insert(job.id);
     }
     
     return result;

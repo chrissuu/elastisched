@@ -36,6 +36,7 @@ class ScheduledOccurrenceModel(Base):
     __tablename__ = "scheduled_occurrences"
 
     id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    segment_index: Mapped[int] = mapped_column(Integer, primary_key=True, default=0)
     realized_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     realized_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

@@ -183,24 +183,52 @@ function getPolicyFlagsFromPolicy(policy = {}) {
       : Boolean(mask & 2);
   const invisible =
     typeof policy.is_invisible === "boolean" ? policy.is_invisible : Boolean(mask & 4);
-  return { splittable, overlappable, invisible };
+  const maxSplits = Number.isFinite(Number(policy.max_splits))
+    ? Math.max(0, Math.round(Number(policy.max_splits)))
+    : 0;
+  const minSplitSeconds = Number(policy.min_split_duration_seconds ?? policy.min_split_duration);
+  const minSplitDurationMinutes = Number.isFinite(minSplitSeconds)
+    ? Math.max(0, Math.round(minSplitSeconds / 60))
+    : 0;
+  const roundToGranularity = Boolean(policy.round_to_granularity);
+  return { splittable, overlappable, invisible, maxSplits, minSplitDurationMinutes, roundToGranularity };
 }
 
 function getPolicyPayloadFromForm() {
+  const maxSplitsValue = Number(dom.blobForm.policyMaxSplits?.value);
+  const minSplitMinutesValue = Number(dom.blobForm.policyMinSplitDuration?.value);
+  const maxSplits = Number.isFinite(maxSplitsValue) ? Math.max(0, Math.round(maxSplitsValue)) : 0;
+  const minSplitMinutes = Number.isFinite(minSplitMinutesValue)
+    ? Math.max(0, Math.round(minSplitMinutesValue))
+    : 0;
+  const roundToGranularity = Boolean(dom.blobForm.policyRoundToGranularity?.checked);
   return getPolicyPayloadFromFlags(
     Boolean(dom.blobForm.policySplittable?.checked),
     Boolean(dom.blobForm.policyOverlappable?.checked),
-    Boolean(dom.blobForm.policyInvisible?.checked)
+    Boolean(dom.blobForm.policyInvisible?.checked),
+    maxSplits,
+    minSplitMinutes * 60,
+    roundToGranularity
   );
 }
 
-function getPolicyPayloadFromFlags(splittable, overlappable, invisible) {
+function getPolicyPayloadFromFlags(
+  splittable,
+  overlappable,
+  invisible,
+  maxSplits = 0,
+  minSplitDurationSeconds = 0,
+  roundToGranularity = false
+) {
   const schedulingPolicies =
     (splittable ? 1 : 0) | (overlappable ? 2 : 0) | (invisible ? 4 : 0);
   return {
     is_splittable: splittable,
     is_overlappable: overlappable,
     is_invisible: invisible,
+    max_splits: maxSplits,
+    min_split_duration_seconds: minSplitDurationSeconds,
+    round_to_granularity: roundToGranularity,
     scheduling_policies: schedulingPolicies,
   };
 }
@@ -623,6 +651,15 @@ function applyPolicyToForm(policy) {
   if (dom.blobForm.policyInvisible) {
     dom.blobForm.policyInvisible.checked = flags.invisible;
   }
+  if (dom.blobForm.policyMaxSplits) {
+    dom.blobForm.policyMaxSplits.value = String(flags.maxSplits ?? 0);
+  }
+  if (dom.blobForm.policyMinSplitDuration) {
+    dom.blobForm.policyMinSplitDuration.value = String(flags.minSplitDurationMinutes ?? 0);
+  }
+  if (dom.blobForm.policyRoundToGranularity) {
+    dom.blobForm.policyRoundToGranularity.checked = flags.roundToGranularity;
+  }
 }
 
 function applyPolicyToSlot(slot, policy) {
@@ -630,9 +667,19 @@ function applyPolicyToSlot(slot, policy) {
   const splittableEl = slot.querySelector('[name="slotPolicySplittable"]');
   const overlappableEl = slot.querySelector('[name="slotPolicyOverlappable"]');
   const invisibleEl = slot.querySelector('[name="slotPolicyInvisible"]');
+  const maxSplitsEl = slot.querySelector('[name="slotPolicyMaxSplits"]');
+  const minSplitDurationEl = slot.querySelector('[name="slotPolicyMinSplitDuration"]');
+  const roundToGranularityEl = slot.querySelector('[name="slotPolicyRoundToGranularity"]');
   if (splittableEl) splittableEl.checked = flags.splittable;
   if (overlappableEl) overlappableEl.checked = flags.overlappable;
   if (invisibleEl) invisibleEl.checked = flags.invisible;
+  if (maxSplitsEl) maxSplitsEl.value = String(flags.maxSplits ?? 0);
+  if (minSplitDurationEl) {
+    minSplitDurationEl.value = String(flags.minSplitDurationMinutes ?? 0);
+  }
+  if (roundToGranularityEl) {
+    roundToGranularityEl.checked = flags.roundToGranularity;
+  }
 }
 
 function syncSlotPoliciesFromForm() {
@@ -924,6 +971,36 @@ function createWeeklySlot(slotData = {}) {
         <span>Invisible</span>
       </label>
     </div>
+    <div class="weekly-slot-row slot-policy-advanced">
+      <label>
+        Max splits
+        <input
+          type="number"
+          name="slotPolicyMaxSplits"
+          min="0"
+          step="1"
+          value="${policyFlags.maxSplits ?? 0}"
+        />
+      </label>
+      <label>
+        Min split duration (min)
+        <input
+          type="number"
+          name="slotPolicyMinSplitDuration"
+          min="0"
+          step="1"
+          value="${policyFlags.minSplitDurationMinutes ?? 0}"
+        />
+      </label>
+      <label class="policy-option">
+        <input
+          type="checkbox"
+          name="slotPolicyRoundToGranularity"
+          ${policyFlags.roundToGranularity ? "checked" : ""}
+        />
+        <span>Round to granularity</span>
+      </label>
+    </div>
     <div class="weekly-slot-actions">
       <button type="button" class="ghost small" data-action="remove-slot">Remove</button>
     </div>
@@ -1016,6 +1093,17 @@ function getWeeklySlotSelections() {
     const splittable = Boolean(slot.querySelector('[name="slotPolicySplittable"]')?.checked);
     const overlappable = Boolean(slot.querySelector('[name="slotPolicyOverlappable"]')?.checked);
     const invisible = Boolean(slot.querySelector('[name="slotPolicyInvisible"]')?.checked);
+    const maxSplitsValue = Number(slot.querySelector('[name="slotPolicyMaxSplits"]')?.value);
+    const minSplitMinutesValue = Number(
+      slot.querySelector('[name="slotPolicyMinSplitDuration"]')?.value
+    );
+    const maxSplits = Number.isFinite(maxSplitsValue) ? Math.max(0, Math.round(maxSplitsValue)) : 0;
+    const minSplitMinutes = Number.isFinite(minSplitMinutesValue)
+      ? Math.max(0, Math.round(minSplitMinutesValue))
+      : 0;
+    const roundToGranularity = Boolean(
+      slot.querySelector('[name="slotPolicyRoundToGranularity"]')?.checked
+    );
     selections.push({
       days: getSelectedDays(slot),
       defaultStart: slot.querySelector('[name="slotDefaultStart"]').value,
@@ -1025,7 +1113,14 @@ function getWeeklySlotSelections() {
       name: slot.querySelector('[name="slotName"]').value,
       description: slot.querySelector('[name="slotDescription"]').value,
       tags: getSlotTags(slot),
-      policy: getPolicyPayloadFromFlags(splittable, overlappable, invisible),
+      policy: getPolicyPayloadFromFlags(
+        splittable,
+        overlappable,
+        invisible,
+        maxSplits,
+        minSplitMinutes * 60,
+        roundToGranularity
+      ),
     });
   });
   return selections;

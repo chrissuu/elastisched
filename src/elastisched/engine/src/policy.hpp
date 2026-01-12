@@ -18,13 +18,18 @@ class Policy {
 private:
     uint8_t max_splits;
     time_t min_split_duration;
+    bool round_to_granularity;
     uint8_t scheduling_policies;  // Bitfield: bit 0 = is_splittable, bit 1 = is_overlappable, bit 2 = is_invisible
 
 public:
-    Policy(uint8_t max_splits, time_t min_split_duration, uint8_t scheduling_policies);
+    Policy(uint8_t max_splits = 0,
+           time_t min_split_duration = 0,
+           uint8_t scheduling_policies = 0,
+           bool round_to_granularity = false);
 
     uint8_t getMaxSplits() const;
     time_t getMinSplitDuration() const;
+    bool getRoundToGranularity() const;
     uint8_t getSchedulingPolicies() const;
 
     bool isSplittable() const;
