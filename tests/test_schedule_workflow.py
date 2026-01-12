@@ -37,6 +37,7 @@ def _next_weekday_date(current: datetime, target_weekday: int) -> datetime.date:
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Deprecated: non-primitive cost function behavior is handled by preference learning.")
 async def test_frontend_to_scheduler_friday_afternoon_cost(api_client):
     user_tz = ZoneInfo("America/Los_Angeles")
     project_tz = timezone.utc
@@ -146,6 +147,7 @@ async def test_frontend_to_scheduler_friday_afternoon_cost(api_client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Deprecated: non-primitive cost preferences handled by learner.")
 async def test_single_occurrence_scheduled_same_day_before_afternoon(
     api_client, monkeypatch
 ):

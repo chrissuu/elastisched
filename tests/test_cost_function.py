@@ -1,6 +1,29 @@
 from .constants import *
 import engine
-import math
+import pytest
+
+
+def _make_job(
+    schedulable_low,
+    schedulable_high,
+    scheduled_low,
+    scheduled_high,
+    policy=None,
+    job_id="job",
+):
+    policy = policy or engine.Policy(0, 0, 0)
+    tr_schedulable = engine.TimeRange(schedulable_low, schedulable_high)
+    tr_scheduled = engine.TimeRange(scheduled_low, scheduled_high)
+    duration = tr_scheduled.getHigh() - tr_scheduled.getLow()
+    return engine.Job(
+        duration,
+        tr_schedulable,
+        tr_scheduled,
+        job_id,
+        policy,
+        set(),
+        set(),
+    )
 
 
 """
@@ -14,6 +37,61 @@ overlap cost
 
 Everything else is handled by preference learner
 """
+
+
+def test_illegal_schedule_cost_outside_schedulable_range():
+    job = _make_job(
+        schedulable_low=0,
+        schedulable_high=HOUR,
+        scheduled_low=2 * HOUR,
+        scheduled_high=3 * HOUR,
+    )
+    schedule = engine.Schedule([job])
+    cost_function = engine.ScheduleCostFunction(schedule, GRANULARITY)
+
+    assert cost_function.schedule_cost() == pytest.approx(1e12, rel=1e-6)
+
+
+def test_overlap_cost_counts_overlap_duration():
+    overlappable_policy = engine.Policy(0, 0, 2)
+    job_a = _make_job(
+        schedulable_low=0,
+        schedulable_high=4 * HOUR,
+        scheduled_low=0,
+        scheduled_high=HOUR,
+        policy=overlappable_policy,
+        job_id="job_a",
+    )
+    job_b = _make_job(
+        schedulable_low=0,
+        schedulable_high=4 * HOUR,
+        scheduled_low=30 * MINUTE,
+        scheduled_high=90 * MINUTE,
+        policy=overlappable_policy,
+        job_id="job_b",
+    )
+    schedule = engine.Schedule([job_a, job_b])
+    cost_function = engine.ScheduleCostFunction(schedule, MINUTE)
+
+    assert cost_function.schedule_cost() == 30.0
+
+
+def test_split_cost_counts_number_of_splits():
+    job = _make_job(
+        schedulable_low=0,
+        schedulable_high=6 * HOUR,
+        scheduled_low=HOUR,
+        scheduled_high=2 * HOUR,
+        job_id="split_job",
+    )
+    job.scheduledTimeRanges = [
+        engine.TimeRange(HOUR, 2 * HOUR),
+        engine.TimeRange(3 * HOUR, 4 * HOUR),
+    ]
+    schedule = engine.Schedule([job])
+    cost_function = engine.ScheduleCostFunction(schedule, MINUTE)
+
+    assert cost_function.schedule_cost() == 10.0
 # def test_thursday_no_cost():
 #     # Given
 #     tag = engine.Tag(WORK_TAG)

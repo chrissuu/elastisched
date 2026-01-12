@@ -51,7 +51,15 @@ async def test_create_and_get_blob(api_client):
         fetched = get_resp.json()
 
     assert fetched["name"] == payload["name"]
-    assert fetched["default_scheduled_timerange"]["start"] == payload["default_scheduled_timerange"]["start"]
+    def _coerce_utc(value: str) -> datetime:
+        parsed = datetime.fromisoformat(value)
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    assert _coerce_utc(fetched["default_scheduled_timerange"]["start"]) == _coerce_utc(
+        payload["default_scheduled_timerange"]["start"]
+    )
 
 
 @pytest.mark.asyncio
