@@ -961,6 +961,10 @@ body.modal-open .info-card {
   font-size: 13px;
 }
 
+.blob-form .slot-policy-advanced.is-hidden {
+  display: none;
+}
+
 .single-slot {
   grid-column: 1 / -1;
 }
