@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Iterable, List, Optional, Set
 
-from elastisched.timerange import TimeRange
-from elastisched.constants import *
+from .timerange import TimeRange
+from .constants import *
 from engine import Policy, Tag, Job, TimeRange as tr
 
 

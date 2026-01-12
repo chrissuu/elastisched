@@ -14,7 +14,8 @@ RUN apt-get update \
 RUN mkdir -p /app/data
 
 COPY README.md requirements.txt pyproject.toml /app/
-COPY src /app/src
+COPY core /app/core
+COPY engine /app/engine
 COPY backend /app/backend
 COPY frontend /app/frontend
 

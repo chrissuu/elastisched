@@ -19,7 +19,8 @@ Elastisched is a scheduling and time management software built around "blobs": f
 ## Project Layout
 
 - `backend/elastisched_api`: FastAPI backend and models
-- `src/elastisched`: core scheduling library + engine
+- `core`: core scheduling library
+- `engine`: C++ scheduler engine
 - `frontend`: UI (HTML/CSS/JS)
 - `learning`: preference learning and ML models
 - `integrations`: integrations with other calendar apps, i.e., Google Calendar
@@ -74,4 +75,3 @@ the most suitable schedule in O(S) time, where S is the number of samples discov
 #### Semantic Preference Learning
 To help the preference learning algorithm, we utilize all information about an event including the description and recurrence name. 
 In the backend, we use a sentence-transformer model which can be optionally GPU accelerated if the user has a GPU. 
-

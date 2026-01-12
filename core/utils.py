@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from math import ceil
 
-from elastisched.constants import *
+from .constants import *
 
 
 class Day(Enum):

@@ -44,4 +44,5 @@ Homepage = "https://github.com/chrissuu/elastisched"
 [tool.scikit-build]
 cmake.version = ">=3.15"
 build.verbose = true
-cmake.source-dir = "src/elastisched/engine"
+cmake.source-dir = "engine"
+wheel.packages = ["core"]

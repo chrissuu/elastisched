@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from elastisched.blob import Blob
-from elastisched.constants import DEFAULT_TZ
-from elastisched.recurrence import DeltaBlobRecurrence
-from elastisched.timerange import TimeRange
+from core.blob import Blob
+from core.constants import DEFAULT_TZ
+from core.recurrence import DeltaBlobRecurrence
+from core.timerange import TimeRange
 
 
 def test_delta_next_occurrence_before_start():
@@ -109,8 +109,8 @@ def test_delta_all_occurrences_none_in_range():
 
 def test_delta_next_occurrence_dst_agnostic(monkeypatch):
     tz = ZoneInfo("America/New_York")
-    import elastisched.constants as constants
-    import elastisched.timerange as timerange
+    import core.constants as constants
+    import core.timerange as timerange
 
     monkeypatch.setattr(constants, "DEFAULT_TZ", tz)
     monkeypatch.setattr(timerange, "DEFAULT_TZ", tz)
@@ -139,8 +139,8 @@ def test_delta_next_occurrence_dst_agnostic(monkeypatch):
 
 def test_delta_next_occurrence_dst_fall_back_fold(monkeypatch):
     tz = ZoneInfo("America/New_York")
-    import elastisched.constants as constants
-    import elastisched.timerange as timerange
+    import core.constants as constants
+    import core.timerange as timerange
 
     monkeypatch.setattr(constants, "DEFAULT_TZ", tz)
     monkeypatch.setattr(timerange, "DEFAULT_TZ", tz)
@@ -169,8 +169,8 @@ def test_delta_next_occurrence_dst_fall_back_fold(monkeypatch):
 
 def test_delta_next_occurrence_dst_spring_forward_duration(monkeypatch):
     tz = ZoneInfo("America/New_York")
-    import elastisched.constants as constants
-    import elastisched.timerange as timerange
+    import core.constants as constants
+    import core.timerange as timerange
 
     monkeypatch.setattr(constants, "DEFAULT_TZ", tz)
     monkeypatch.setattr(timerange, "DEFAULT_TZ", tz)
