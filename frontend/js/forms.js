@@ -961,7 +961,7 @@ function updateRecurrenceUI() {
       const interval = Number(dom.blobForm.weeklyInterval.value || 1);
       const slotSelections = getWeeklySlotSelections();
       const slotCount = slotSelections.reduce((total, slot) => total + slot.days.length, 0);
-      dom.recurrenceSummary.textContent = `Repeats every ${interval} week(s) with ${slotCount} slot(s).`;
+    dom.recurrenceSummary.textContent = `Repeats every ${interval} week(s) with ${slotCount} occurrence(s).`;
     } else if (type === "delta") {
       const value = Number(dom.blobForm.deltaValue.value || 1);
       const unit = dom.blobForm.deltaUnit.value || "days";
@@ -1091,16 +1091,16 @@ function createWeeklySlot(slotData = {}) {
     </div>
     <div class="weekly-slot-row slot-meta">
       <label>
-        Slot name
+        Occurrence name
         <input type="text" name="slotName" value="${nameValue}" />
       </label>
       <label>
-        Slot description
+        Occurrence description
         <input type="text" name="slotDescription" value="${descriptionValue}" />
       </label>
     </div>
     <div class="weekly-slot-row slot-tags slot-tag-field">
-      <span class="tag-label">Slot tags</span>
+      <span class="tag-label">Occurrence tags</span>
       <div class="tag-input-row">
         <input
           type="text"
@@ -1316,12 +1316,12 @@ function validateWeeklySlots() {
   if (!dom.weeklySlotStatus) return true;
   const selections = getWeeklySlotSelections();
   if (selections.length === 0) {
-    dom.weeklySlotStatus.textContent = "Add at least one weekly slot.";
+    dom.weeklySlotStatus.textContent = "Add at least one weekly occurrence.";
     return false;
   }
   for (const slot of selections) {
     if (slot.days.length === 0) {
-      dom.weeklySlotStatus.textContent = "Weekly slots need a day of week.";
+      dom.weeklySlotStatus.textContent = "Weekly occurrences need a day of week.";
       return false;
     }
   }
@@ -1338,16 +1338,16 @@ function validateWeeklySlots() {
       schedStart === null ||
       schedEnd === null
     ) {
-      dom.weeklySlotStatus.textContent = "Weekly slots need valid times.";
+      dom.weeklySlotStatus.textContent = "Weekly occurrences need valid times.";
       return false;
     }
     if (defaultEnd <= defaultStart || schedEnd <= schedStart) {
-      dom.weeklySlotStatus.textContent = "Weekly slots must end after they start.";
+      dom.weeklySlotStatus.textContent = "Weekly occurrences must end after they start.";
       return false;
     }
     if (schedStart > defaultStart || schedEnd < defaultEnd) {
       dom.weeklySlotStatus.textContent =
-        "Schedulable range must contain default range for each slot.";
+        "Schedulable range must contain default range for each occurrence.";
       return false;
     }
     const offset = dayOffsetFromSunday(slot.day);
@@ -1359,7 +1359,7 @@ function validateWeeklySlots() {
   const sorted = ranges.sort((a, b) => a.start - b.start);
   for (let i = 0; i < sorted.length - 1; i += 1) {
     if (sorted[i].end > sorted[i + 1].start) {
-      dom.weeklySlotStatus.textContent = "Weekly slots cannot overlap.";
+      dom.weeklySlotStatus.textContent = "Weekly occurrences cannot overlap.";
       return false;
     }
   }

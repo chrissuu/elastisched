@@ -75,6 +75,9 @@ async function getRecurrence(recurrenceId) {
 }
 
 async function createRecurrence(type, payload) {
+  if (Array.isArray(type)) {
+    return createRecurrencesBulk(type);
+  }
   const response = await fetch(`${API_BASE}/recurrences`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -82,6 +85,26 @@ async function createRecurrence(type, payload) {
   });
   if (!response.ok) {
     let detail = "Failed to create recurrence";
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      detail = data.detail || detail;
+    } else {
+      detail = (await response.text()) || detail;
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+async function createRecurrencesBulk(recurrences) {
+  const response = await fetch(`${API_BASE}/recurrences/bulk`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(recurrences),
+  });
+  if (!response.ok) {
+    let detail = "Failed to create recurrences";
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       const data = await response.json();
@@ -146,6 +169,7 @@ export {
   runSchedule,
   getRecurrence,
   createRecurrence,
+  createRecurrencesBulk,
   deleteRecurrence,
   updateRecurrence,
 };
