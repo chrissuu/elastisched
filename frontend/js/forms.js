@@ -22,6 +22,7 @@ const settingsSections = document.querySelectorAll(".settings-section");
 let dependencyIds = [];
 let tagNames = [];
 const slotTagStore = new WeakMap();
+const slotDependencyStore = new WeakMap();
 let isDraggingForm = false;
 let dragOffset = { x: 0, y: 0 };
 let formPosition = null;
@@ -327,6 +328,24 @@ function getSlotTags(slot) {
   return getSlotTagList(slot);
 }
 
+function setSlotDependencies(slot, ids) {
+  const next = [];
+  const seen = new Set();
+  (ids || []).forEach((id) => {
+    const value = typeof id === "string" ? id.trim() : "";
+    if (!value) return;
+    if (seen.has(value)) return;
+    seen.add(value);
+    next.push(value);
+  });
+  slotDependencyStore.set(slot, next);
+  renderSlotDependencyList(slot);
+}
+
+function getSlotDependencies(slot) {
+  return slotDependencyStore.get(slot) || [];
+}
+
 function getRecurrenceColor() {
   const selected = document.querySelector('input[name="recurrenceColor"]:checked');
   const value = selected?.value || "default";
@@ -421,6 +440,19 @@ function getSlotTagSuggestions(query, selectedTags) {
   return matches.slice(0, 6);
 }
 
+function getSlotDependencySuggestions(query, selectedIds) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
+  const selected = new Set((selectedIds || []).map((id) => id.toLowerCase()));
+  const matches = state.blobs.filter((item) => {
+    if (selected.has(item.id.toLowerCase())) return false;
+    const name = item.name?.toLowerCase() || "";
+    return name.includes(normalized) || item.id.toLowerCase().includes(normalized);
+  });
+  matches.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  return matches.slice(0, 6);
+}
+
 function renderDependencySuggestions() {
   if (!dom.dependencySuggestions) return;
   const query = dom.dependencyInput?.value || "";
@@ -468,6 +500,25 @@ function renderSlotTagSuggestions(slot) {
     button.className = "tag-suggestion";
     button.dataset.tagName = match;
     button.textContent = match;
+    suggestions.appendChild(button);
+  });
+}
+
+function renderSlotDependencySuggestions(slot) {
+  const suggestions = slot.querySelector(".slot-dependency-suggestions");
+  const input = slot.querySelector('[name="slotDependencyInput"]');
+  if (!suggestions || !input) return;
+  const query = input.value || "";
+  const matches = getSlotDependencySuggestions(query, getSlotDependencies(slot));
+  suggestions.innerHTML = "";
+  if (!query.trim() || matches.length === 0) return;
+  matches.forEach((match) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dependency-suggestion";
+    button.dataset.dependencyId = match.id;
+    button.textContent = match.name || "Untitled";
+    button.title = match.id;
     suggestions.appendChild(button);
   });
 }
@@ -599,6 +650,54 @@ function renderSlotTagList(slot) {
   });
 }
 
+function renderSlotDependencyList(slot) {
+  const list = slot.querySelector(".slot-dependency-list");
+  if (!list) return;
+  list.innerHTML = "";
+  getSlotDependencies(slot).forEach((id) => {
+    const blob = findBlobById(id);
+    const name = blob?.name || "Unknown blob";
+    const pill = document.createElement("div");
+    pill.className = "dependency-pill";
+    pill.dataset.dependencyId = id;
+
+    const label = document.createElement("span");
+    label.className = "dependency-name";
+    label.textContent = name;
+    pill.appendChild(label);
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "dependency-tooltip";
+
+    const title = document.createElement("div");
+    title.className = "dependency-tooltip-title";
+    title.textContent = name;
+    tooltip.appendChild(title);
+
+    const idRow = document.createElement("div");
+    idRow.className = "dependency-tooltip-row";
+    const idLabel = document.createElement("span");
+    idLabel.className = "dependency-tooltip-label";
+    idLabel.textContent = "Blob id";
+    const idValue = document.createElement("span");
+    idValue.className = "dependency-tooltip-value";
+    idValue.textContent = id;
+    idRow.appendChild(idLabel);
+    idRow.appendChild(idValue);
+    tooltip.appendChild(idRow);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "ghost small dependency-remove";
+    removeBtn.textContent = "Remove dependency";
+    removeBtn.dataset.removeSlotDependency = id;
+    tooltip.appendChild(removeBtn);
+
+    pill.appendChild(tooltip);
+    list.appendChild(pill);
+  });
+}
+
 function addDependencyFromInput() {
   if (!dom.dependencyInput) return;
   const raw = dom.dependencyInput.value.trim();
@@ -650,6 +749,32 @@ function addSlotTagFromInput(slot) {
   const seen = new Set(getSlotTagList(slot).map((tag) => tagKey(tag)));
   if (!seen.has(key)) {
     setSlotTagList(slot, [...getSlotTagList(slot), candidate]);
+  }
+  dom.formStatus.textContent = "";
+  input.value = "";
+  if (suggestions) {
+    suggestions.innerHTML = "";
+  }
+}
+
+function addSlotDependencyFromInput(slot) {
+  const input = slot.querySelector('[name="slotDependencyInput"]');
+  const suggestions = slot.querySelector(".slot-dependency-suggestions");
+  if (!input) return;
+  const raw = input.value.trim();
+  if (!raw) return;
+  const matches = getSlotDependencySuggestions(raw, getSlotDependencies(slot));
+  const candidate =
+    matches[0] ||
+    findBlobById(raw) ||
+    findBlobByName(raw);
+  if (!candidate) {
+    dom.formStatus.textContent = "No matching blob found.";
+    return;
+  }
+  const existing = getSlotDependencies(slot);
+  if (!existing.includes(candidate.id)) {
+    setSlotDependencies(slot, [...existing, candidate.id]);
   }
   dom.formStatus.textContent = "";
   input.value = "";
@@ -756,6 +881,18 @@ function updateRecurrenceUI() {
     );
   }
   document.querySelectorAll(".non-weekly-field").forEach((field) => {
+    field.classList.toggle("hidden", isMultiple);
+  });
+  document.querySelectorAll(".dependency-field:not(.slot-dependency-field)").forEach((field) => {
+    field.classList.toggle("hidden", isMultiple);
+  });
+  document.querySelectorAll(".tag-field").forEach((field) => {
+    field.classList.toggle("hidden", isMultiple);
+  });
+  document.querySelectorAll(".color-field").forEach((field) => {
+    field.classList.toggle("hidden", isMultiple);
+  });
+  document.querySelectorAll(".recurrence-extras").forEach((field) => {
     field.classList.toggle("hidden", isMultiple);
   });
   document.querySelectorAll(".non-weekly-field input").forEach((field) => {
@@ -1249,6 +1386,10 @@ function createMultipleSlot(slotData = {}) {
   const defaultEnd = slotData.defaultEnd || "";
   const schedStart = slotData.schedStart || "";
   const schedEnd = slotData.schedEnd || "";
+  const nameValue = slotData.name || "";
+  const descriptionValue = slotData.description || "";
+  const tagsValue = slotData.tags || [];
+  const policyFlags = getPolicyFlagsFromPolicy(slotData.policy || {});
 
   slot.innerHTML = `
     <div class="weekly-slot-row time-range-row">
@@ -1295,6 +1436,110 @@ function createMultipleSlot(slotData = {}) {
         </div>
       </label>
     </div>
+    <div class="weekly-slot-row slot-meta">
+      <label>
+        Occurrence name
+        <input type="text" name="multiName" class="needs-input" value="${nameValue}" required />
+      </label>
+      <label>
+        Occurrence description
+        <input type="text" name="multiDescription" class="needs-input" value="${descriptionValue}" />
+      </label>
+    </div>
+    <div class="weekly-slot-row slot-tags slot-tag-field">
+      <span class="tag-label">Tags</span>
+      <div class="tag-input-row">
+        <input
+          type="text"
+          name="slotTagInput"
+          class="needs-input"
+          placeholder="Search or add a tag"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="ghost small"
+          data-action="add-slot-tag"
+          aria-label="Add tag"
+          title="Add tag"
+        >
+          +
+        </button>
+      </div>
+      <div class="tag-suggestions slot-tag-suggestions"></div>
+      <div class="tag-list slot-tag-list"></div>
+    </div>
+    <div class="weekly-slot-row slot-policy">
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicySplittable" ${
+          policyFlags.splittable ? "checked" : ""
+        } />
+        <span>Splittable</span>
+      </label>
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicyOverlappable" ${
+          policyFlags.overlappable ? "checked" : ""
+        } />
+        <span>Overlappable</span>
+      </label>
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicyInvisible" ${
+          policyFlags.invisible ? "checked" : ""
+        } />
+        <span>Invisible</span>
+      </label>
+    </div>
+    <div class="weekly-slot-row slot-policy-advanced ${policyFlags.splittable ? "" : "is-hidden"}">
+      <label>
+        Max splits
+        <input
+          type="number"
+          name="slotPolicyMaxSplits"
+          min="0"
+          step="1"
+          value="${policyFlags.maxSplits ?? DEFAULT_MAX_SPLITS}"
+        />
+      </label>
+      <label>
+        Min split duration (min)
+        <input
+          type="number"
+          name="slotPolicyMinSplitDuration"
+          min="0"
+          step="1"
+          value="${policyFlags.minSplitDurationMinutes ?? DEFAULT_MIN_SPLIT_MINUTES}"
+        />
+      </label>
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicyRoundToGranularity" ${
+          policyFlags.roundToGranularity ? "checked" : ""
+        } />
+        <span>Round to granularity</span>
+      </label>
+    </div>
+    <div class="dependency-field slot-dependency-field">
+      <span class="dependency-label">Dependencies</span>
+      <div class="dependency-input-row">
+        <input
+          type="text"
+          name="slotDependencyInput"
+          class="needs-input"
+          placeholder="Search by blob name or id"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="ghost small"
+          data-action="add-slot-dependency"
+          aria-label="Add dependency"
+          title="Add dependency"
+        >
+          +
+        </button>
+      </div>
+      <div class="dependency-suggestions slot-dependency-suggestions"></div>
+      <div class="dependency-list slot-dependency-list"></div>
+    </div>
     <div class="weekly-slot-row weekly-slot-actions">
       <button type="button" class="ghost small" data-action="remove-multiple-slot">
         Remove
@@ -1313,6 +1558,9 @@ function createMultipleSlot(slotData = {}) {
   if (schedStartInput) schedStartInput.value = schedStart;
   if (schedEndInput) schedEndInput.value = schedEnd;
 
+  setSlotTagList(slot, Array.isArray(tagsValue) ? tagsValue : []);
+  setSlotDependencies(slot, Array.isArray(slotData.dependencies) ? slotData.dependencies : []);
+
   const removeBtn = slot.querySelector('[data-action="remove-multiple-slot"]');
   if (removeBtn) {
     removeBtn.addEventListener("click", () => {
@@ -1324,6 +1572,104 @@ function createMultipleSlot(slotData = {}) {
 
   bindDateTimePickers();
   syncDateTimeDisplays();
+  const tagInput = slot.querySelector('[name="slotTagInput"]');
+  const tagSuggestions = slot.querySelector(".slot-tag-suggestions");
+  const addTagBtn = slot.querySelector('[data-action="add-slot-tag"]');
+  if (tagInput) {
+    tagInput.addEventListener("input", () => renderSlotTagSuggestions(slot));
+    tagInput.addEventListener("focus", () => renderSlotTagSuggestions(slot));
+    tagInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === ",") {
+        event.preventDefault();
+        addSlotTagFromInput(slot);
+      }
+    });
+  }
+  if (addTagBtn) {
+    addTagBtn.addEventListener("click", () => addSlotTagFromInput(slot));
+  }
+  if (tagSuggestions) {
+    tagSuggestions.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-tag-name]");
+      if (!target) return;
+      const candidate = target.dataset.tagName;
+      if (!candidate) return;
+      const currentTags = getSlotTagList(slot);
+      if (!currentTags.some((tag) => tagKey(tag) === tagKey(candidate))) {
+        setSlotTagList(slot, [...currentTags, candidate]);
+      }
+      if (tagInput) {
+        tagInput.value = "";
+      }
+      tagSuggestions.innerHTML = "";
+    });
+  }
+  const tagList = slot.querySelector(".slot-tag-list");
+  if (tagList) {
+    tagList.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-remove-slot-tag]");
+      if (!target) return;
+      const name = target.dataset.removeSlotTag;
+      setSlotTagList(
+        slot,
+        getSlotTagList(slot).filter((tag) => tagKey(tag) !== tagKey(name))
+      );
+    });
+  }
+  const dependencyInput = slot.querySelector('[name="slotDependencyInput"]');
+  const dependencySuggestions = slot.querySelector(".slot-dependency-suggestions");
+  const addDependencyBtn = slot.querySelector('[data-action="add-slot-dependency"]');
+  if (dependencyInput) {
+    dependencyInput.addEventListener("input", () => renderSlotDependencySuggestions(slot));
+    dependencyInput.addEventListener("focus", () => renderSlotDependencySuggestions(slot));
+    dependencyInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === ",") {
+        event.preventDefault();
+        addSlotDependencyFromInput(slot);
+      }
+    });
+  }
+  if (addDependencyBtn) {
+    addDependencyBtn.addEventListener("click", () => addSlotDependencyFromInput(slot));
+  }
+  if (dependencySuggestions) {
+    dependencySuggestions.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-dependency-id]");
+      if (!target) return;
+      const candidate = target.dataset.dependencyId;
+      if (!candidate) return;
+      const current = getSlotDependencies(slot);
+      if (!current.includes(candidate)) {
+        setSlotDependencies(slot, [...current, candidate]);
+      }
+      if (dependencyInput) {
+        dependencyInput.value = "";
+      }
+      dependencySuggestions.innerHTML = "";
+    });
+  }
+  const dependencyList = slot.querySelector(".slot-dependency-list");
+  if (dependencyList) {
+    dependencyList.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-remove-slot-dependency]");
+      if (!target) return;
+      const id = target.dataset.removeSlotDependency;
+      setSlotDependencies(
+        slot,
+        getSlotDependencies(slot).filter((depId) => depId !== id)
+      );
+    });
+  }
+  ["slotPolicySplittable", "slotPolicyOverlappable", "slotPolicyInvisible"].forEach((name) => {
+    const field = slot.querySelector(`[name="${name}"]`);
+    if (!field) return;
+    field.addEventListener("change", () => {
+      if (name === "slotPolicySplittable") {
+        setPolicyAdvancedVisibility(field, field.checked);
+      }
+    });
+  });
+
   validateMultipleSlots();
   updateRecurrenceUI();
 }
@@ -1337,6 +1683,18 @@ function getMultipleSlots() {
       defaultEnd: slot.querySelector('[name="multiDefaultEnd"]')?.value || "",
       schedStart: slot.querySelector('[name="multiSchedStart"]')?.value || "",
       schedEnd: slot.querySelector('[name="multiSchedEnd"]')?.value || "",
+      name: slot.querySelector('[name="multiName"]')?.value?.trim() || "",
+      description: slot.querySelector('[name="multiDescription"]')?.value?.trim() || "",
+      tags: getSlotTags(slot),
+      dependencies: getSlotDependencies(slot),
+      policy: getPolicyPayloadFromFlags(
+        Boolean(slot.querySelector('[name="slotPolicySplittable"]')?.checked),
+        Boolean(slot.querySelector('[name="slotPolicyOverlappable"]')?.checked),
+        Boolean(slot.querySelector('[name="slotPolicyInvisible"]')?.checked),
+        Number(slot.querySelector('[name="slotPolicyMaxSplits"]')?.value || 0),
+        Number(slot.querySelector('[name="slotPolicyMinSplitDuration"]')?.value || 0),
+        Boolean(slot.querySelector('[name="slotPolicyRoundToGranularity"]')?.checked)
+      ),
     });
   });
   return slots;
@@ -1350,6 +1708,10 @@ function validateMultipleSlots() {
     return false;
   }
   for (const slot of slots) {
+    if (!slot.name) {
+      dom.multipleSlotStatus.textContent = "Occurrences need a name.";
+      return false;
+    }
     const defaultStart = new Date(slot.defaultStart);
     const defaultEnd = new Date(slot.defaultEnd);
     const schedStart = new Date(slot.schedStart);
@@ -1452,10 +1814,21 @@ function openEditForm(blob) {
     blob.recurrence_payload?.recurrence_description || "";
   setRecurrenceEndValue(blob.recurrence_payload?.end_date || null);
   setRecurrenceColor(blob.recurrence_payload?.color || null);
-  dom.blobForm.blobName.value = blob.name || "";
-  dom.blobForm.blobDescription.value = blob.description || "";
-  setDependencies(Array.isArray(blob.dependencies) ? blob.dependencies : []);
-  setTags(Array.isArray(blob.tags) ? blob.tags : []);
+  if (recurrenceType === "multiple") {
+    setRecurrenceEndValue(null);
+    setRecurrenceColor(null);
+  }
+  if (recurrenceType !== "multiple") {
+    dom.blobForm.blobName.value = blob.name || "";
+    dom.blobForm.blobDescription.value = blob.description || "";
+    setDependencies(Array.isArray(blob.dependencies) ? blob.dependencies : []);
+    setTags(Array.isArray(blob.tags) ? blob.tags : []);
+  } else {
+    dom.blobForm.blobName.value = "";
+    dom.blobForm.blobDescription.value = "";
+    setDependencies([]);
+    setTags([]);
+  }
   const blobTimeZone = blob.tz || appConfig.userTimeZone;
   if (recurrenceType !== "date") {
     dom.blobForm.defaultStart.value = toLocalInputValueInTimeZone(
@@ -1577,11 +1950,6 @@ function openEditForm(blob) {
     if (!blobs.length) {
       createMultipleSlot();
     } else {
-      applyPolicyToForm(blobs[0]?.policy || {});
-      dom.blobForm.blobName.value = blobs[0]?.name || "";
-      dom.blobForm.blobDescription.value = blobs[0]?.description || "";
-      setDependencies(Array.isArray(blobs[0]?.dependencies) ? blobs[0].dependencies : []);
-      setTags(Array.isArray(blobs[0]?.tags) ? blobs[0].tags : []);
       blobs.forEach((multiBlob) => {
         const slotTimeZone = multiBlob.tz || appConfig.userTimeZone;
         createMultipleSlot({
@@ -1601,6 +1969,11 @@ function openEditForm(blob) {
             multiBlob.schedulable_timerange?.end,
             slotTimeZone
           ),
+          name: multiBlob.name || "",
+          description: multiBlob.description || "",
+          tags: Array.isArray(multiBlob.tags) ? multiBlob.tags : [],
+          dependencies: Array.isArray(multiBlob.dependencies) ? multiBlob.dependencies : [],
+          policy: multiBlob.policy || {},
         });
       });
     }
@@ -1878,8 +2251,8 @@ async function handleBlobSubmit(event) {
     }
     const slots = getMultipleSlots();
     const blobs = slots.map((slot) => ({
-      name: formData.get("blobName"),
-      description: formData.get("blobDescription") || null,
+      name: slot.name,
+      description: slot.description || null,
       tz: appConfig.userTimeZone,
       default_scheduled_timerange: {
         start: toProjectIsoFromLocalInput(
@@ -1905,15 +2278,15 @@ async function handleBlobSubmit(event) {
           appConfig.projectTimeZone
         ),
       },
-      policy: policyPayload,
-      dependencies,
-      tags,
+      policy: slot.policy || {},
+      dependencies: slot.dependencies || [],
+      tags: slot.tags || [],
     }));
     recurrencePayload = {
       recurrence_name: formData.get("recurrenceName") || null,
       recurrence_description: formData.get("recurrenceDescription") || null,
       end_date: null,
-      color: recurrenceColor,
+      color: null,
       blobs,
     };
   } else if (recurrenceType === "date") {

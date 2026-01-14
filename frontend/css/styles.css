@@ -584,6 +584,18 @@ body.modal-open .info-card {
   display: none;
 }
 
+.dependency-field.hidden {
+  display: none;
+}
+
+.color-field.hidden {
+  display: none;
+}
+
+.recurrence-extras.hidden {
+  display: none;
+}
+
 .tag-label {
   font-size: 13px;
   color: var(--muted);
@@ -1101,6 +1113,26 @@ body.modal-open .info-card {
 
 .weekly-slot .slot-tags {
   display: none;
+}
+
+.multiple-slots .slot-meta {
+  display: grid;
+}
+
+.multiple-slots .slot-tags {
+  display: grid;
+}
+
+.multiple-slots .slot-policy {
+  display: flex;
+}
+
+.multiple-slots .weekly-slot .slot-tags {
+  display: grid;
+}
+
+.multiple-slots.weekly-slots:not(.per-slot) .weekly-slot .slot-tags {
+  display: grid;
 }
 
 .weekly-slots.per-slot .slot-meta {
