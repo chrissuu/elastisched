@@ -16,11 +16,16 @@ import { deleteOccurrenceWithUndo, deleteRecurrenceWithUndo } from "./actions.js
 
 let refreshView = null;
 const recurrenceFieldGroups = document.querySelectorAll(".recurrence-fields");
+const weeklyRecurrenceFields = document.querySelector('.recurrence-fields[data-recurrence="weekly"]');
 const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const editOnlyElements = document.querySelectorAll(".edit-only");
 const settingsTabs = document.querySelectorAll(".settings-tab");
 const settingsSections = document.querySelectorAll(".settings-section");
 const nonWeeklyField = document.querySelector(".non-weekly-field");
+const primaryDependencyField = document.querySelector(
+  ".dependency-field:not(.slot-dependency-field)"
+);
+const primaryTagField = document.getElementById("recurrenceTagField");
 let dependencyIds = [];
 let tagNames = [];
 const slotTagStore = new WeakMap();
@@ -28,6 +33,39 @@ const slotDependencyStore = new WeakMap();
 let isDraggingForm = false;
 let dragOffset = { x: 0, y: 0 };
 let formPosition = null;
+
+const weeklyFieldPlacement = {
+  dependency: {
+    el: primaryDependencyField,
+    parent: null,
+    nextSibling: null,
+  },
+  tag: {
+    el: primaryTagField,
+    parent: null,
+    nextSibling: null,
+  },
+};
+
+function storeWeeklyFieldPlacement(entry) {
+  if (!entry?.el || entry.parent) return;
+  entry.parent = entry.el.parentNode;
+  entry.nextSibling = entry.el.nextSibling;
+}
+
+function moveWeeklyField(entry, target) {
+  if (!entry?.el || !target) return;
+  target.appendChild(entry.el);
+}
+
+function restoreWeeklyField(entry) {
+  if (!entry?.el || !entry.parent) return;
+  if (entry.nextSibling && entry.nextSibling.parentNode === entry.parent) {
+    entry.parent.insertBefore(entry.el, entry.nextSibling);
+  } else {
+    entry.parent.appendChild(entry.el);
+  }
+}
 
 function setRefreshHandler(handler) {
   refreshView = handler;
@@ -978,6 +1016,15 @@ function collectSlotTagsUnion() {
 function updateRecurrenceUI() {
   const type = dom.recurrenceType?.value || "single";
   const isMultiple = type === "multiple";
+  storeWeeklyFieldPlacement(weeklyFieldPlacement.dependency);
+  storeWeeklyFieldPlacement(weeklyFieldPlacement.tag);
+  if (type === "weekly" && weeklyRecurrenceFields) {
+    moveWeeklyField(weeklyFieldPlacement.tag, weeklyRecurrenceFields);
+    restoreWeeklyField(weeklyFieldPlacement.dependency);
+  } else {
+    restoreWeeklyField(weeklyFieldPlacement.dependency);
+    restoreWeeklyField(weeklyFieldPlacement.tag);
+  }
   recurrenceFieldGroups.forEach((group) => {
     const matches = group.dataset.recurrence === type;
     group.classList.toggle("active", matches);
@@ -989,20 +1036,15 @@ function updateRecurrenceUI() {
   if (weeklyWrapper) {
     weeklyWrapper.classList.toggle("per-slot", Boolean(dom.weeklyPerSlot?.checked));
   }
-  if (dom.recurrenceTagField) {
-    dom.recurrenceTagField.classList.toggle(
-      "hidden",
-      type === "weekly" && Boolean(dom.weeklyPerSlot?.checked)
-    );
-  }
+  const isWeeklyPerSlot = Boolean(dom.weeklyPerSlot?.checked);
   document.querySelectorAll(".non-weekly-field").forEach((field) => {
     field.classList.toggle("hidden", isMultiple);
   });
   document.querySelectorAll(".dependency-field:not(.slot-dependency-field)").forEach((field) => {
-    field.classList.toggle("hidden", isMultiple);
+    field.classList.toggle("hidden", isMultiple || type === "weekly");
   });
   document.querySelectorAll(".tag-field").forEach((field) => {
-    field.classList.toggle("hidden", isMultiple);
+    field.classList.toggle("hidden", isMultiple || (type === "weekly" && isWeeklyPerSlot));
   });
   document.querySelectorAll(".color-field").forEach((field) => {
     field.classList.toggle("hidden", isMultiple);
@@ -1286,7 +1328,7 @@ function createWeeklySlot(slotData = {}) {
       </label>
     </div>
     <div class="weekly-slot-row slot-tags slot-tag-field">
-      <span class="tag-label">Occurrence tags</span>
+      <span class="tag-label">Tags</span>
       <div class="tag-input-row">
         <input
           type="text"
