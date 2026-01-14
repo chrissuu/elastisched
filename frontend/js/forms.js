@@ -9,6 +9,7 @@ import {
   toProjectIsoFromLocalInput,
 } from "./utils.js";
 import { startInteractiveCreate } from "./render.js";
+import { createRecurrence, updateRecurrence } from "./api.js";
 import { confirmDialog } from "./popups.js";
 import { bindDateTimePickers, syncDateTimeDisplays } from "./datetime_picker.js";
 import { deleteOccurrenceWithUndo, deleteRecurrenceWithUndo } from "./actions.js";
@@ -22,6 +23,7 @@ const settingsSections = document.querySelectorAll(".settings-section");
 let dependencyIds = [];
 let tagNames = [];
 const slotTagStore = new WeakMap();
+const slotDependencyStore = new WeakMap();
 let isDraggingForm = false;
 let dragOffset = { x: 0, y: 0 };
 let formPosition = null;
@@ -327,6 +329,24 @@ function getSlotTags(slot) {
   return getSlotTagList(slot);
 }
 
+function setSlotDependencies(slot, ids) {
+  const next = [];
+  const seen = new Set();
+  (ids || []).forEach((id) => {
+    const value = typeof id === "string" ? id.trim() : "";
+    if (!value) return;
+    if (seen.has(value)) return;
+    seen.add(value);
+    next.push(value);
+  });
+  slotDependencyStore.set(slot, next);
+  renderSlotDependencyList(slot);
+}
+
+function getSlotDependencies(slot) {
+  return slotDependencyStore.get(slot) || [];
+}
+
 function getRecurrenceColor() {
   const selected = document.querySelector('input[name="recurrenceColor"]:checked');
   const value = selected?.value || "default";
@@ -421,6 +441,19 @@ function getSlotTagSuggestions(query, selectedTags) {
   return matches.slice(0, 6);
 }
 
+function getSlotDependencySuggestions(query, selectedIds) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
+  const selected = new Set((selectedIds || []).map((id) => id.toLowerCase()));
+  const matches = state.blobs.filter((item) => {
+    if (selected.has(item.id.toLowerCase())) return false;
+    const name = item.name?.toLowerCase() || "";
+    return name.includes(normalized) || item.id.toLowerCase().includes(normalized);
+  });
+  matches.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  return matches.slice(0, 6);
+}
+
 function renderDependencySuggestions() {
   if (!dom.dependencySuggestions) return;
   const query = dom.dependencyInput?.value || "";
@@ -468,6 +501,25 @@ function renderSlotTagSuggestions(slot) {
     button.className = "tag-suggestion";
     button.dataset.tagName = match;
     button.textContent = match;
+    suggestions.appendChild(button);
+  });
+}
+
+function renderSlotDependencySuggestions(slot) {
+  const suggestions = slot.querySelector(".slot-dependency-suggestions");
+  const input = slot.querySelector('[name="slotDependencyInput"]');
+  if (!suggestions || !input) return;
+  const query = input.value || "";
+  const matches = getSlotDependencySuggestions(query, getSlotDependencies(slot));
+  suggestions.innerHTML = "";
+  if (!query.trim() || matches.length === 0) return;
+  matches.forEach((match) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "dependency-suggestion";
+    button.dataset.dependencyId = match.id;
+    button.textContent = match.name || "Untitled";
+    button.title = match.id;
     suggestions.appendChild(button);
   });
 }
@@ -599,6 +651,54 @@ function renderSlotTagList(slot) {
   });
 }
 
+function renderSlotDependencyList(slot) {
+  const list = slot.querySelector(".slot-dependency-list");
+  if (!list) return;
+  list.innerHTML = "";
+  getSlotDependencies(slot).forEach((id) => {
+    const blob = findBlobById(id);
+    const name = blob?.name || "Unknown blob";
+    const pill = document.createElement("div");
+    pill.className = "dependency-pill";
+    pill.dataset.dependencyId = id;
+
+    const label = document.createElement("span");
+    label.className = "dependency-name";
+    label.textContent = name;
+    pill.appendChild(label);
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "dependency-tooltip";
+
+    const title = document.createElement("div");
+    title.className = "dependency-tooltip-title";
+    title.textContent = name;
+    tooltip.appendChild(title);
+
+    const idRow = document.createElement("div");
+    idRow.className = "dependency-tooltip-row";
+    const idLabel = document.createElement("span");
+    idLabel.className = "dependency-tooltip-label";
+    idLabel.textContent = "Blob id";
+    const idValue = document.createElement("span");
+    idValue.className = "dependency-tooltip-value";
+    idValue.textContent = id;
+    idRow.appendChild(idLabel);
+    idRow.appendChild(idValue);
+    tooltip.appendChild(idRow);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "ghost small dependency-remove";
+    removeBtn.textContent = "Remove dependency";
+    removeBtn.dataset.removeSlotDependency = id;
+    tooltip.appendChild(removeBtn);
+
+    pill.appendChild(tooltip);
+    list.appendChild(pill);
+  });
+}
+
 function addDependencyFromInput() {
   if (!dom.dependencyInput) return;
   const raw = dom.dependencyInput.value.trim();
@@ -650,6 +750,32 @@ function addSlotTagFromInput(slot) {
   const seen = new Set(getSlotTagList(slot).map((tag) => tagKey(tag)));
   if (!seen.has(key)) {
     setSlotTagList(slot, [...getSlotTagList(slot), candidate]);
+  }
+  dom.formStatus.textContent = "";
+  input.value = "";
+  if (suggestions) {
+    suggestions.innerHTML = "";
+  }
+}
+
+function addSlotDependencyFromInput(slot) {
+  const input = slot.querySelector('[name="slotDependencyInput"]');
+  const suggestions = slot.querySelector(".slot-dependency-suggestions");
+  if (!input) return;
+  const raw = input.value.trim();
+  if (!raw) return;
+  const matches = getSlotDependencySuggestions(raw, getSlotDependencies(slot));
+  const candidate =
+    matches[0] ||
+    findBlobById(raw) ||
+    findBlobByName(raw);
+  if (!candidate) {
+    dom.formStatus.textContent = "No matching blob found.";
+    return;
+  }
+  const existing = getSlotDependencies(slot);
+  if (!existing.includes(candidate.id)) {
+    setSlotDependencies(slot, [...existing, candidate.id]);
   }
   dom.formStatus.textContent = "";
   input.value = "";
@@ -737,12 +863,14 @@ function collectSlotTagsUnion() {
 
 function updateRecurrenceUI() {
   const type = dom.recurrenceType?.value || "single";
+  const isMultiple = type === "multiple";
   recurrenceFieldGroups.forEach((group) => {
     const matches = group.dataset.recurrence === type;
     group.classList.toggle("active", matches);
   });
   dom.formPanel.classList.toggle("weekly-mode", type === "weekly");
   dom.formPanel.classList.toggle("date-mode", type === "date");
+  dom.formPanel.classList.toggle("multiple-mode", isMultiple);
   const weeklyWrapper = dom.weeklySlots?.closest(".weekly-slots");
   if (weeklyWrapper) {
     weeklyWrapper.classList.toggle("per-slot", Boolean(dom.weeklyPerSlot?.checked));
@@ -753,6 +881,21 @@ function updateRecurrenceUI() {
       type === "weekly" && Boolean(dom.weeklyPerSlot?.checked)
     );
   }
+  document.querySelectorAll(".non-weekly-field").forEach((field) => {
+    field.classList.toggle("hidden", isMultiple);
+  });
+  document.querySelectorAll(".dependency-field:not(.slot-dependency-field)").forEach((field) => {
+    field.classList.toggle("hidden", isMultiple);
+  });
+  document.querySelectorAll(".tag-field").forEach((field) => {
+    field.classList.toggle("hidden", isMultiple);
+  });
+  document.querySelectorAll(".color-field").forEach((field) => {
+    field.classList.toggle("hidden", isMultiple);
+  });
+  document.querySelectorAll(".recurrence-extras").forEach((field) => {
+    field.classList.toggle("hidden", isMultiple);
+  });
   document.querySelectorAll(".non-weekly-field input").forEach((field) => {
     const isCheckbox = field.type === "checkbox";
     const isOptional = field.name === "blobDescription";
@@ -762,7 +905,7 @@ function updateRecurrenceUI() {
       "schedulableStart",
       "schedulableEnd",
     ].includes(field.name);
-    if (type === "weekly") {
+    if (type === "weekly" || isMultiple) {
       field.disabled = true;
       field.required = false;
     } else if (type === "date") {
@@ -784,8 +927,8 @@ function updateRecurrenceUI() {
     annualDateField.required = type === "date";
   }
   if (dom.recurrenceEnd) {
-    dom.recurrenceEnd.disabled = type === "single";
-    if (type === "single") {
+    dom.recurrenceEnd.disabled = type === "single" || isMultiple;
+    if (type === "single" || isMultiple) {
       dom.recurrenceEnd.value = "";
     }
   }
@@ -794,48 +937,53 @@ function updateRecurrenceUI() {
     setPolicyAdvancedVisibility(dom.blobForm.policySplittable, dom.blobForm.policySplittable.checked);
   }
 
-  const defaultStart = dom.blobForm.defaultStart.value;
-  const annualDate = dom.blobForm.annualDate?.value || "";
-  const startDate = annualDate
-    ? new Date(`${annualDate}T00:00:00`)
-    : defaultStart
-      ? new Date(
-          toProjectIsoFromLocalInput(
-            defaultStart,
-            appConfig.userTimeZone,
-            appConfig.projectTimeZone
+  if (type === "multiple") {
+    const slotCount = getMultipleSlots().length;
+    dom.recurrenceSummary.textContent = `Grouping ${slotCount} occurrence(s).`;
+  } else {
+    const defaultStart = dom.blobForm.defaultStart.value;
+    const annualDate = dom.blobForm.annualDate?.value || "";
+    const startDate = annualDate
+      ? new Date(`${annualDate}T00:00:00`)
+      : defaultStart
+        ? new Date(
+            toProjectIsoFromLocalInput(
+              defaultStart,
+              appConfig.userTimeZone,
+              appConfig.projectTimeZone
+            )
           )
-        )
-      : state.anchorDate;
-  if (Number.isNaN(startDate.getTime())) {
-    dom.recurrenceSummary.textContent = "Set a default start time to preview the cadence.";
-    return;
-  }
-  if (type === "weekly") {
-    const interval = Number(dom.blobForm.weeklyInterval.value || 1);
-    const slotSelections = getWeeklySlotSelections();
-    const slotCount = slotSelections.reduce((total, slot) => total + slot.days.length, 0);
-    dom.recurrenceSummary.textContent = `Repeats every ${interval} week(s) with ${slotCount} slot(s).`;
-  } else if (type === "delta") {
-    const value = Number(dom.blobForm.deltaValue.value || 1);
-    const unit = dom.blobForm.deltaUnit.value || "days";
-    dom.recurrenceSummary.textContent = `Repeats every ${value} ${unit}.`;
-  } else if (type === "date") {
-    if (!annualDate) {
-      dom.recurrenceSummary.textContent = "Select an annual date.";
+        : state.anchorDate;
+    if (Number.isNaN(startDate.getTime())) {
+      dom.recurrenceSummary.textContent = "Set a default start time to preview the cadence.";
       return;
     }
-    const dateLabel = startDate.toLocaleDateString(undefined, {
-      month: "long",
-      day: "numeric",
-    });
-    dom.recurrenceSummary.textContent = `Repeats annually on ${dateLabel}.`;
-  } else {
-    dom.recurrenceSummary.textContent = "One-time event. Switch to create repeats.";
+    if (type === "weekly") {
+      const interval = Number(dom.blobForm.weeklyInterval.value || 1);
+      const slotSelections = getWeeklySlotSelections();
+      const slotCount = slotSelections.reduce((total, slot) => total + slot.days.length, 0);
+    dom.recurrenceSummary.textContent = `Repeats every ${interval} week(s) with ${slotCount} occurrence(s).`;
+    } else if (type === "delta") {
+      const value = Number(dom.blobForm.deltaValue.value || 1);
+      const unit = dom.blobForm.deltaUnit.value || "days";
+      dom.recurrenceSummary.textContent = `Repeats every ${value} ${unit}.`;
+    } else if (type === "date") {
+      if (!annualDate) {
+        dom.recurrenceSummary.textContent = "Select an annual date.";
+        return;
+      }
+      const dateLabel = startDate.toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+      });
+      dom.recurrenceSummary.textContent = `Repeats annually on ${dateLabel}.`;
+    } else {
+      dom.recurrenceSummary.textContent = "One-time event. Switch to create repeats.";
+    }
   }
 
   const endValue = dom.recurrenceEnd?.value;
-  if (endValue && type !== "single") {
+  if (endValue && type !== "single" && !isMultiple) {
     const endDate = new Date(endValue);
     if (!Number.isNaN(endDate.getTime())) {
       const endLabel = endDate.toLocaleString(undefined, {
@@ -944,16 +1092,16 @@ function createWeeklySlot(slotData = {}) {
     </div>
     <div class="weekly-slot-row slot-meta">
       <label>
-        Slot name
+        Occurrence name
         <input type="text" name="slotName" value="${nameValue}" />
       </label>
       <label>
-        Slot description
+        Occurrence description
         <input type="text" name="slotDescription" value="${descriptionValue}" />
       </label>
     </div>
     <div class="weekly-slot-row slot-tags slot-tag-field">
-      <span class="tag-label">Slot tags</span>
+      <span class="tag-label">Occurrence tags</span>
       <div class="tag-input-row">
         <input
           type="text"
@@ -1169,12 +1317,12 @@ function validateWeeklySlots() {
   if (!dom.weeklySlotStatus) return true;
   const selections = getWeeklySlotSelections();
   if (selections.length === 0) {
-    dom.weeklySlotStatus.textContent = "Add at least one weekly slot.";
+    dom.weeklySlotStatus.textContent = "Add at least one weekly occurrence.";
     return false;
   }
   for (const slot of selections) {
     if (slot.days.length === 0) {
-      dom.weeklySlotStatus.textContent = "Weekly slots need a day of week.";
+      dom.weeklySlotStatus.textContent = "Weekly occurrences need a day of week.";
       return false;
     }
   }
@@ -1191,16 +1339,16 @@ function validateWeeklySlots() {
       schedStart === null ||
       schedEnd === null
     ) {
-      dom.weeklySlotStatus.textContent = "Weekly slots need valid times.";
+      dom.weeklySlotStatus.textContent = "Weekly occurrences need valid times.";
       return false;
     }
     if (defaultEnd <= defaultStart || schedEnd <= schedStart) {
-      dom.weeklySlotStatus.textContent = "Weekly slots must end after they start.";
+      dom.weeklySlotStatus.textContent = "Weekly occurrences must end after they start.";
       return false;
     }
     if (schedStart > defaultStart || schedEnd < defaultEnd) {
       dom.weeklySlotStatus.textContent =
-        "Schedulable range must contain default range for each slot.";
+        "Schedulable range must contain default range for each occurrence.";
       return false;
     }
     const offset = dayOffsetFromSunday(slot.day);
@@ -1212,11 +1360,382 @@ function validateWeeklySlots() {
   const sorted = ranges.sort((a, b) => a.start - b.start);
   for (let i = 0; i < sorted.length - 1; i += 1) {
     if (sorted[i].end > sorted[i + 1].start) {
-      dom.weeklySlotStatus.textContent = "Weekly slots cannot overlap.";
+      dom.weeklySlotStatus.textContent = "Weekly occurrences cannot overlap.";
       return false;
     }
   }
   dom.weeklySlotStatus.textContent = "";
+  return true;
+}
+
+function clearMultipleSlots() {
+  if (dom.multipleSlots) {
+    dom.multipleSlots.innerHTML = "";
+  }
+}
+
+function createMultipleSlot(slotData = {}) {
+  if (!dom.multipleSlots) return;
+  const slot = document.createElement("div");
+  slot.className = "weekly-slot multiple-slot";
+  const slotId = typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `multi-slot-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  slot.dataset.slotId = slotId;
+
+  const defaultStart = slotData.defaultStart || "";
+  const defaultEnd = slotData.defaultEnd || "";
+  const schedStart = slotData.schedStart || "";
+  const schedEnd = slotData.schedEnd || "";
+  const nameValue = slotData.name || "";
+  const descriptionValue = slotData.description || "";
+  const tagsValue = slotData.tags || [];
+  const policyFlags = getPolicyFlagsFromPolicy(slotData.policy || {});
+
+  slot.innerHTML = `
+    <div class="weekly-slot-row time-range-row">
+      <label>
+        Default start
+        <div class="datetime-field">
+          <input type="text" class="datetime-display" placeholder="Select date/time" readonly />
+          <button type="button" class="ghost small datetime-trigger" aria-label="Pick date">
+            📅
+          </button>
+          <input type="hidden" name="multiDefaultStart" data-datetime-input />
+        </div>
+      </label>
+      <label>
+        Default end
+        <div class="datetime-field">
+          <input type="text" class="datetime-display" placeholder="Select date/time" readonly />
+          <button type="button" class="ghost small datetime-trigger" aria-label="Pick date">
+            📅
+          </button>
+          <input type="hidden" name="multiDefaultEnd" data-datetime-input />
+        </div>
+      </label>
+    </div>
+    <div class="weekly-slot-row time-range-row">
+      <label>
+        Schedulable start
+        <div class="datetime-field">
+          <input type="text" class="datetime-display" placeholder="Select date/time" readonly />
+          <button type="button" class="ghost small datetime-trigger" aria-label="Pick date">
+            📅
+          </button>
+          <input type="hidden" name="multiSchedStart" data-datetime-input />
+        </div>
+      </label>
+      <label>
+        Schedulable end
+        <div class="datetime-field">
+          <input type="text" class="datetime-display" placeholder="Select date/time" readonly />
+          <button type="button" class="ghost small datetime-trigger" aria-label="Pick date">
+            📅
+          </button>
+          <input type="hidden" name="multiSchedEnd" data-datetime-input />
+        </div>
+      </label>
+    </div>
+    <div class="weekly-slot-row slot-meta">
+      <label>
+        Occurrence name
+        <input type="text" name="multiName" class="needs-input" value="${nameValue}" required />
+      </label>
+      <label>
+        Occurrence description
+        <input type="text" name="multiDescription" class="needs-input" value="${descriptionValue}" />
+      </label>
+    </div>
+    <div class="weekly-slot-row slot-tags slot-tag-field">
+      <span class="tag-label">Tags</span>
+      <div class="tag-input-row">
+        <input
+          type="text"
+          name="slotTagInput"
+          class="needs-input"
+          placeholder="Search or add a tag"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="ghost small"
+          data-action="add-slot-tag"
+          aria-label="Add tag"
+          title="Add tag"
+        >
+          +
+        </button>
+      </div>
+      <div class="tag-suggestions slot-tag-suggestions"></div>
+      <div class="tag-list slot-tag-list"></div>
+    </div>
+    <div class="weekly-slot-row slot-policy">
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicySplittable" ${
+          policyFlags.splittable ? "checked" : ""
+        } />
+        <span>Splittable</span>
+      </label>
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicyOverlappable" ${
+          policyFlags.overlappable ? "checked" : ""
+        } />
+        <span>Overlappable</span>
+      </label>
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicyInvisible" ${
+          policyFlags.invisible ? "checked" : ""
+        } />
+        <span>Invisible</span>
+      </label>
+    </div>
+    <div class="weekly-slot-row slot-policy-advanced ${policyFlags.splittable ? "" : "is-hidden"}">
+      <label>
+        Max splits
+        <input
+          type="number"
+          name="slotPolicyMaxSplits"
+          min="0"
+          step="1"
+          value="${policyFlags.maxSplits ?? DEFAULT_MAX_SPLITS}"
+        />
+      </label>
+      <label>
+        Min split duration (min)
+        <input
+          type="number"
+          name="slotPolicyMinSplitDuration"
+          min="0"
+          step="1"
+          value="${policyFlags.minSplitDurationMinutes ?? DEFAULT_MIN_SPLIT_MINUTES}"
+        />
+      </label>
+      <label class="policy-option">
+        <input type="checkbox" name="slotPolicyRoundToGranularity" ${
+          policyFlags.roundToGranularity ? "checked" : ""
+        } />
+        <span>Round to granularity</span>
+      </label>
+    </div>
+    <div class="dependency-field slot-dependency-field">
+      <span class="dependency-label">Dependencies</span>
+      <div class="dependency-input-row">
+        <input
+          type="text"
+          name="slotDependencyInput"
+          class="needs-input"
+          placeholder="Search by blob name or id"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="ghost small"
+          data-action="add-slot-dependency"
+          aria-label="Add dependency"
+          title="Add dependency"
+        >
+          +
+        </button>
+      </div>
+      <div class="dependency-suggestions slot-dependency-suggestions"></div>
+      <div class="dependency-list slot-dependency-list"></div>
+    </div>
+    <div class="weekly-slot-row weekly-slot-actions">
+      <button type="button" class="ghost small" data-action="remove-multiple-slot">
+        Remove
+      </button>
+    </div>
+  `;
+
+  dom.multipleSlots.appendChild(slot);
+
+  const defaultStartInput = slot.querySelector('[name="multiDefaultStart"]');
+  const defaultEndInput = slot.querySelector('[name="multiDefaultEnd"]');
+  const schedStartInput = slot.querySelector('[name="multiSchedStart"]');
+  const schedEndInput = slot.querySelector('[name="multiSchedEnd"]');
+  if (defaultStartInput) defaultStartInput.value = defaultStart;
+  if (defaultEndInput) defaultEndInput.value = defaultEnd;
+  if (schedStartInput) schedStartInput.value = schedStart;
+  if (schedEndInput) schedEndInput.value = schedEnd;
+
+  setSlotTagList(slot, Array.isArray(tagsValue) ? tagsValue : []);
+  setSlotDependencies(slot, Array.isArray(slotData.dependencies) ? slotData.dependencies : []);
+
+  const removeBtn = slot.querySelector('[data-action="remove-multiple-slot"]');
+  if (removeBtn) {
+    removeBtn.addEventListener("click", () => {
+      slot.remove();
+      validateMultipleSlots();
+      updateRecurrenceUI();
+    });
+  }
+
+  bindDateTimePickers();
+  syncDateTimeDisplays();
+  const tagInput = slot.querySelector('[name="slotTagInput"]');
+  const tagSuggestions = slot.querySelector(".slot-tag-suggestions");
+  const addTagBtn = slot.querySelector('[data-action="add-slot-tag"]');
+  if (tagInput) {
+    tagInput.addEventListener("input", () => renderSlotTagSuggestions(slot));
+    tagInput.addEventListener("focus", () => renderSlotTagSuggestions(slot));
+    tagInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === ",") {
+        event.preventDefault();
+        addSlotTagFromInput(slot);
+      }
+    });
+  }
+  if (addTagBtn) {
+    addTagBtn.addEventListener("click", () => addSlotTagFromInput(slot));
+  }
+  if (tagSuggestions) {
+    tagSuggestions.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-tag-name]");
+      if (!target) return;
+      const candidate = target.dataset.tagName;
+      if (!candidate) return;
+      const currentTags = getSlotTagList(slot);
+      if (!currentTags.some((tag) => tagKey(tag) === tagKey(candidate))) {
+        setSlotTagList(slot, [...currentTags, candidate]);
+      }
+      if (tagInput) {
+        tagInput.value = "";
+      }
+      tagSuggestions.innerHTML = "";
+    });
+  }
+  const tagList = slot.querySelector(".slot-tag-list");
+  if (tagList) {
+    tagList.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-remove-slot-tag]");
+      if (!target) return;
+      const name = target.dataset.removeSlotTag;
+      setSlotTagList(
+        slot,
+        getSlotTagList(slot).filter((tag) => tagKey(tag) !== tagKey(name))
+      );
+    });
+  }
+  const dependencyInput = slot.querySelector('[name="slotDependencyInput"]');
+  const dependencySuggestions = slot.querySelector(".slot-dependency-suggestions");
+  const addDependencyBtn = slot.querySelector('[data-action="add-slot-dependency"]');
+  if (dependencyInput) {
+    dependencyInput.addEventListener("input", () => renderSlotDependencySuggestions(slot));
+    dependencyInput.addEventListener("focus", () => renderSlotDependencySuggestions(slot));
+    dependencyInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === ",") {
+        event.preventDefault();
+        addSlotDependencyFromInput(slot);
+      }
+    });
+  }
+  if (addDependencyBtn) {
+    addDependencyBtn.addEventListener("click", () => addSlotDependencyFromInput(slot));
+  }
+  if (dependencySuggestions) {
+    dependencySuggestions.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-dependency-id]");
+      if (!target) return;
+      const candidate = target.dataset.dependencyId;
+      if (!candidate) return;
+      const current = getSlotDependencies(slot);
+      if (!current.includes(candidate)) {
+        setSlotDependencies(slot, [...current, candidate]);
+      }
+      if (dependencyInput) {
+        dependencyInput.value = "";
+      }
+      dependencySuggestions.innerHTML = "";
+    });
+  }
+  const dependencyList = slot.querySelector(".slot-dependency-list");
+  if (dependencyList) {
+    dependencyList.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-remove-slot-dependency]");
+      if (!target) return;
+      const id = target.dataset.removeSlotDependency;
+      setSlotDependencies(
+        slot,
+        getSlotDependencies(slot).filter((depId) => depId !== id)
+      );
+    });
+  }
+  ["slotPolicySplittable", "slotPolicyOverlappable", "slotPolicyInvisible"].forEach((name) => {
+    const field = slot.querySelector(`[name="${name}"]`);
+    if (!field) return;
+    field.addEventListener("change", () => {
+      if (name === "slotPolicySplittable") {
+        setPolicyAdvancedVisibility(field, field.checked);
+      }
+    });
+  });
+
+  validateMultipleSlots();
+  updateRecurrenceUI();
+}
+
+function getMultipleSlots() {
+  if (!dom.multipleSlots) return [];
+  const slots = [];
+  dom.multipleSlots.querySelectorAll(".multiple-slot").forEach((slot) => {
+    slots.push({
+      defaultStart: slot.querySelector('[name="multiDefaultStart"]')?.value || "",
+      defaultEnd: slot.querySelector('[name="multiDefaultEnd"]')?.value || "",
+      schedStart: slot.querySelector('[name="multiSchedStart"]')?.value || "",
+      schedEnd: slot.querySelector('[name="multiSchedEnd"]')?.value || "",
+      name: slot.querySelector('[name="multiName"]')?.value?.trim() || "",
+      description: slot.querySelector('[name="multiDescription"]')?.value?.trim() || "",
+      tags: getSlotTags(slot),
+      dependencies: getSlotDependencies(slot),
+      policy: getPolicyPayloadFromFlags(
+        Boolean(slot.querySelector('[name="slotPolicySplittable"]')?.checked),
+        Boolean(slot.querySelector('[name="slotPolicyOverlappable"]')?.checked),
+        Boolean(slot.querySelector('[name="slotPolicyInvisible"]')?.checked),
+        Number(slot.querySelector('[name="slotPolicyMaxSplits"]')?.value || 0),
+        Number(slot.querySelector('[name="slotPolicyMinSplitDuration"]')?.value || 0),
+        Boolean(slot.querySelector('[name="slotPolicyRoundToGranularity"]')?.checked)
+      ),
+    });
+  });
+  return slots;
+}
+
+function validateMultipleSlots() {
+  if (!dom.multipleSlotStatus) return true;
+  const slots = getMultipleSlots();
+  if (slots.length === 0) {
+    dom.multipleSlotStatus.textContent = "Add at least one occurrence.";
+    return false;
+  }
+  for (const slot of slots) {
+    if (!slot.name) {
+      dom.multipleSlotStatus.textContent = "Occurrences need a name.";
+      return false;
+    }
+    const defaultStart = new Date(slot.defaultStart);
+    const defaultEnd = new Date(slot.defaultEnd);
+    const schedStart = new Date(slot.schedStart);
+    const schedEnd = new Date(slot.schedEnd);
+    if ([defaultStart, defaultEnd, schedStart, schedEnd].some((dt) => Number.isNaN(dt.getTime()))) {
+      dom.multipleSlotStatus.textContent = "Occurrences need valid date/time values.";
+      return false;
+    }
+    if (defaultEnd <= defaultStart) {
+      dom.multipleSlotStatus.textContent = "Default end must be after default start.";
+      return false;
+    }
+    if (schedEnd <= schedStart) {
+      dom.multipleSlotStatus.textContent = "Schedulable end must be after schedulable start.";
+      return false;
+    }
+    if (schedStart > defaultStart || schedEnd < defaultEnd) {
+      dom.multipleSlotStatus.textContent =
+        "Schedulable range must contain default range for each occurrence.";
+      return false;
+    }
+  }
+  dom.multipleSlotStatus.textContent = "";
   return true;
 }
 
@@ -1261,6 +1780,11 @@ function resetFormMode() {
   if (dom.weeklySlotStatus) {
     dom.weeklySlotStatus.textContent = "";
   }
+  clearMultipleSlots();
+  createMultipleSlot();
+  if (dom.multipleSlotStatus) {
+    dom.multipleSlotStatus.textContent = "";
+  }
   updateRecurrenceUI();
   setFormMode("create");
   updateStarButtons();
@@ -1291,10 +1815,21 @@ function openEditForm(blob) {
     blob.recurrence_payload?.recurrence_description || "";
   setRecurrenceEndValue(blob.recurrence_payload?.end_date || null);
   setRecurrenceColor(blob.recurrence_payload?.color || null);
-  dom.blobForm.blobName.value = blob.name || "";
-  dom.blobForm.blobDescription.value = blob.description || "";
-  setDependencies(Array.isArray(blob.dependencies) ? blob.dependencies : []);
-  setTags(Array.isArray(blob.tags) ? blob.tags : []);
+  if (recurrenceType === "multiple") {
+    setRecurrenceEndValue(null);
+    setRecurrenceColor(null);
+  }
+  if (recurrenceType !== "multiple") {
+    dom.blobForm.blobName.value = blob.name || "";
+    dom.blobForm.blobDescription.value = blob.description || "";
+    setDependencies(Array.isArray(blob.dependencies) ? blob.dependencies : []);
+    setTags(Array.isArray(blob.tags) ? blob.tags : []);
+  } else {
+    dom.blobForm.blobName.value = "";
+    dom.blobForm.blobDescription.value = "";
+    setDependencies([]);
+    setTags([]);
+  }
   const blobTimeZone = blob.tz || appConfig.userTimeZone;
   if (recurrenceType !== "date") {
     dom.blobForm.defaultStart.value = toLocalInputValueInTimeZone(
@@ -1322,6 +1857,7 @@ function openEditForm(blob) {
     dom.blobForm.annualDate.value = dateValue ? dateValue.split("T")[0] : "";
   }
   clearWeeklySlots();
+  clearMultipleSlots();
   if (blob.recurrence_payload?.interval && dom.blobForm.weeklyInterval) {
     dom.blobForm.weeklyInterval.value = blob.recurrence_payload.interval;
   }
@@ -1410,6 +1946,38 @@ function openEditForm(blob) {
     });
     setDependencies(Array.isArray(blobs[0]?.dependencies) ? blobs[0].dependencies : []);
     setTags(hasCustom ? [] : sharedTags);
+  } else if (recurrenceType === "multiple" && blob.recurrence_payload?.blobs) {
+    const blobs = blob.recurrence_payload.blobs;
+    if (!blobs.length) {
+      createMultipleSlot();
+    } else {
+      blobs.forEach((multiBlob) => {
+        const slotTimeZone = multiBlob.tz || appConfig.userTimeZone;
+        createMultipleSlot({
+          defaultStart: toLocalInputValueInTimeZone(
+            multiBlob.default_scheduled_timerange?.start,
+            slotTimeZone
+          ),
+          defaultEnd: toLocalInputValueInTimeZone(
+            multiBlob.default_scheduled_timerange?.end,
+            slotTimeZone
+          ),
+          schedStart: toLocalInputValueInTimeZone(
+            multiBlob.schedulable_timerange?.start,
+            slotTimeZone
+          ),
+          schedEnd: toLocalInputValueInTimeZone(
+            multiBlob.schedulable_timerange?.end,
+            slotTimeZone
+          ),
+          name: multiBlob.name || "",
+          description: multiBlob.description || "",
+          tags: Array.isArray(multiBlob.tags) ? multiBlob.tags : [],
+          dependencies: Array.isArray(multiBlob.dependencies) ? multiBlob.dependencies : [],
+          policy: multiBlob.policy || {},
+        });
+      });
+    }
   } else {
     applyPolicyToForm(blob.policy);
     createWeeklySlot();
@@ -1430,6 +1998,9 @@ function openEditForm(blob) {
     }
     dom.blobForm.deltaValue.value = value;
     dom.blobForm.deltaUnit.value = unit;
+  }
+  if (dom.multipleSlots && dom.multipleSlots.children.length === 0) {
+    createMultipleSlot();
   }
   state.editingRecurrenceId = blob.recurrence_id || null;
   state.editingRecurrenceType = recurrenceType;
@@ -1673,6 +2244,52 @@ async function handleBlobSubmit(event) {
       color: recurrenceColor,
       start_blob: baseBlob,
     };
+  } else if (recurrenceType === "multiple") {
+    const isValid = validateMultipleSlots();
+    if (!isValid) {
+      dom.formStatus.textContent = "Fix occurrence errors before saving.";
+      return;
+    }
+    const slots = getMultipleSlots();
+    const blobs = slots.map((slot) => ({
+      name: slot.name,
+      description: slot.description || null,
+      tz: appConfig.userTimeZone,
+      default_scheduled_timerange: {
+        start: toProjectIsoFromLocalInput(
+          slot.defaultStart,
+          appConfig.userTimeZone,
+          appConfig.projectTimeZone
+        ),
+        end: toProjectIsoFromLocalInput(
+          slot.defaultEnd,
+          appConfig.userTimeZone,
+          appConfig.projectTimeZone
+        ),
+      },
+      schedulable_timerange: {
+        start: toProjectIsoFromLocalInput(
+          slot.schedStart,
+          appConfig.userTimeZone,
+          appConfig.projectTimeZone
+        ),
+        end: toProjectIsoFromLocalInput(
+          slot.schedEnd,
+          appConfig.userTimeZone,
+          appConfig.projectTimeZone
+        ),
+      },
+      policy: slot.policy || {},
+      dependencies: slot.dependencies || [],
+      tags: slot.tags || [],
+    }));
+    recurrencePayload = {
+      recurrence_name: formData.get("recurrenceName") || null,
+      recurrence_description: formData.get("recurrenceDescription") || null,
+      end_date: null,
+      color: null,
+      blobs,
+    };
   } else if (recurrenceType === "date") {
     const annualDate = formData.get("annualDate")?.toString().trim() || "";
     if (!annualDate) {
@@ -1725,28 +2342,16 @@ async function handleBlobSubmit(event) {
       unstarred: Array.isArray(priorPayload.unstarred) ? priorPayload.unstarred : [],
     };
   }
-  const payload = { type: recurrenceType, payload: recurrencePayload };
-
   try {
     const isEditing = Boolean(state.editingRecurrenceId);
-    const endpoint = isEditing
-      ? `${API_BASE}/recurrences/${state.editingRecurrenceId}`
-      : `${API_BASE}/recurrences`;
-    const response = await fetch(endpoint, {
-      method: isEditing ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      let detail = "Failed to save recurrence";
-      const contentType = response.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        const data = await response.json();
-        detail = data.detail || detail;
-      } else {
-        detail = (await response.text()) || detail;
-      }
-      throw new Error(detail);
+    if (isEditing) {
+      await updateRecurrence(
+        state.editingRecurrenceId,
+        recurrenceType,
+        recurrencePayload
+      );
+    } else {
+      await createRecurrence(recurrenceType, recurrencePayload);
     }
     dom.blobForm.reset();
     dom.formStatus.textContent = isEditing ? "Updated." : "Created.";
@@ -1951,6 +2556,11 @@ function bindFormHandlers(onRefresh) {
     dom.blobForm.deltaValue.addEventListener("input", updateRecurrenceUI);
     dom.blobForm.deltaUnit.addEventListener("change", updateRecurrenceUI);
   }
+  if (dom.addMultipleSlotBtn) {
+    dom.addMultipleSlotBtn.addEventListener("click", () => {
+      createMultipleSlot();
+    });
+  }
   if (dom.recurrenceEnd) {
     dom.recurrenceEnd.addEventListener("change", updateRecurrenceUI);
   }
@@ -2067,6 +2677,9 @@ function bindFormHandlers(onRefresh) {
   });
   if (dom.weeklySlots && dom.weeklySlots.children.length === 0) {
     createWeeklySlot();
+  }
+  if (dom.multipleSlots && dom.multipleSlots.children.length === 0) {
+    createMultipleSlot();
   }
   if (settingsTabs.length) {
     settingsTabs.forEach((tab) => {

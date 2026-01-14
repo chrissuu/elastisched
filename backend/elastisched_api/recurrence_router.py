@@ -22,6 +22,7 @@ from core.blob import Blob
 from core.recurrence import (
     DateBlobRecurrence,
     DeltaBlobRecurrence,
+    MultipleBlobOccurrence,
     SingleBlobOccurrence,
     WeeklyBlobRecurrence,
 )
@@ -45,6 +46,19 @@ async def _mark_schedule_dirty(session: AsyncSession) -> None:
         state.dirty = True
     await session.execute(delete(ScheduledOccurrenceModel))
     await session.commit()
+
+
+def _normalize_recurrence_type(value: str | None) -> str:
+    raw = (value or "").strip().lower()
+    raw = raw.replace("-", "_").replace(" ", "_")
+    aliases = {
+        "single_occurrence": "single",
+        "weekly_cadence": "weekly",
+        "fixed_interval": "delta",
+        "annual_date": "date",
+        "multiple_occurrence": "multiple",
+    }
+    return aliases.get(raw, raw)
 
 
 def _parse_datetime(value: str) -> datetime:
@@ -142,6 +156,7 @@ def _blob_from_payload(data: dict) -> Blob:
 
 
 def _recurrence_from_payload(recurrence_type: str, payload: dict):
+    recurrence_type = _normalize_recurrence_type(recurrence_type)
     payload = payload or {}
     if payload.get("end_date"):
         _parse_datetime(payload.get("end_date"))
@@ -198,6 +213,14 @@ def _recurrence_from_payload(recurrence_type: str, payload: dict):
         blob.set_default_scheduled_timerange(TimeRange(start=day_start, end=day_end))
         blob.set_schedulable_timerange(TimeRange(start=day_start, end=day_end))
         return DateBlobRecurrence(blob=blob)
+    if recurrence_type == "multiple":
+        blobs = [_blob_from_payload(blob) for blob in payload.get("blobs") or []]
+        if not blobs:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Multiple occurrence requires blobs",
+            )
+        return MultipleBlobOccurrence(blobs=blobs)
     raise HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail="Unsupported recurrence type",
@@ -219,6 +242,8 @@ def _recurrence_tzinfo(recurrence_obj):
         return recurrence_obj.blob.get_schedulable_timerange().start.tzinfo
     if isinstance(recurrence_obj, SingleBlobOccurrence):
         return recurrence_obj.blob.get_schedulable_timerange().start.tzinfo
+    if isinstance(recurrence_obj, MultipleBlobOccurrence):
+        return recurrence_obj.blobs[0].get_schedulable_timerange().start.tzinfo
     return None
 
 
@@ -304,14 +329,41 @@ def _to_occurrence_schema(
     )
 
 
-@recurrence_router.post("", response_model=RecurrenceRead, status_code=status.HTTP_201_CREATED)
+@recurrence_router.post(
+    "",
+    response_model=RecurrenceRead | list[RecurrenceRead],
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_recurrence(
-    payload: RecurrenceCreate, session: AsyncSession = Depends(get_session)
-) -> RecurrenceRead:
-    _recurrence_from_payload(payload.type, payload.payload)
+    payload: RecurrenceCreate | list[RecurrenceCreate],
+    session: AsyncSession = Depends(get_session),
+) -> RecurrenceRead | list[RecurrenceRead]:
+    if isinstance(payload, list):
+        if not payload:
+            return []
+        recurrences = []
+        for item in payload:
+            normalized_type = _normalize_recurrence_type(item.type)
+            _recurrence_from_payload(normalized_type, item.payload)
+            recurrences.append(
+                RecurrenceModel(
+                    id=str(uuid.uuid4()),
+                    type=normalized_type,
+                    payload=item.payload,
+                )
+            )
+        session.add_all(recurrences)
+        await session.commit()
+        await _mark_schedule_dirty(session)
+        return [
+            RecurrenceRead(id=item.id, type=item.type, payload=item.payload)
+            for item in recurrences
+        ]
+    normalized_type = _normalize_recurrence_type(payload.type)
+    _recurrence_from_payload(normalized_type, payload.payload)
     recurrence = RecurrenceModel(
         id=str(uuid.uuid4()),
-        type=payload.type,
+        type=normalized_type,
         payload=payload.payload,
     )
     session.add(recurrence)
@@ -319,6 +371,32 @@ async def create_recurrence(
     await session.refresh(recurrence)
     await _mark_schedule_dirty(session)
     return RecurrenceRead(id=recurrence.id, type=recurrence.type, payload=recurrence.payload)
+
+
+@recurrence_router.post("/bulk", response_model=list[RecurrenceRead])
+async def create_recurrences_bulk(
+    payload: list[RecurrenceCreate], session: AsyncSession = Depends(get_session)
+) -> list[RecurrenceRead]:
+    if not payload:
+        return []
+    recurrences = []
+    for item in payload:
+        normalized_type = _normalize_recurrence_type(item.type)
+        _recurrence_from_payload(normalized_type, item.payload)
+        recurrences.append(
+            RecurrenceModel(
+                id=str(uuid.uuid4()),
+                type=normalized_type,
+                payload=item.payload,
+            )
+        )
+    session.add_all(recurrences)
+    await session.commit()
+    await _mark_schedule_dirty(session)
+    return [
+        RecurrenceRead(id=item.id, type=item.type, payload=item.payload)
+        for item in recurrences
+    ]
 
 
 @recurrence_router.get("", response_model=list[RecurrenceRead])
@@ -356,7 +434,7 @@ async def update_recurrence(
     if not recurrence:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recurrence not found")
 
-    new_type = payload.type or recurrence.type
+    new_type = _normalize_recurrence_type(payload.type or recurrence.type)
     new_payload = payload.payload if payload.payload is not None else recurrence.payload
     _recurrence_from_payload(new_type, new_payload)
     recurrence.type = new_type
@@ -398,8 +476,9 @@ async def list_occurrences(
     result = await session.execute(select(RecurrenceModel))
     occurrences: list[OccurrenceRead] = []
     for recurrence in result.scalars().all():
+        recurrence_type = _normalize_recurrence_type(recurrence.type)
         exclusions = _exclusion_set(recurrence.payload or {})
-        recurrence_obj = _recurrence_from_payload(recurrence.type, recurrence.payload)
+        recurrence_obj = _recurrence_from_payload(recurrence_type, recurrence.payload)
         recurrence_tz = _recurrence_tzinfo(recurrence_obj)
         recurrence_range = _coerce_timerange(timerange, recurrence_tz)
         end_date = _payload_end_datetime(recurrence.payload or {}, recurrence_tz)
@@ -417,7 +496,7 @@ async def list_occurrences(
                 continue
             occurrences.append(
                 _to_occurrence_schema(
-                    recurrence.id, recurrence.type, recurrence.payload, blob
+                    recurrence.id, recurrence_type, recurrence.payload, blob
                 )
             )
     if occurrences:

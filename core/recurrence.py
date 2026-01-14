@@ -207,6 +207,36 @@ class SingleBlobOccurrence(BlobRecurrence):
 
 
 @dataclass
+class MultipleBlobOccurrence(BlobRecurrence):
+    blobs: List[Blob]
+
+    def __post_init__(self):
+        if not self.blobs:
+            raise ValueError("Multiple occurrence requires at least one blob")
+        self.blobs.sort(key=lambda blob: blob.get_schedulable_timerange().start)
+
+    def next_occurrence(self, current: datetime) -> Optional[Blob]:
+        candidates = []
+        for blob in self.blobs:
+            timerange = blob.get_schedulable_timerange()
+            current_local = _coerce_datetime(current, timerange.start.tzinfo)
+            if current_local < timerange.start:
+                candidates.append(blob)
+        if not candidates:
+            return None
+        candidates.sort(key=lambda item: item.get_schedulable_timerange().start)
+        return deepcopy(candidates[0])
+
+    def all_occurrences(self, timerange: TimeRange) -> List[Blob]:
+        occurrences = []
+        for blob in self.blobs:
+            if timerange.contains(blob.get_schedulable_timerange()):
+                occurrences.append(deepcopy(blob))
+        occurrences.sort(key=lambda item: item.get_schedulable_timerange().start)
+        return occurrences
+
+
+@dataclass
 class WeeklyBlobRecurrence(BlobRecurrence):
     """Weekly recurrence rule"""
 
