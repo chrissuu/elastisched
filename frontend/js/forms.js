@@ -1190,7 +1190,6 @@ function createWeeklySlot(slotData = {}) {
       </div>
     </div>
     <div class="weekly-slot-row blob-type-row">
-      <span class="slot-day-label">Occurrence type</span>
       <div class="blob-type-toggle" role="group" aria-label="Occurrence type">
         <button type="button" class="type-pill ${slotType === BLOB_TYPES.TASK ? "active" : ""}" data-blob-type="task" aria-pressed="${slotType === BLOB_TYPES.TASK}">
           Task
@@ -1231,31 +1230,11 @@ function createWeeklySlot(slotData = {}) {
         <input type="text" name="slotDescription" value="${descriptionValue}" />
       </label>
     </div>
-    <div class="weekly-slot-row slot-tags slot-tag-field">
-      <span class="tag-label">Occurrence tags</span>
-      <div class="tag-input-row">
-        <input
-          type="text"
-          name="slotTagInput"
-          class="needs-input"
-          placeholder="Search or add a tag"
-          autocomplete="off"
-        />
-        <button
-          type="button"
-          class="ghost small"
-          data-action="add-slot-tag"
-          aria-label="Add tag"
-          title="Add tag"
-        >
-          +
-        </button>
-      </div>
-      <div class="tag-suggestions slot-tag-suggestions"></div>
-      <div class="tag-list slot-tag-list"></div>
+    <div class="weekly-slot-row policy-label-row">
+      <span class="policy-label">Policy options</span>
     </div>
     <div class="weekly-slot-row slot-policy">
-      <label class="policy-option">
+      <label class="policy-option policy-splittable">
         <input type="checkbox" name="slotPolicySplittable" ${
           policyFlags.splittable ? "checked" : ""
         } />
@@ -1303,6 +1282,29 @@ function createWeeklySlot(slotData = {}) {
         />
         <span>Round to granularity</span>
       </label>
+    </div>
+    <div class="weekly-slot-row slot-tags slot-tag-field">
+      <span class="tag-label">Occurrence tags</span>
+      <div class="tag-input-row">
+        <input
+          type="text"
+          name="slotTagInput"
+          class="needs-input"
+          placeholder="Search or add a tag"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="ghost small"
+          data-action="add-slot-tag"
+          aria-label="Add tag"
+          title="Add tag"
+        >
+          +
+        </button>
+      </div>
+      <div class="tag-suggestions slot-tag-suggestions"></div>
+      <div class="tag-list slot-tag-list"></div>
     </div>
     <div class="weekly-slot-actions">
       <button type="button" class="ghost small" data-action="remove-slot">Remove</button>
@@ -1544,7 +1546,6 @@ function createMultipleSlot(slotData = {}) {
 
   slot.innerHTML = `
     <div class="weekly-slot-row blob-type-row">
-      <span class="slot-day-label">Occurrence type</span>
       <div class="blob-type-toggle" role="group" aria-label="Occurrence type">
         <button type="button" class="type-pill ${slotType === BLOB_TYPES.TASK ? "active" : ""}" data-blob-type="task" aria-pressed="${slotType === BLOB_TYPES.TASK}">
           Task
@@ -1609,31 +1610,11 @@ function createMultipleSlot(slotData = {}) {
         <input type="text" name="multiDescription" class="needs-input" value="${descriptionValue}" />
       </label>
     </div>
-    <div class="weekly-slot-row slot-tags slot-tag-field">
-      <span class="tag-label">Tags</span>
-      <div class="tag-input-row">
-        <input
-          type="text"
-          name="slotTagInput"
-          class="needs-input"
-          placeholder="Search or add a tag"
-          autocomplete="off"
-        />
-        <button
-          type="button"
-          class="ghost small"
-          data-action="add-slot-tag"
-          aria-label="Add tag"
-          title="Add tag"
-        >
-          +
-        </button>
-      </div>
-      <div class="tag-suggestions slot-tag-suggestions"></div>
-      <div class="tag-list slot-tag-list"></div>
+    <div class="weekly-slot-row policy-label-row">
+      <span class="policy-label">Policy options</span>
     </div>
     <div class="weekly-slot-row slot-policy">
-      <label class="policy-option">
+      <label class="policy-option policy-splittable">
         <input type="checkbox" name="slotPolicySplittable" ${
           policyFlags.splittable ? "checked" : ""
         } />
@@ -1702,6 +1683,29 @@ function createMultipleSlot(slotData = {}) {
       </div>
       <div class="dependency-suggestions slot-dependency-suggestions"></div>
       <div class="dependency-list slot-dependency-list"></div>
+    </div>
+    <div class="weekly-slot-row slot-tags slot-tag-field">
+      <span class="tag-label">Tags</span>
+      <div class="tag-input-row">
+        <input
+          type="text"
+          name="slotTagInput"
+          class="needs-input"
+          placeholder="Search or add a tag"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="ghost small"
+          data-action="add-slot-tag"
+          aria-label="Add tag"
+          title="Add tag"
+        >
+          +
+        </button>
+      </div>
+      <div class="tag-suggestions slot-tag-suggestions"></div>
+      <div class="tag-list slot-tag-list"></div>
     </div>
     <div class="weekly-slot-row weekly-slot-actions">
       <button type="button" class="ghost small" data-action="remove-multiple-slot">
