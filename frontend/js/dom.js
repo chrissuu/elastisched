@@ -17,6 +17,7 @@ const dom = {
   recurrenceType: document.getElementById("recurrenceType"),
   recurrenceSummary: document.getElementById("recurrenceSummary"),
   recurrenceEnd: document.querySelector('[name="recurrenceEnd"]'),
+  blobTypeInput: document.getElementById("blobTypeInput"),
   weeklyPerSlot: document.getElementById("weeklyPerSlot"),
   weeklySlots: document.getElementById("weeklySlots"),
   weeklySlotStatus: document.getElementById("weeklySlotStatus"),

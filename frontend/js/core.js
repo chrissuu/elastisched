@@ -18,6 +18,7 @@ const state = {
   activeBlockClickHandler: null,
   infoCardLocked: false,
   lockedBlobId: null,
+  currentBlobType: "task",
   scheduleDirty: true,
   scheduleLastRun: null,
   scheduleRunning: false,
