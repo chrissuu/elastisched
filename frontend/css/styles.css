@@ -953,6 +953,25 @@ body.modal-open .info-card {
   display: none;
 }
 
+.form-panel.date-mode .blob-type-row {
+  display: none;
+}
+
+.non-weekly-field.is-event .default-range-row,
+.weekly-slot.is-event .default-range-row {
+  display: none;
+}
+
+.non-weekly-field.is-event .policy-splittable,
+.weekly-slot.is-event .policy-splittable {
+  display: none;
+}
+
+.non-weekly-field.is-event .slot-policy-advanced,
+.weekly-slot.is-event .slot-policy-advanced {
+  display: none;
+}
+
 .blob-form .policy-option {
   display: flex;
   align-items: center;
@@ -1018,6 +1037,33 @@ body.modal-open .info-card {
   height: 18px;
 }
 
+.blob-type-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid #e0d3c1;
+  background: #fffaf2;
+  gap: 2px;
+  width: max-content;
+  justify-self: start;
+}
+
+.type-pill {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.type-pill.active {
+  background: var(--ink);
+  color: #f7f2e8;
+}
+
 .weekly-slots {
   grid-column: 1 / -1;
   display: grid;
@@ -1066,6 +1112,20 @@ body.modal-open .info-card {
 
 .weekly-slot-row.slot-day-row {
   grid-template-columns: 1fr;
+}
+
+.weekly-slot-row.blob-type-row {
+  grid-template-columns: auto;
+  align-items: start;
+}
+
+.weekly-slot-row.policy-label-row {
+  grid-template-columns: 1fr;
+}
+
+.policy-label {
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .slot-day-field {
@@ -1124,6 +1184,10 @@ body.modal-open .info-card {
 }
 
 .multiple-slots .slot-policy {
+  display: flex;
+}
+
+.multiple-slots.weekly-slots:not(.per-slot) .weekly-slot .slot-policy {
   display: flex;
 }
 

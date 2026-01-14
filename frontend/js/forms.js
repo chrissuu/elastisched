@@ -20,6 +20,7 @@ const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 const editOnlyElements = document.querySelectorAll(".edit-only");
 const settingsTabs = document.querySelectorAll(".settings-tab");
 const settingsSections = document.querySelectorAll(".settings-section");
+const nonWeeklyField = document.querySelector(".non-weekly-field");
 let dependencyIds = [];
 let tagNames = [];
 const slotTagStore = new WeakMap();
@@ -172,6 +173,119 @@ function markUnsavedChanges() {
   if (state.editingRecurrenceId) {
     dom.formStatus.textContent = "Unsaved changes.";
   }
+}
+
+const BLOB_TYPES = {
+  TASK: "task",
+  EVENT: "event",
+};
+
+function normalizeBlobType(value) {
+  return value === BLOB_TYPES.EVENT ? BLOB_TYPES.EVENT : BLOB_TYPES.TASK;
+}
+
+function getRangeInputs(container) {
+  if (!container) return null;
+  const direct = {
+    defaultStart: container.querySelector('[name="defaultStart"]'),
+    defaultEnd: container.querySelector('[name="defaultEnd"]'),
+    schedStart: container.querySelector('[name="schedulableStart"]'),
+    schedEnd: container.querySelector('[name="schedulableEnd"]'),
+  };
+  if (direct.defaultStart && direct.defaultEnd && direct.schedStart && direct.schedEnd) {
+    return direct;
+  }
+  const weekly = {
+    defaultStart: container.querySelector('[name="slotDefaultStart"]'),
+    defaultEnd: container.querySelector('[name="slotDefaultEnd"]'),
+    schedStart: container.querySelector('[name="slotSchedStart"]'),
+    schedEnd: container.querySelector('[name="slotSchedEnd"]'),
+  };
+  if (weekly.defaultStart && weekly.defaultEnd && weekly.schedStart && weekly.schedEnd) {
+    return weekly;
+  }
+  const multiple = {
+    defaultStart: container.querySelector('[name="multiDefaultStart"]'),
+    defaultEnd: container.querySelector('[name="multiDefaultEnd"]'),
+    schedStart: container.querySelector('[name="multiSchedStart"]'),
+    schedEnd: container.querySelector('[name="multiSchedEnd"]'),
+  };
+  if (multiple.defaultStart && multiple.defaultEnd && multiple.schedStart && multiple.schedEnd) {
+    return multiple;
+  }
+  return null;
+}
+
+function syncDefaultToSched(container) {
+  const inputs = getRangeInputs(container);
+  if (!inputs) return;
+  if (!inputs.schedStart.value || !inputs.schedEnd.value) return;
+  inputs.defaultStart.value = inputs.schedStart.value;
+  inputs.defaultEnd.value = inputs.schedEnd.value;
+  inputs.defaultStart.dispatchEvent(new Event("change", { bubbles: true }));
+  inputs.defaultEnd.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function setBlobTypeOnContainer(container, nextType) {
+  if (!container) return;
+  const type = normalizeBlobType(nextType);
+  container.dataset.blobType = type;
+  container.classList.toggle("is-event", type === BLOB_TYPES.EVENT);
+  if (container === nonWeeklyField) {
+    state.currentBlobType = type;
+    if (state.selectionMode) {
+      if (type === BLOB_TYPES.EVENT) {
+        state.selectionStep = "schedulable";
+        dom.formStatus.textContent = "Click start/end for schedulable range.";
+      } else if (!state.pendingDefaultRange) {
+        state.selectionStep = "default";
+        dom.formStatus.textContent = "Click start/end for default range.";
+      }
+    }
+  }
+  const hiddenInput = container.querySelector("[data-blob-type-input]");
+  if (hiddenInput) {
+    hiddenInput.value = type;
+  }
+  container.querySelectorAll("[data-blob-type]").forEach((button) => {
+    const isActive = button.dataset.blobType === type;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", isActive.toString());
+  });
+  if (type === BLOB_TYPES.EVENT) {
+    syncDefaultToSched(container);
+  }
+}
+
+function isEventFromRanges(defaultStart, defaultEnd, schedStart, schedEnd) {
+  return Boolean(defaultStart && defaultEnd && schedStart && schedEnd) &&
+    defaultStart === schedStart &&
+    defaultEnd === schedEnd;
+}
+
+function bindBlobTypeSync(container) {
+  const inputs = getRangeInputs(container);
+  if (!inputs) return;
+  const syncIfEvent = () => {
+    if (container.dataset.blobType === BLOB_TYPES.EVENT) {
+      syncDefaultToSched(container);
+    }
+  };
+  inputs.schedStart.addEventListener("change", syncIfEvent);
+  inputs.schedEnd.addEventListener("change", syncIfEvent);
+}
+
+function bindBlobTypeToggle(container, onChange) {
+  if (!container) return;
+  container.querySelectorAll("[data-blob-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setBlobTypeOnContainer(container, button.dataset.blobType);
+      if (onChange) {
+        onChange();
+      }
+    });
+  });
+  bindBlobTypeSync(container);
 }
 
 const DEFAULT_MAX_SPLITS = 1;
@@ -898,7 +1012,7 @@ function updateRecurrenceUI() {
   });
   document.querySelectorAll(".non-weekly-field input").forEach((field) => {
     const isCheckbox = field.type === "checkbox";
-    const isOptional = field.name === "blobDescription";
+    const isOptional = field.type === "hidden" || field.name === "blobDescription";
     const isTimeRangeField = [
       "defaultStart",
       "defaultEnd",
@@ -1058,6 +1172,11 @@ function createWeeklySlot(slotData = {}) {
   const tagsValue = slotData.tags || [];
   const fallbackPolicy = dom.weeklyPerSlot?.checked ? getPolicyPayloadFromForm() : {};
   const policyFlags = getPolicyFlagsFromPolicy(slotData.policy ?? fallbackPolicy);
+  const slotType = normalizeBlobType(
+    slotData.blobType || (isEventFromRanges(defaultStart, defaultEnd, schedStart, schedEnd)
+      ? BLOB_TYPES.EVENT
+      : BLOB_TYPES.TASK)
+  );
   slot.innerHTML = `
     <div class="weekly-slot-row slot-day-row">
       <div class="slot-day-field">
@@ -1070,7 +1189,18 @@ function createWeeklySlot(slotData = {}) {
         </div>
       </div>
     </div>
-    <div class="weekly-slot-row time-range-row">
+    <div class="weekly-slot-row blob-type-row">
+      <div class="blob-type-toggle" role="group" aria-label="Occurrence type">
+        <button type="button" class="type-pill ${slotType === BLOB_TYPES.TASK ? "active" : ""}" data-blob-type="task" aria-pressed="${slotType === BLOB_TYPES.TASK}">
+          Task
+        </button>
+        <button type="button" class="type-pill ${slotType === BLOB_TYPES.EVENT ? "active" : ""}" data-blob-type="event" aria-pressed="${slotType === BLOB_TYPES.EVENT}">
+          Event
+        </button>
+      </div>
+      <input type="hidden" name="slotBlobType" value="${slotType}" data-blob-type-input />
+    </div>
+    <div class="weekly-slot-row time-range-row default-range-row">
       <label>
         Default start
         <input type="time" name="slotDefaultStart" value="${defaultStart}" required />
@@ -1080,7 +1210,7 @@ function createWeeklySlot(slotData = {}) {
         <input type="time" name="slotDefaultEnd" value="${defaultEnd}" required />
       </label>
     </div>
-    <div class="weekly-slot-row time-range-row">
+    <div class="weekly-slot-row time-range-row schedulable-range-row">
       <label>
         Schedulable start
         <input type="time" name="slotSchedStart" value="${schedStart}" required />
@@ -1100,31 +1230,11 @@ function createWeeklySlot(slotData = {}) {
         <input type="text" name="slotDescription" value="${descriptionValue}" />
       </label>
     </div>
-    <div class="weekly-slot-row slot-tags slot-tag-field">
-      <span class="tag-label">Occurrence tags</span>
-      <div class="tag-input-row">
-        <input
-          type="text"
-          name="slotTagInput"
-          class="needs-input"
-          placeholder="Search or add a tag"
-          autocomplete="off"
-        />
-        <button
-          type="button"
-          class="ghost small"
-          data-action="add-slot-tag"
-          aria-label="Add tag"
-          title="Add tag"
-        >
-          +
-        </button>
-      </div>
-      <div class="tag-suggestions slot-tag-suggestions"></div>
-      <div class="tag-list slot-tag-list"></div>
+    <div class="weekly-slot-row policy-label-row">
+      <span class="policy-label">Policy options</span>
     </div>
     <div class="weekly-slot-row slot-policy">
-      <label class="policy-option">
+      <label class="policy-option policy-splittable">
         <input type="checkbox" name="slotPolicySplittable" ${
           policyFlags.splittable ? "checked" : ""
         } />
@@ -1173,10 +1283,34 @@ function createWeeklySlot(slotData = {}) {
         <span>Round to granularity</span>
       </label>
     </div>
+    <div class="weekly-slot-row slot-tags slot-tag-field">
+      <span class="tag-label">Occurrence tags</span>
+      <div class="tag-input-row">
+        <input
+          type="text"
+          name="slotTagInput"
+          class="needs-input"
+          placeholder="Search or add a tag"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="ghost small"
+          data-action="add-slot-tag"
+          aria-label="Add tag"
+          title="Add tag"
+        >
+          +
+        </button>
+      </div>
+      <div class="tag-suggestions slot-tag-suggestions"></div>
+      <div class="tag-list slot-tag-list"></div>
+    </div>
     <div class="weekly-slot-actions">
       <button type="button" class="ghost small" data-action="remove-slot">Remove</button>
     </div>
   `;
+  setBlobTypeOnContainer(slot, slotType);
   slot.querySelector('[data-action="remove-slot"]').addEventListener("click", () => {
     slot.remove();
     updateRecurrenceUI();
@@ -1250,6 +1384,9 @@ function createWeeklySlot(slotData = {}) {
       );
     });
   }
+  bindBlobTypeToggle(slot, () => {
+    validateWeeklySlots();
+  });
   dom.weeklySlots.appendChild(slot);
   updateRecurrenceUI();
   validateWeeklySlots();
@@ -1281,12 +1418,22 @@ function getWeeklySlotSelections() {
     const roundToGranularity = Boolean(
       slot.querySelector('[name="slotPolicyRoundToGranularity"]')?.checked
     );
+    const slotType = normalizeBlobType(slot.querySelector('[name="slotBlobType"]')?.value);
+    const schedStart = slot.querySelector('[name="slotSchedStart"]').value;
+    const schedEnd = slot.querySelector('[name="slotSchedEnd"]').value;
+    const defaultStart = slotType === BLOB_TYPES.EVENT
+      ? schedStart
+      : slot.querySelector('[name="slotDefaultStart"]').value;
+    const defaultEnd = slotType === BLOB_TYPES.EVENT
+      ? schedEnd
+      : slot.querySelector('[name="slotDefaultEnd"]').value;
     selections.push({
       days: getSelectedDays(slot),
-      defaultStart: slot.querySelector('[name="slotDefaultStart"]').value,
-      defaultEnd: slot.querySelector('[name="slotDefaultEnd"]').value,
-      schedStart: slot.querySelector('[name="slotSchedStart"]').value,
-      schedEnd: slot.querySelector('[name="slotSchedEnd"]').value,
+      blobType: slotType,
+      defaultStart,
+      defaultEnd,
+      schedStart,
+      schedEnd,
       name: slot.querySelector('[name="slotName"]').value,
       description: slot.querySelector('[name="slotDescription"]').value,
       tags: getSlotTags(slot),
@@ -1391,9 +1538,25 @@ function createMultipleSlot(slotData = {}) {
   const descriptionValue = slotData.description || "";
   const tagsValue = slotData.tags || [];
   const policyFlags = getPolicyFlagsFromPolicy(slotData.policy || {});
+  const slotType = normalizeBlobType(
+    slotData.blobType || (isEventFromRanges(defaultStart, defaultEnd, schedStart, schedEnd)
+      ? BLOB_TYPES.EVENT
+      : BLOB_TYPES.TASK)
+  );
 
   slot.innerHTML = `
-    <div class="weekly-slot-row time-range-row">
+    <div class="weekly-slot-row blob-type-row">
+      <div class="blob-type-toggle" role="group" aria-label="Occurrence type">
+        <button type="button" class="type-pill ${slotType === BLOB_TYPES.TASK ? "active" : ""}" data-blob-type="task" aria-pressed="${slotType === BLOB_TYPES.TASK}">
+          Task
+        </button>
+        <button type="button" class="type-pill ${slotType === BLOB_TYPES.EVENT ? "active" : ""}" data-blob-type="event" aria-pressed="${slotType === BLOB_TYPES.EVENT}">
+          Event
+        </button>
+      </div>
+      <input type="hidden" name="multiBlobType" value="${slotType}" data-blob-type-input />
+    </div>
+    <div class="weekly-slot-row time-range-row default-range-row">
       <label>
         Default start
         <div class="datetime-field">
@@ -1415,7 +1578,7 @@ function createMultipleSlot(slotData = {}) {
         </div>
       </label>
     </div>
-    <div class="weekly-slot-row time-range-row">
+    <div class="weekly-slot-row time-range-row schedulable-range-row">
       <label>
         Schedulable start
         <div class="datetime-field">
@@ -1447,31 +1610,11 @@ function createMultipleSlot(slotData = {}) {
         <input type="text" name="multiDescription" class="needs-input" value="${descriptionValue}" />
       </label>
     </div>
-    <div class="weekly-slot-row slot-tags slot-tag-field">
-      <span class="tag-label">Tags</span>
-      <div class="tag-input-row">
-        <input
-          type="text"
-          name="slotTagInput"
-          class="needs-input"
-          placeholder="Search or add a tag"
-          autocomplete="off"
-        />
-        <button
-          type="button"
-          class="ghost small"
-          data-action="add-slot-tag"
-          aria-label="Add tag"
-          title="Add tag"
-        >
-          +
-        </button>
-      </div>
-      <div class="tag-suggestions slot-tag-suggestions"></div>
-      <div class="tag-list slot-tag-list"></div>
+    <div class="weekly-slot-row policy-label-row">
+      <span class="policy-label">Policy options</span>
     </div>
     <div class="weekly-slot-row slot-policy">
-      <label class="policy-option">
+      <label class="policy-option policy-splittable">
         <input type="checkbox" name="slotPolicySplittable" ${
           policyFlags.splittable ? "checked" : ""
         } />
@@ -1541,6 +1684,29 @@ function createMultipleSlot(slotData = {}) {
       <div class="dependency-suggestions slot-dependency-suggestions"></div>
       <div class="dependency-list slot-dependency-list"></div>
     </div>
+    <div class="weekly-slot-row slot-tags slot-tag-field">
+      <span class="tag-label">Tags</span>
+      <div class="tag-input-row">
+        <input
+          type="text"
+          name="slotTagInput"
+          class="needs-input"
+          placeholder="Search or add a tag"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="ghost small"
+          data-action="add-slot-tag"
+          aria-label="Add tag"
+          title="Add tag"
+        >
+          +
+        </button>
+      </div>
+      <div class="tag-suggestions slot-tag-suggestions"></div>
+      <div class="tag-list slot-tag-list"></div>
+    </div>
     <div class="weekly-slot-row weekly-slot-actions">
       <button type="button" class="ghost small" data-action="remove-multiple-slot">
         Remove
@@ -1558,6 +1724,7 @@ function createMultipleSlot(slotData = {}) {
   if (defaultEndInput) defaultEndInput.value = defaultEnd;
   if (schedStartInput) schedStartInput.value = schedStart;
   if (schedEndInput) schedEndInput.value = schedEnd;
+  setBlobTypeOnContainer(slot, slotType);
 
   setSlotTagList(slot, Array.isArray(tagsValue) ? tagsValue : []);
   setSlotDependencies(slot, Array.isArray(slotData.dependencies) ? slotData.dependencies : []);
@@ -1661,6 +1828,9 @@ function createMultipleSlot(slotData = {}) {
       );
     });
   }
+  bindBlobTypeToggle(slot, () => {
+    validateMultipleSlots();
+  });
   ["slotPolicySplittable", "slotPolicyOverlappable", "slotPolicyInvisible"].forEach((name) => {
     const field = slot.querySelector(`[name="${name}"]`);
     if (!field) return;
@@ -1679,11 +1849,19 @@ function getMultipleSlots() {
   if (!dom.multipleSlots) return [];
   const slots = [];
   dom.multipleSlots.querySelectorAll(".multiple-slot").forEach((slot) => {
+    const slotType = normalizeBlobType(slot.querySelector('[name="multiBlobType"]')?.value);
+    const schedStart = slot.querySelector('[name="multiSchedStart"]')?.value || "";
+    const schedEnd = slot.querySelector('[name="multiSchedEnd"]')?.value || "";
     slots.push({
-      defaultStart: slot.querySelector('[name="multiDefaultStart"]')?.value || "",
-      defaultEnd: slot.querySelector('[name="multiDefaultEnd"]')?.value || "",
-      schedStart: slot.querySelector('[name="multiSchedStart"]')?.value || "",
-      schedEnd: slot.querySelector('[name="multiSchedEnd"]')?.value || "",
+      blobType: slotType,
+      defaultStart: slotType === BLOB_TYPES.EVENT
+        ? schedStart
+        : slot.querySelector('[name="multiDefaultStart"]')?.value || "",
+      defaultEnd: slotType === BLOB_TYPES.EVENT
+        ? schedEnd
+        : slot.querySelector('[name="multiDefaultEnd"]')?.value || "",
+      schedStart,
+      schedEnd,
       name: slot.querySelector('[name="multiName"]')?.value?.trim() || "",
       description: slot.querySelector('[name="multiDescription"]')?.value?.trim() || "",
       tags: getSlotTags(slot),
@@ -1755,6 +1933,7 @@ function resetFormMode() {
     state.selectionScrollHandler = null;
   }
   dom.blobForm.reset();
+  setBlobTypeOnContainer(nonWeeklyField, BLOB_TYPES.TASK);
   if (dom.recurrenceType) {
     dom.recurrenceType.value = "single";
   }
@@ -1848,6 +2027,17 @@ function openEditForm(blob) {
       blob.schedulable_timerange?.end,
       blobTimeZone
     );
+    setBlobTypeOnContainer(
+      nonWeeklyField,
+      isEventFromRanges(
+        dom.blobForm.defaultStart.value,
+        dom.blobForm.defaultEnd.value,
+        dom.blobForm.schedulableStart.value,
+        dom.blobForm.schedulableEnd.value
+      )
+        ? BLOB_TYPES.EVENT
+        : BLOB_TYPES.TASK
+    );
   }
   if (dom.blobForm.annualDate) {
     const dateValue = toLocalInputValueInTimeZone(
@@ -1855,6 +2045,9 @@ function openEditForm(blob) {
       blobTimeZone
     );
     dom.blobForm.annualDate.value = dateValue ? dateValue.split("T")[0] : "";
+  }
+  if (recurrenceType === "date") {
+    setBlobTypeOnContainer(nonWeeklyField, BLOB_TYPES.EVENT);
   }
   clearWeeklySlots();
   clearMultipleSlots();
@@ -1911,6 +2104,14 @@ function openEditForm(blob) {
         tags,
         policy: weeklyBlob.policy || {},
         days: [dayValue],
+        blobType: isEventFromRanges(
+          timeValueFromDate(start, "09:00", slotTimeZone),
+          timeValueFromDate(end, "10:00", slotTimeZone),
+          timeValueFromDate(schedStart, "08:30", slotTimeZone),
+          timeValueFromDate(schedEnd, "10:30", slotTimeZone)
+        )
+          ? BLOB_TYPES.EVENT
+          : BLOB_TYPES.TASK,
       };
       const key = JSON.stringify({
         defaultStart: slot.defaultStart,
@@ -1942,6 +2143,7 @@ function openEditForm(blob) {
         description: slot.description,
         tags: slot.tags,
         policy: slot.policy,
+        blobType: slot.blobType,
       });
     });
     setDependencies(Array.isArray(blobs[0]?.dependencies) ? blobs[0].dependencies : []);
@@ -1953,28 +2155,35 @@ function openEditForm(blob) {
     } else {
       blobs.forEach((multiBlob) => {
         const slotTimeZone = multiBlob.tz || appConfig.userTimeZone;
+        const defaultStart = toLocalInputValueInTimeZone(
+          multiBlob.default_scheduled_timerange?.start,
+          slotTimeZone
+        );
+        const defaultEnd = toLocalInputValueInTimeZone(
+          multiBlob.default_scheduled_timerange?.end,
+          slotTimeZone
+        );
+        const schedStart = toLocalInputValueInTimeZone(
+          multiBlob.schedulable_timerange?.start,
+          slotTimeZone
+        );
+        const schedEnd = toLocalInputValueInTimeZone(
+          multiBlob.schedulable_timerange?.end,
+          slotTimeZone
+        );
         createMultipleSlot({
-          defaultStart: toLocalInputValueInTimeZone(
-            multiBlob.default_scheduled_timerange?.start,
-            slotTimeZone
-          ),
-          defaultEnd: toLocalInputValueInTimeZone(
-            multiBlob.default_scheduled_timerange?.end,
-            slotTimeZone
-          ),
-          schedStart: toLocalInputValueInTimeZone(
-            multiBlob.schedulable_timerange?.start,
-            slotTimeZone
-          ),
-          schedEnd: toLocalInputValueInTimeZone(
-            multiBlob.schedulable_timerange?.end,
-            slotTimeZone
-          ),
+          defaultStart,
+          defaultEnd,
+          schedStart,
+          schedEnd,
           name: multiBlob.name || "",
           description: multiBlob.description || "",
           tags: Array.isArray(multiBlob.tags) ? multiBlob.tags : [],
           dependencies: Array.isArray(multiBlob.dependencies) ? multiBlob.dependencies : [],
           policy: multiBlob.policy || {},
+          blobType: isEventFromRanges(defaultStart, defaultEnd, schedStart, schedEnd)
+            ? BLOB_TYPES.EVENT
+            : BLOB_TYPES.TASK,
         });
       });
     }
@@ -2122,33 +2331,42 @@ async function handleBlobSubmit(event) {
   const dependencies = getDependencies();
   const tags = getTags();
   const recurrenceType = formData.get("recurrenceType") || "single";
+  const blobType = normalizeBlobType(formData.get("blobType"));
   const perSlot = recurrenceType === "weekly" && Boolean(dom.weeklyPerSlot?.checked);
   const recurrenceColor = getRecurrenceColor();
   const recurrenceEnd = getRecurrenceEndValue();
+  const schedulableStart = formData.get("schedulableStart");
+  const schedulableEnd = formData.get("schedulableEnd");
+  const defaultStart = blobType === BLOB_TYPES.EVENT
+    ? schedulableStart
+    : formData.get("defaultStart");
+  const defaultEnd = blobType === BLOB_TYPES.EVENT
+    ? schedulableEnd
+    : formData.get("defaultEnd");
   let baseBlob = {
     name: formData.get("blobName"),
     description: formData.get("blobDescription") || null,
     tz: appConfig.userTimeZone,
     default_scheduled_timerange: {
       start: toProjectIsoFromLocalInput(
-        formData.get("defaultStart"),
+        defaultStart,
         appConfig.userTimeZone,
         appConfig.projectTimeZone
       ),
       end: toProjectIsoFromLocalInput(
-        formData.get("defaultEnd"),
+        defaultEnd,
         appConfig.userTimeZone,
         appConfig.projectTimeZone
       ),
     },
     schedulable_timerange: {
       start: toProjectIsoFromLocalInput(
-        formData.get("schedulableStart"),
+        schedulableStart,
         appConfig.userTimeZone,
         appConfig.projectTimeZone
       ),
       end: toProjectIsoFromLocalInput(
-        formData.get("schedulableEnd"),
+        schedulableEnd,
         appConfig.userTimeZone,
         appConfig.projectTimeZone
       ),
@@ -2401,9 +2619,14 @@ function handleSettingsSubmit(event) {
 }
 
 function handleAddClick() {
+  openCreateForm(BLOB_TYPES.TASK);
+}
+
+function openCreateForm(blobType = BLOB_TYPES.TASK) {
   resetFormMode();
+  setBlobTypeOnContainer(nonWeeklyField, blobType);
   toggleForm(true);
-  startInteractiveCreate();
+  startInteractiveCreate({ blobType });
   syncDateTimeDisplays();
 }
 
@@ -2681,6 +2904,7 @@ function bindFormHandlers(onRefresh) {
   if (dom.multipleSlots && dom.multipleSlots.children.length === 0) {
     createMultipleSlot();
   }
+  bindBlobTypeToggle(nonWeeklyField);
   if (settingsTabs.length) {
     settingsTabs.forEach((tab) => {
       tab.addEventListener("click", () => {
@@ -2691,4 +2915,13 @@ function bindFormHandlers(onRefresh) {
   updateRecurrenceUI();
 }
 
-export { bindFormHandlers, handleAddClick, openEditForm, resetFormMode, toggleForm, toggleSettings, toggleHelp };
+export {
+  bindFormHandlers,
+  handleAddClick,
+  openCreateForm,
+  openEditForm,
+  resetFormMode,
+  toggleForm,
+  toggleSettings,
+  toggleHelp,
+};
