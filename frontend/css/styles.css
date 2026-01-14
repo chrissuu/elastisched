@@ -1093,6 +1093,10 @@ body.modal-open .info-card {
   display: none;
 }
 
+.weekly-slots:not(.per-slot) .weekly-slot .policy-label-row {
+  display: none;
+}
+
 .weekly-slots-header {
   display: flex;
   align-items: center;
