@@ -368,6 +368,10 @@ function bindDateTimePickers() {
     const hidden = field.querySelector("[data-datetime-input]");
     if (!display || !hidden) return;
     updateDisplayForField(field);
+    if (field.dataset.datetimeBound) {
+      return;
+    }
+    field.dataset.datetimeBound = "true";
     const open = (event) => {
       event.preventDefault();
       openPopover(field);
