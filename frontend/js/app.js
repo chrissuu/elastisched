@@ -11,6 +11,7 @@ import { pushHistoryAction, redoHistoryAction, undoHistoryAction } from "./histo
 import { alertDialog, bindDialogEvents, confirmDialog } from "./popups.js";
 import {
   bindFormHandlers,
+  openCreateForm,
   openEditForm,
   resetFormMode,
   toggleForm,
@@ -20,7 +21,6 @@ import {
 import {
   clearInfoCardLock,
   setActive,
-  startInteractiveCreate,
   updateNowIndicators,
 } from "./render.js";
 import {
@@ -463,11 +463,13 @@ window.addEventListener("keydown", (event) => {
     }
     return;
   }
-  if (event.key.toLowerCase() === "n") {
+  if (!hasMod && event.key.toLowerCase() === "n") {
     event.preventDefault();
-    resetFormMode();
-    toggleForm(true);
-    startInteractiveCreate();
+    openCreateForm("task");
+  }
+  if (!hasMod && event.key.toLowerCase() === "c") {
+    event.preventDefault();
+    openCreateForm("event");
   }
   if (isArrowLeft || isArrowRight) {
     const direction = isArrowLeft ? -1 : 1;

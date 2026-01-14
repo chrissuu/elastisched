@@ -256,7 +256,19 @@
             </label>
           </div>
           <div class="non-weekly-field weekly-slot single-slot">
-            <div class="weekly-slot-row time-range-row">
+            <div class="weekly-slot-row blob-type-row">
+              <span class="slot-day-label">Occurrence type</span>
+              <div class="blob-type-toggle" role="group" aria-label="Occurrence type">
+                <button type="button" class="type-pill active" data-blob-type="task" aria-pressed="true">
+                  Task
+                </button>
+                <button type="button" class="type-pill" data-blob-type="event" aria-pressed="false">
+                  Event
+                </button>
+              </div>
+              <input type="hidden" name="blobType" id="blobTypeInput" value="task" data-blob-type-input />
+            </div>
+            <div class="weekly-slot-row time-range-row default-range-row">
               <label>
                 Default start
                 <div class="datetime-field">

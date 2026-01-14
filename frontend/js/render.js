@@ -848,21 +848,24 @@ function renderDay() {
     };
 
     const finalizeRange = (startMin, endMin) => {
+      const isEvent = state.currentBlobType === "event";
       const startDate = new Date(dayStart.getTime() + startMin * 60000);
       const endDate = new Date(dayStart.getTime() + endMin * 60000);
-      if (state.selectionStep === "default") {
+      if (state.selectionStep === "default" && !isEvent) {
         state.pendingDefaultRange = { start: startDate, end: endDate };
         state.selectionStep = "schedulable";
         dom.formStatus.textContent = "Click start/end for schedulable range.";
         selectionCaretDefault.classList.remove("active");
-      } else if (state.selectionStep === "schedulable") {
+      } else if (state.selectionStep === "schedulable" || isEvent) {
         state.pendingSchedulableRange = { start: startDate, end: endDate };
         state.selectionMode = false;
         state.selectionStep = null;
         selectionOverlayDefault.classList.add("active");
         selectionOverlaySchedulable.classList.add("active");
         selectionCaretSchedulable.classList.remove("active");
-        const defaultRange = state.pendingDefaultRange;
+        const defaultRange = state.pendingDefaultRange || (isEvent
+          ? state.pendingSchedulableRange
+          : null);
         const schedRange = state.pendingSchedulableRange;
         if (defaultRange && schedRange) {
           dom.blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
@@ -1412,16 +1415,19 @@ function renderWeek() {
       const endDay = startOfDay(days[rangeEndCol]);
       const startDate = new Date(startDay.getTime() + rangeStartMin * 60000);
       const endDate = new Date(endDay.getTime() + rangeEndMin * 60000);
-      if (state.selectionStep === "default") {
+      const isEvent = state.currentBlobType === "event";
+      if (state.selectionStep === "default" && !isEvent) {
         state.pendingDefaultRange = { start: startDate, end: endDate };
         state.selectionStep = "schedulable";
         dom.formStatus.textContent = "Click start/end for schedulable range.";
         clearSelectionCarets(".selection-caret.default-range");
-      } else if (state.selectionStep === "schedulable") {
+      } else if (state.selectionStep === "schedulable" || isEvent) {
         state.pendingSchedulableRange = { start: startDate, end: endDate };
         state.selectionMode = false;
         state.selectionStep = null;
-        const defaultRange = state.pendingDefaultRange;
+        const defaultRange = state.pendingDefaultRange || (isEvent
+          ? state.pendingSchedulableRange
+          : null);
         const schedRange = state.pendingSchedulableRange;
         if (defaultRange && schedRange) {
           dom.blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
@@ -1757,12 +1763,16 @@ function setActive(view, options = {}) {
   }
 }
 
-function startInteractiveCreate() {
+function startInteractiveCreate(options = {}) {
+  const nextType = options.blobType === "event" ? "event" : state.currentBlobType || "task";
+  state.currentBlobType = nextType;
   state.selectionMode = true;
-  state.selectionStep = "default";
+  state.selectionStep = nextType === "event" ? "schedulable" : "default";
   state.pendingDefaultRange = null;
   state.pendingSchedulableRange = null;
-  dom.formStatus.textContent = "Click start/end for default range.";
+  dom.formStatus.textContent = nextType === "event"
+    ? "Click start/end for schedulable range."
+    : "Click start/end for default range.";
   if (state.view !== "day" && state.view !== "week") {
     setActive("day");
   }

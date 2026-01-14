@@ -953,6 +953,15 @@ body.modal-open .info-card {
   display: none;
 }
 
+.form-panel.date-mode .blob-type-row {
+  display: none;
+}
+
+.non-weekly-field.is-event .default-range-row,
+.weekly-slot.is-event .default-range-row {
+  display: none;
+}
+
 .blob-form .policy-option {
   display: flex;
   align-items: center;
@@ -1016,6 +1025,36 @@ body.modal-open .info-card {
 .weekly-toggle input {
   width: 18px;
   height: 18px;
+}
+
+.blob-type-row {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.blob-type-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid #e0d3c1;
+  background: #fffaf2;
+  gap: 2px;
+}
+
+.type-pill {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.type-pill.active {
+  background: var(--ink);
+  color: #f7f2e8;
 }
 
 .weekly-slots {
