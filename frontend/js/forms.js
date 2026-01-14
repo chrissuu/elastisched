@@ -1013,6 +1013,8 @@ function updateRecurrenceUI() {
   document.querySelectorAll(".non-weekly-field input").forEach((field) => {
     const isCheckbox = field.type === "checkbox";
     const isOptional = field.type === "hidden" || field.name === "blobDescription";
+    const isMetaField = field.name === "blobName" || field.name === "blobDescription";
+    const isPolicyField = field.name?.startsWith?.("policy");
     const isTimeRangeField = [
       "defaultStart",
       "defaultEnd",
@@ -1023,7 +1025,7 @@ function updateRecurrenceUI() {
       field.disabled = true;
       field.required = false;
     } else if (type === "date") {
-      if (isTimeRangeField) {
+      if (isTimeRangeField || isMetaField || isPolicyField) {
         field.disabled = true;
         field.required = false;
       } else {
@@ -2514,6 +2516,14 @@ async function handleBlobSubmit(event) {
       dom.formStatus.textContent = "Select an annual date.";
       return;
     }
+    const datePolicy = getPolicyPayloadFromFlags(
+      false,
+      false,
+      true,
+      DEFAULT_MAX_SPLITS,
+      DEFAULT_MIN_SPLIT_MINUTES * 60,
+      false
+    );
     const dayStart = toProjectIsoFromLocalInput(
       `${annualDate}T00:00`,
       appConfig.userTimeZone,
@@ -2526,6 +2536,8 @@ async function handleBlobSubmit(event) {
     );
     baseBlob = {
       ...baseBlob,
+      name: formData.get("recurrenceName") || "Untitled event",
+      description: formData.get("recurrenceDescription") || null,
       default_scheduled_timerange: {
         start: dayStart,
         end: dayEnd,
@@ -2534,6 +2546,8 @@ async function handleBlobSubmit(event) {
         start: dayStart,
         end: dayEnd,
       },
+      policy: datePolicy,
+      dependencies: [],
     };
     recurrencePayload = {
       recurrence_name: formData.get("recurrenceName") || null,

@@ -949,11 +949,26 @@ body.modal-open .info-card {
   display: none;
 }
 
+.form-panel.date-mode .non-weekly-field {
+  display: none;
+}
+
 .form-panel.date-mode .non-weekly-field .time-range-row {
   display: none;
 }
 
 .form-panel.date-mode .blob-type-row {
+  display: none;
+}
+
+.form-panel.date-mode .non-weekly-field .slot-meta,
+.form-panel.date-mode .non-weekly-field .slot-policy,
+.form-panel.date-mode .non-weekly-field .slot-policy-advanced,
+.form-panel.date-mode .non-weekly-field .policy-label-row {
+  display: none;
+}
+
+.form-panel.date-mode .dependency-field {
   display: none;
 }
 
