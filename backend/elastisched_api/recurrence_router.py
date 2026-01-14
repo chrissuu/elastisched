@@ -329,10 +329,36 @@ def _to_occurrence_schema(
     )
 
 
-@recurrence_router.post("", response_model=RecurrenceRead, status_code=status.HTTP_201_CREATED)
+@recurrence_router.post(
+    "",
+    response_model=RecurrenceRead | list[RecurrenceRead],
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_recurrence(
-    payload: RecurrenceCreate, session: AsyncSession = Depends(get_session)
-) -> RecurrenceRead:
+    payload: RecurrenceCreate | list[RecurrenceCreate],
+    session: AsyncSession = Depends(get_session),
+) -> RecurrenceRead | list[RecurrenceRead]:
+    if isinstance(payload, list):
+        if not payload:
+            return []
+        recurrences = []
+        for item in payload:
+            normalized_type = _normalize_recurrence_type(item.type)
+            _recurrence_from_payload(normalized_type, item.payload)
+            recurrences.append(
+                RecurrenceModel(
+                    id=str(uuid.uuid4()),
+                    type=normalized_type,
+                    payload=item.payload,
+                )
+            )
+        session.add_all(recurrences)
+        await session.commit()
+        await _mark_schedule_dirty(session)
+        return [
+            RecurrenceRead(id=item.id, type=item.type, payload=item.payload)
+            for item in recurrences
+        ]
     normalized_type = _normalize_recurrence_type(payload.type)
     _recurrence_from_payload(normalized_type, payload.payload)
     recurrence = RecurrenceModel(

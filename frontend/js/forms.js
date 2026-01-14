@@ -9,6 +9,7 @@ import {
   toProjectIsoFromLocalInput,
 } from "./utils.js";
 import { startInteractiveCreate } from "./render.js";
+import { createRecurrence, updateRecurrence } from "./api.js";
 import { confirmDialog } from "./popups.js";
 import { bindDateTimePickers, syncDateTimeDisplays } from "./datetime_picker.js";
 import { deleteOccurrenceWithUndo, deleteRecurrenceWithUndo } from "./actions.js";
@@ -2341,28 +2342,16 @@ async function handleBlobSubmit(event) {
       unstarred: Array.isArray(priorPayload.unstarred) ? priorPayload.unstarred : [],
     };
   }
-  const payload = { type: recurrenceType, payload: recurrencePayload };
-
   try {
     const isEditing = Boolean(state.editingRecurrenceId);
-    const endpoint = isEditing
-      ? `${API_BASE}/recurrences/${state.editingRecurrenceId}`
-      : `${API_BASE}/recurrences`;
-    const response = await fetch(endpoint, {
-      method: isEditing ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      let detail = "Failed to save recurrence";
-      const contentType = response.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        const data = await response.json();
-        detail = data.detail || detail;
-      } else {
-        detail = (await response.text()) || detail;
-      }
-      throw new Error(detail);
+    if (isEditing) {
+      await updateRecurrence(
+        state.editingRecurrenceId,
+        recurrenceType,
+        recurrencePayload
+      );
+    } else {
+      await createRecurrence(recurrenceType, recurrencePayload);
     }
     dom.blobForm.reset();
     dom.formStatus.textContent = isEditing ? "Updated." : "Created.";
