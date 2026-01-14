@@ -580,6 +580,10 @@ body.modal-open .info-card {
   display: none;
 }
 
+.non-weekly-field.hidden {
+  display: none;
+}
+
 .tag-label {
   font-size: 13px;
   color: var(--muted);

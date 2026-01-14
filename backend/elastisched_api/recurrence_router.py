@@ -22,6 +22,7 @@ from core.blob import Blob
 from core.recurrence import (
     DateBlobRecurrence,
     DeltaBlobRecurrence,
+    MultipleBlobOccurrence,
     SingleBlobOccurrence,
     WeeklyBlobRecurrence,
 )
@@ -198,6 +199,14 @@ def _recurrence_from_payload(recurrence_type: str, payload: dict):
         blob.set_default_scheduled_timerange(TimeRange(start=day_start, end=day_end))
         blob.set_schedulable_timerange(TimeRange(start=day_start, end=day_end))
         return DateBlobRecurrence(blob=blob)
+    if recurrence_type == "multiple":
+        blobs = [_blob_from_payload(blob) for blob in payload.get("blobs") or []]
+        if not blobs:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Multiple occurrence requires blobs",
+            )
+        return MultipleBlobOccurrence(blobs=blobs)
     raise HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail="Unsupported recurrence type",
@@ -219,6 +228,8 @@ def _recurrence_tzinfo(recurrence_obj):
         return recurrence_obj.blob.get_schedulable_timerange().start.tzinfo
     if isinstance(recurrence_obj, SingleBlobOccurrence):
         return recurrence_obj.blob.get_schedulable_timerange().start.tzinfo
+    if isinstance(recurrence_obj, MultipleBlobOccurrence):
+        return recurrence_obj.blobs[0].get_schedulable_timerange().start.tzinfo
     return None
 
 

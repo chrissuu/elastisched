@@ -195,8 +195,14 @@ function showInfoCard(blob, anchorRect) {
   const recurrenceEnd = blob.recurrence_payload?.end_date;
   const recurrenceType = blob.recurrence_type || "single";
   const recurrenceTypeLabel = recurrenceType
-    ? `${recurrenceType.charAt(0).toUpperCase()}${recurrenceType.slice(1)}`
-    : "Single";
+    ? ({
+        single: "Single occurrence",
+        multiple: "Multiple occurrence",
+        weekly: "Weekly cadence",
+        delta: "Fixed interval",
+        date: "Annual date",
+      }[recurrenceType] || `${recurrenceType.charAt(0).toUpperCase()}${recurrenceType.slice(1)}`)
+    : "Single occurrence";
   const starred = isOccurrenceStarred(blob);
   const blobName = blob.name || "Untitled";
   const blobDescription = blob.description || recurrenceDescription;

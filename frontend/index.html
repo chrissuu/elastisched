@@ -158,6 +158,7 @@
             Recurrence
             <select name="recurrenceType" id="recurrenceType">
               <option value="single">Single occurrence</option>
+              <option value="multiple">Multiple occurrence</option>
               <option value="weekly">Weekly cadence</option>
               <option value="delta">Fixed interval</option>
               <option value="date">Annual date</option>
@@ -165,6 +166,21 @@
           </label>
           <div class="recurrence-note" id="recurrenceSummary">
             One-time event. Switch to create repeats.
+          </div>
+          <div class="recurrence-fields" data-recurrence="multiple">
+            <div class="recurrence-note subtle">
+              Group one-time occurrences together. These do not repeat.
+            </div>
+            <div class="weekly-slots multiple-slots">
+              <div class="weekly-slots-header">
+                <span>Occurrences</span>
+                <button type="button" class="ghost small" id="addMultipleSlotBtn">
+                  Add occurrence
+                </button>
+              </div>
+              <div class="weekly-slot-status" id="multipleSlotStatus"></div>
+              <div id="multipleSlots"></div>
+            </div>
           </div>
           <div class="recurrence-fields" data-recurrence="weekly">
             <div class="weekly-controls">
