@@ -972,6 +972,10 @@ body.modal-open .info-card {
   display: none;
 }
 
+.form-panel.single-mode .non-weekly-field .slot-meta {
+  display: none;
+}
+
 .non-weekly-field.is-event .default-range-row,
 .weekly-slot.is-event .default-range-row {
   display: none;
