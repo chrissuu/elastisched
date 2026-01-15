@@ -19,3 +19,5 @@ offline-packages
 
 elastisched.db
 elastischedcopy.db
+
+.env
