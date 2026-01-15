@@ -200,7 +200,7 @@ class SingleBlobOccurrence(BlobRecurrence):
         return None
 
     def all_occurrences(self, timerange: TimeRange) -> List[Blob]:
-        if timerange.contains(self.blob.get_schedulable_timerange()):
+        if timerange.overlaps(self.blob.get_schedulable_timerange()):
             return [deepcopy(self.blob)]
 
         return []
@@ -230,7 +230,7 @@ class MultipleBlobOccurrence(BlobRecurrence):
     def all_occurrences(self, timerange: TimeRange) -> List[Blob]:
         occurrences = []
         for blob in self.blobs:
-            if timerange.contains(blob.get_schedulable_timerange()):
+            if timerange.overlaps(blob.get_schedulable_timerange()):
                 occurrences.append(deepcopy(blob))
         occurrences.sort(key=lambda item: item.get_schedulable_timerange().start)
         return occurrences
@@ -632,13 +632,11 @@ class DateBlobRecurrence(BlobRecurrence):
             delta_to_occurrence = target_project - schedulable_timerange_start
             blob_copy = blob_copy_with_delta_future(self.blob, delta_to_occurrence)
 
-            # Check if this occurrence is within our range
-            if target_date > end_local or (
-                not timerange.contains(blob_copy.get_schedulable_timerange())
-            ):
+            # Stop once the next occurrence starts after the range end.
+            if target_date > end_local:
                 break
 
-            if target_date >= start_local:
+            if timerange.overlaps(blob_copy.get_schedulable_timerange()):
                 occurrences.append(blob_copy)
 
             current_year += 1
@@ -688,7 +686,7 @@ class DateBlobRecurrence(BlobRecurrence):
 
                 blob_copy = blob_copy_with_delta_future(self.blob, delta_to_occurrence)
 
-                if start_local <= target_date <= end_local and timerange.contains(
+                if target_date <= end_local and timerange.overlaps(
                     blob_copy.get_schedulable_timerange()
                 ):
                     occurrences.append(blob_copy)

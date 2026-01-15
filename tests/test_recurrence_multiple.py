@@ -75,3 +75,24 @@ def test_multiple_all_occurrences_in_range():
 
     assert len(occurrences) == 1
     assert occurrences[0].get_schedulable_timerange().start == blob2.get_schedulable_timerange().start
+
+
+def test_multiple_all_occurrences_includes_overlap():
+    blob1 = _make_blob(
+        datetime(2024, 1, 1, 23, 0),
+        datetime(2024, 1, 2, 2, 0),
+    )
+    blob2 = _make_blob(
+        datetime(2024, 1, 3, 10, 0),
+        datetime(2024, 1, 3, 11, 0),
+    )
+    recurrence = MultipleBlobOccurrence(blobs=[blob1, blob2])
+    search_range = TimeRange(
+        start=datetime(2024, 1, 2, 0, 0),
+        end=datetime(2024, 1, 2, 1, 0),
+    )
+
+    occurrences = recurrence.all_occurrences(search_range)
+
+    assert len(occurrences) == 1
+    assert occurrences[0].get_schedulable_timerange().start == blob1.get_schedulable_timerange().start

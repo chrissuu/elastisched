@@ -80,3 +80,28 @@ def test_schedulable_before_current_next_occurrence():
 
     # Assert that
     assert next_occurrence is None
+
+
+def test_all_occurrences_includes_overlap():
+    default_timerange = TimeRange(
+        start=datetime(year=2000, month=1, day=1, hour=1),
+        end=datetime(year=2000, month=1, day=3, hour=1),
+    )
+    schedulable_timerange = TimeRange(
+        start=datetime(year=2000, month=1, day=1, hour=1),
+        end=datetime(year=2000, month=1, day=3, hour=1),
+    )
+    blob = Blob(
+        default_scheduled_timerange=default_timerange,
+        schedulable_timerange=schedulable_timerange,
+    )
+    single_occurrence = SingleBlobOccurrence(blob)
+    search_range = TimeRange(
+        start=datetime(year=2000, month=1, day=2, hour=0),
+        end=datetime(year=2000, month=1, day=2, hour=12),
+    )
+
+    occurrences = single_occurrence.all_occurrences(search_range)
+
+    assert len(occurrences) == 1
+    assert occurrences[0].get_schedulable_timerange() == schedulable_timerange
