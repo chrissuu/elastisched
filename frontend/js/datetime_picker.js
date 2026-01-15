@@ -33,6 +33,18 @@ function formatLocalValue({ year, month, day, hour, minute }) {
   return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}`;
 }
 
+function normalizeDragValue(value, sourceMode, targetMode) {
+  if (!value) return "";
+  if (targetMode === "date") {
+    return value.split("T")[0] || "";
+  }
+  if (sourceMode === "date") {
+    const datePart = value.split("T")[0] || "";
+    return datePart ? `${datePart}T00:00` : "";
+  }
+  return value;
+}
+
 function formatDisplay(value, mode) {
   if (mode === "date") {
     const parsed = parseDateValue(value);
@@ -381,6 +393,46 @@ function bindDateTimePickers() {
       trigger.addEventListener("click", open);
     }
     hidden.addEventListener("change", () => updateDisplayForField(field));
+    display.setAttribute("draggable", "true");
+    display.addEventListener("dragstart", (event) => {
+      if (!hidden.value) {
+        event.preventDefault();
+        return;
+      }
+      const payload = {
+        value: hidden.value,
+        mode: field.dataset.mode || "datetime",
+      };
+      event.dataTransfer?.setData("application/x-elastisched-datetime", JSON.stringify(payload));
+      event.dataTransfer?.setData("text/plain", hidden.value);
+    });
+    const handleDragOver = (event) => {
+      if (event.dataTransfer?.types?.includes("application/x-elastisched-datetime")) {
+        event.preventDefault();
+      }
+    };
+    const handleDrop = (event) => {
+      const data = event.dataTransfer?.getData("application/x-elastisched-datetime");
+      if (!data) return;
+      event.preventDefault();
+      let payload = null;
+      try {
+        payload = JSON.parse(data);
+      } catch {
+        payload = null;
+      }
+      if (!payload?.value) return;
+      const targetMode = field.dataset.mode || "datetime";
+      const normalized = normalizeDragValue(payload.value, payload.mode, targetMode);
+      if (!normalized) return;
+      hidden.value = normalized;
+      hidden.dispatchEvent(new Event("change", { bubbles: true }));
+      updateDisplayForField(field);
+    };
+    display.addEventListener("dragover", handleDragOver);
+    display.addEventListener("drop", handleDrop);
+    field.addEventListener("dragover", handleDragOver);
+    field.addEventListener("drop", handleDrop);
   });
   if (!document.body.dataset.datetimePickerBound) {
     document.body.dataset.datetimePickerBound = "true";

@@ -269,6 +269,16 @@ function setBlobTypeOnContainer(container, nextType) {
   const type = normalizeBlobType(nextType);
   container.dataset.blobType = type;
   container.classList.toggle("is-event", type === BLOB_TYPES.EVENT);
+  const rangeInputs = getRangeInputs(container);
+  if (rangeInputs?.defaultStart && rangeInputs?.defaultEnd) {
+    const shouldRequireDefault = type === BLOB_TYPES.TASK;
+    if (!rangeInputs.defaultStart.disabled) {
+      rangeInputs.defaultStart.required = shouldRequireDefault;
+    }
+    if (!rangeInputs.defaultEnd.disabled) {
+      rangeInputs.defaultEnd.required = shouldRequireDefault;
+    }
+  }
   if (container === nonWeeklyField) {
     state.currentBlobType = type;
     if (state.selectionMode) {
@@ -1032,6 +1042,7 @@ function updateRecurrenceUI() {
   dom.formPanel.classList.toggle("weekly-mode", type === "weekly");
   dom.formPanel.classList.toggle("date-mode", type === "date");
   dom.formPanel.classList.toggle("multiple-mode", isMultiple);
+  dom.formPanel.classList.toggle("single-mode", type === "single");
   const weeklyWrapper = dom.weeklySlots?.closest(".weekly-slots");
   if (weeklyWrapper) {
     weeklyWrapper.classList.toggle("per-slot", Boolean(dom.weeklyPerSlot?.checked));
@@ -1066,6 +1077,9 @@ function updateRecurrenceUI() {
     if (type === "weekly" || isMultiple) {
       field.disabled = true;
       field.required = false;
+    } else if (type === "single" && isMetaField) {
+      field.disabled = true;
+      field.required = false;
     } else if (type === "date") {
       if (isTimeRangeField || isMetaField || isPolicyField) {
         field.disabled = true;
@@ -1077,6 +1091,17 @@ function updateRecurrenceUI() {
     } else {
       field.disabled = false;
       field.required = !isCheckbox && !isOptional;
+    }
+  });
+  document.querySelectorAll(".multiple-slots input").forEach((field) => {
+    if (isMultiple) {
+      field.disabled = false;
+      if (field.name === "multiName") {
+        field.required = true;
+      }
+    } else {
+      field.disabled = true;
+      field.required = false;
     }
   });
   const annualDateField = dom.blobForm.annualDate;
@@ -2369,6 +2394,10 @@ function toggleStarOccurrence() {
 
 async function handleBlobSubmit(event) {
   event.preventDefault();
+  console.log("Form submit clicked", {
+    recurrenceType: dom.blobForm.recurrenceType?.value,
+    blobType: dom.blobForm.blobType?.value,
+  });
   dom.formStatus.textContent = "Saving...";
   const formData = new FormData(dom.blobForm);
   const policyPayload = getPolicyPayloadFromForm();
@@ -2379,6 +2408,8 @@ async function handleBlobSubmit(event) {
   const perSlot = recurrenceType === "weekly" && Boolean(dom.weeklyPerSlot?.checked);
   const recurrenceColor = getRecurrenceColor();
   const recurrenceEnd = getRecurrenceEndValue();
+  const recurrenceName = formData.get("recurrenceName");
+  const recurrenceDescription = formData.get("recurrenceDescription") || null;
   const schedulableStart = formData.get("schedulableStart");
   const schedulableEnd = formData.get("schedulableEnd");
   const defaultStart = blobType === BLOB_TYPES.EVENT
@@ -2387,9 +2418,42 @@ async function handleBlobSubmit(event) {
   const defaultEnd = blobType === BLOB_TYPES.EVENT
     ? schedulableEnd
     : formData.get("defaultEnd");
+  if (!["weekly", "multiple", "date"].includes(recurrenceType)) {
+    const defaultStartDate = new Date(defaultStart);
+    const defaultEndDate = new Date(defaultEnd);
+    const schedStartDate = new Date(schedulableStart);
+    const schedEndDate = new Date(schedulableEnd);
+    if (
+      [defaultStartDate, defaultEndDate, schedStartDate, schedEndDate].some(
+        (dt) => Number.isNaN(dt.getTime())
+      )
+    ) {
+      dom.formStatus.textContent = "Select valid start and end times.";
+      return;
+    }
+    if (defaultEndDate <= defaultStartDate) {
+      dom.formStatus.textContent = "Default end must be after default start.";
+      return;
+    }
+    if (schedEndDate <= schedStartDate) {
+      dom.formStatus.textContent = "Schedulable end must be after schedulable start.";
+      return;
+    }
+    if (schedStartDate > defaultStartDate || schedEndDate < defaultEndDate) {
+      dom.formStatus.textContent =
+        "Schedulable range must contain default range.";
+      return;
+    }
+  }
+  const blobName = recurrenceType === "single"
+    ? (recurrenceName || "Unnamed Blob")
+    : (formData.get("blobName") || "Unnamed Blob");
+  const blobDescription = recurrenceType === "single"
+    ? recurrenceDescription
+    : (formData.get("blobDescription") || null);
   let baseBlob = {
-    name: formData.get("blobName"),
-    description: formData.get("blobDescription") || null,
+    name: blobName,
+    description: blobDescription,
     tz: appConfig.userTimeZone,
     default_scheduled_timerange: {
       start: toProjectIsoFromLocalInput(
@@ -2431,7 +2495,6 @@ async function handleBlobSubmit(event) {
     const slots = getWeeklySlots();
     const fallbackName = formData.get("recurrenceName") || "Unnamed Blob";
     const sharedName = perSlot ? formData.get("blobName") : (formData.get("blobName") || fallbackName);
-    const recurrenceDescription = formData.get("recurrenceDescription") || null;
     const sharedDescription = perSlot
       ? (formData.get("blobDescription") || null)
       : (formData.get("blobDescription") || recurrenceDescription || null);
@@ -2482,7 +2545,7 @@ async function handleBlobSubmit(event) {
     });
     recurrencePayload = {
       interval: Math.max(1, Number(formData.get("weeklyInterval") || 1)),
-      recurrence_name: formData.get("recurrenceName") || null,
+      recurrence_name: recurrenceName || null,
       recurrence_description: recurrenceDescription,
       end_date: recurrenceEnd,
       color: recurrenceColor,
@@ -2500,8 +2563,8 @@ async function handleBlobSubmit(event) {
     };
     recurrencePayload = {
       delta_seconds: value * (unitSeconds[unit] || 86400),
-      recurrence_name: formData.get("recurrenceName") || null,
-      recurrence_description: formData.get("recurrenceDescription") || null,
+      recurrence_name: recurrenceName || null,
+      recurrence_description: recurrenceDescription,
       end_date: recurrenceEnd,
       color: recurrenceColor,
       start_blob: baseBlob,
@@ -2546,8 +2609,8 @@ async function handleBlobSubmit(event) {
       tags: slot.tags || [],
     }));
     recurrencePayload = {
-      recurrence_name: formData.get("recurrenceName") || null,
-      recurrence_description: formData.get("recurrenceDescription") || null,
+      recurrence_name: recurrenceName || null,
+      recurrence_description: recurrenceDescription,
       end_date: null,
       color: null,
       blobs,
@@ -2578,8 +2641,8 @@ async function handleBlobSubmit(event) {
     );
     baseBlob = {
       ...baseBlob,
-      name: formData.get("recurrenceName") || "Untitled event",
-      description: formData.get("recurrenceDescription") || null,
+      name: recurrenceName || "Untitled event",
+      description: recurrenceDescription,
       default_scheduled_timerange: {
         start: dayStart,
         end: dayEnd,
@@ -2592,16 +2655,16 @@ async function handleBlobSubmit(event) {
       dependencies: [],
     };
     recurrencePayload = {
-      recurrence_name: formData.get("recurrenceName") || null,
-      recurrence_description: formData.get("recurrenceDescription") || null,
+      recurrence_name: recurrenceName || null,
+      recurrence_description: recurrenceDescription,
       end_date: recurrenceEnd,
       color: recurrenceColor,
       blob: baseBlob,
     };
   } else {
     recurrencePayload = {
-      recurrence_name: formData.get("recurrenceName") || null,
-      recurrence_description: formData.get("recurrenceDescription") || null,
+      recurrence_name: recurrenceName || null,
+      recurrence_description: recurrenceDescription,
       end_date: recurrenceEnd,
       color: recurrenceColor,
       blob: baseBlob,
