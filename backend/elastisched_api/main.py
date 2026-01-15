@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from elastisched_api.db import init_db
+from elastisched_api.mcp_server import mcp
 from elastisched_api.router import router as blob_router
 from elastisched_api.recurrence_router import (
     occurrence_router,
@@ -32,3 +33,4 @@ app.include_router(blob_router)
 app.include_router(recurrence_router)
 app.include_router(occurrence_router)
 app.include_router(schedule_router)
+app.mount("/mcp", mcp.app)
