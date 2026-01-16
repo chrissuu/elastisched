@@ -11,8 +11,8 @@
 #include "container.h"
 #include "map.h"
 #include "dll.h"
-#include "graph.h"
 #include "hash.h"
+#include "utils.h"
 
 
 /**
@@ -98,18 +98,16 @@
  */
 
 typedef uint32_t sec_t;
+typedef double cost_t;
 
-#ifndef INTERVAL_T
-#define INTERVAL_T
 typedef struct interval {
   sec_t low;
   sec_t high;
 } interval_t;
-#endif
 
 typedef struct tag tag_t;
-typedef container_t tag_set;
 typedef container_t vec;
+typedef vec tag_set_t;
 
 typedef tag_t jid_t; /// an dependency ID is a Tag with an empty description
 typedef struct policy policy_t;
@@ -117,7 +115,6 @@ typedef struct policy policy_t;
 typedef struct schedule schedule_t;
 typedef struct jobs jobs_t;
 typedef struct pair pair_t;
-
 
 typedef struct job {
   sec_t duration;
@@ -158,12 +155,21 @@ static const sec_t WEEK = ((sec_t)7 * DAY);
  */
 
 static const double ILLEGAL_SCHEDULE_COST = 1e12;
-
 static const double EPSILON = 1e-8;
 static const unsigned int DEFAULT_RNG_SEED = 1337;
 
+//==========================================
+//==========================================
+//==========================================
 
-// POLICY UTILS
+interval_t* mk_interval(sec_t low, sec_t high);
+void interval_free(interval_t* interval);
+bool interval_eq(const interval_t* U, const interval_t* V);
+bool interval_overlaps(const interval_t* U, const interval_t* V);
+bool interval_contains(const interval_t* U, const interval_t* V);
+sec_t interval_length(const interval_t* interval);
+bool interval_is_valid(const interval_t* interval);
+
 /**
  * @brief creates a scheduling policy configuration struct
  *
@@ -181,11 +187,6 @@ bool policy_is_overlappable(policy_t *policy);
 bool policy_is_invisible(policy_t *policy);
 uint8_t policy_max_splits(policy_t *policy);
 sec_t min_split_duration(policy_t *policy);
-
-schedule_t *mk_schedule();
-void schedule_free(schedule_t *schedule);
-void schedule_add_job(schedule_t *schedule, const job_t *job);
-void schedule_clear(schedule_t *schedule);
 
 /**
  * TAGS
@@ -261,20 +262,17 @@ tag_set_t *ts_intersection(tag_set_t *U, tag_set_t *V);
  */
 bool ts_is_valid(tag_set_t *set);
 
-/**
- * @brief pushback tag to tagvec
- *
- * @param vec
- * @param tag
- * @return: true if no memory failures, false otherwise
- */
-bool tv_pushback(tag_vec_t *vec, tag_t tag);
+schedule_t *mk_schedule();
+void schedule_free(schedule_t *schedule);
+void schedule_add_job(schedule_t *schedule, const job_t *job);
+void schedule_clear(schedule_t *schedule);
 
-schedule_t *generate_random_schedule_neighbor(schedule_t *schedule,
-                                              sec_t granularity,
-                                              unsigned int seed);
-pair_t *_schedule_jobs(jobs_t jobs, sec_t granularity, double initial_temp,
-                       double final_temp, uint64_t num_iters);
+cost_t schedule_cost_illegal(schedule_t *schedule, sec_t granularity);
+cost_t schedule_cost_overlap(schedule_t *schedule, sec_t granularity);
+cost_t schedule_cost_split(schedule_t *schedule, sec_t granularity);
+
+schedule_t *generate_random_schedule_neighbor(schedule_t *schedule, sec_t granularity, unsigned int seed);
+pair_t *_schedule_jobs(jobs_t jobs, sec_t granularity, double initial_temp, double final_temp, uint64_t num_iters);
 pair_t *schedule_jobs(jobs_t jobs, sec_t granularity);
 
 #endif

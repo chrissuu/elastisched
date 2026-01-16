@@ -1,5 +1,35 @@
 #include "engine.h"
 
+interval_t* mk_interval(sec_t low, sec_t high) {
+    interval_t* interval = malloc(sizeof(interval_t));
+    if (!interval) return NULL;
+
+    interval->low = low; interval->high = high;
+    return interval;
+}
+
+void interval_free(interval_t* interval) { free(interval); }
+
+bool interval_eq(const interval_t* U, const interval_t* V) {
+    return (U->low == V->low) && (U->high == V->high);
+}
+
+bool interval_overlaps(const interval_t* U, const interval_t* V) {
+    return !(U->high < V->low || V->high < U->low);
+}
+
+bool interval_contains(const interval_t* U, const interval_t* V) {
+    return (U->low <= V->low && V->high <= U->high);
+}
+
+sec_t interval_length(const interval_t* interval) {
+    return interval->high - interval->low;
+}
+
+bool interval_is_valid(const interval_t* interval) {
+    return interval->high >= interval->low;
+}
+
 /**
  * @brief Scheduling policy struct, which
  * defines the configurations for how a job
@@ -49,36 +79,35 @@ bool policy_is_invisible(policy_t* policy) {
 
 bool job_is_rigid(job_t *job) {
     if (!job) return false;
-    return job->duration == interval_length(job->schedulable_tr);
+    return job->duration == interval_length(&job->schedulable_tr);
 }
-
 
 typedef enum { 
     RED, 
     BLACK } 
 Color;
 
-typedef struct Node Node;
+typedef struct node node_t;
 
-struct Node {
-    Node* left;
-    Node* right;
-    Node* parent;
-    Interval* interval;
+struct node {
+    node_t* left;
+    node_t* right;
+    node_t* parent;
+    interval_t* interval;
     void* value;
     sec_t max;
     Color color;
 };
 
-typedef struct IntervalMap {
-    Node* root;
-} IntervalMap;
+typedef struct interval_tMap {
+    node_t* root;
+} interval_tMap;
 
-static sec_t node_max(Node* node) {
+static sec_t node_max(node_t* node) {
     return node ? node->max : 0;
 }
 
-static void update_max(Node* node) {
+static void update_max(node_t* node) {
     if (!node || !node->interval) return;
     sec_t left_max = node_max(node->left);
     sec_t right_max = node_max(node->right);
@@ -90,10 +119,10 @@ static void update_max(Node* node) {
     node->max = max;
 }
 
-Node* mk_leaf_node(Node* parent, Interval* interval,
+node_t* mk_leaf_node(node_t* parent, interval_t* interval,
     void* value, sec_t max, Color color
 ) {
-    Node* node = malloc(sizeof(Node));
+    node_t* node = malloc(sizeof(node_t));
     if (!node) return NULL;
 
     node->parent = parent;
@@ -108,10 +137,10 @@ Node* mk_leaf_node(Node* parent, Interval* interval,
     return node;
 }
 
-Node* mk_node(Node* left, Node* right, Node* parent,
-    Interval* interval, void* value, sec_t max, Color color
+node_t* mk_node(node_t* left, node_t* right, node_t* parent,
+    interval_t* interval, void* value, sec_t max, Color color
 ) {
-    Node* node = malloc(sizeof(Node));
+    node_t* node = malloc(sizeof(node_t));
     if (!node) return NULL;
 
     node->left = left;
@@ -125,15 +154,15 @@ Node* mk_node(Node* left, Node* right, Node* parent,
     return node;
 }
 
-IntervalMap* mk_intmap(Node* root) {
-    IntervalMap* map = malloc(sizeof(IntervalMap));
+interval_tMap* mk_intmap(node_t* root) {
+    interval_tMap* map = malloc(sizeof(interval_tMap));
     if (!map) return NULL;
 
     map->root = root;
     return map;
 }
 
-void intmap_insert(IntervalMap* map, Interval* key, void* value) {
+void intmap_insert(interval_tMap* map, interval_t* key, void* value) {
     if (!map || !key) return;
     if (!interval_is_valid(key)) return;
 
@@ -142,8 +171,8 @@ void intmap_insert(IntervalMap* map, Interval* key, void* value) {
         return;
     }
 
-    Node* curr = map->root;
-    Node* parent = NULL;
+    node_t* curr = map->root;
+    node_t* parent = NULL;
     while (curr) {
         parent = curr;
         if (key->low < curr->interval->low) {
@@ -153,7 +182,7 @@ void intmap_insert(IntervalMap* map, Interval* key, void* value) {
         }
     }
 
-    Node* node = mk_leaf_node(parent, key, value, key->high, BLACK);
+    node_t* node = mk_leaf_node(parent, key, value, key->high, BLACK);
     if (!node) return;
 
     if (key->low < parent->interval->low) {
@@ -162,16 +191,16 @@ void intmap_insert(IntervalMap* map, Interval* key, void* value) {
         parent->right = node;
     }
 
-    for (Node* n = parent; n; n = n->parent) {
+    for (node_t* n = parent; n; n = n->parent) {
         update_max(n);
     }
 }
 
-void intmap_delete(IntervalMap* map) {
+void intmap_delete(interval_tMap* map) {
     return;
 }
 
-void intmap_free(IntervalMap* map) {
+void intmap_free(interval_tMap* map) {
     if (!map) return;
     if (!map->root) {
         free(map);
@@ -180,7 +209,7 @@ void intmap_free(IntervalMap* map) {
 
     size_t capacity = 32;
     size_t top = 0;
-    Node** stack = malloc(capacity * sizeof(Node*));
+    node_t** stack = malloc(capacity * sizeof(node_t*));
     if (!stack) {
         free(map);
         return;
@@ -188,11 +217,11 @@ void intmap_free(IntervalMap* map) {
     stack[top++] = map->root;
 
     while (top > 0) {
-        Node* node = stack[--top];
+        node_t* node = stack[--top];
         if (node->left) {
             if (top == capacity) {
                 capacity *= 2;
-                Node** new_stack = realloc(stack, capacity * sizeof(Node*));
+                node_t** new_stack = realloc(stack, capacity * sizeof(node_t*));
                 if (!new_stack) break;
                 stack = new_stack;
             }
@@ -201,7 +230,7 @@ void intmap_free(IntervalMap* map) {
         if (node->right) {
             if (top == capacity) {
                 capacity *= 2;
-                Node** new_stack = realloc(stack, capacity * sizeof(Node*));
+                node_t** new_stack = realloc(stack, capacity * sizeof(node_t*));
                 if (!new_stack) break;
                 stack = new_stack;
             }
@@ -214,8 +243,8 @@ void intmap_free(IntervalMap* map) {
     free(map);
 }
 
-void intmap_left_rotate(IntervalMap* map, Node* x) {
-    Node* y = x->right;
+void intmap_left_rotate(interval_tMap* map, node_t* x) {
+    node_t* y = x->right;
     x->right = y->left;
     if (y->left) y->left->parent = x;
 
@@ -231,8 +260,8 @@ void intmap_left_rotate(IntervalMap* map, Node* x) {
     x->parent = y;
 }
 
-void intmap_right_rotate(IntervalMap* map, Node* y) {
-    Node* x = y->left;
+void intmap_right_rotate(interval_tMap* map, node_t* y) {
+    node_t* x = y->left;
 
     y->left = x->right;
     if (x->right) x->right->parent = y;
@@ -251,13 +280,8 @@ void intmap_right_rotate(IntervalMap* map, Node* y) {
 }
 
 /**
- * 
- * 
- * Definitions for working with the Tag and TagContainer structs.
- * 
- * TagContainer is a simple container struct which allows for
- * functions to operate on it and implement Sets and Vectors.
- * 
+ * @brief 
+ *
  * TagSet in practice does not get very large nor updated
  * often so we opt for a simple vector-based sorted set.
  * 
@@ -296,13 +320,13 @@ uint64_t tag_hash_void(const void* U) {
     return tag_hash((const tag_t*)U);
 }
 
-size_t ts_insert_index(tag_set* set, tag_t tag) {
+size_t ts_insert_index(tag_set_t* set, tag_t tag) {
     size_t l = 0;
     size_t r = set->size;
 
     while (l < r) {
         size_t mid = l + (r - l) / 2;
-        int _cmp = tag_cmp(&tag, &(set->data)[mid]);
+        int _cmp = tag_cmp(&tag, (tag_t*)(set->data)[mid]);
         if (_cmp == 0) return mid;
         if (_cmp < 0) r = mid;
         else l = mid + 1;
@@ -310,45 +334,54 @@ size_t ts_insert_index(tag_set* set, tag_t tag) {
     return l;
 }
 
-void ts_insert(tag_set* set, tag_t tag, size_t insert_ind) {
+void ts_insert(tag_set_t* set, tag_t tag, size_t insert_ind) {
+    void** e_ref = malloc(sizeof(void*));
+    if (!e_ref) return;
+    *e_ref = (void*)&tag;
+
     if (insert_ind < set->size) {
         memmove(&set->data[insert_ind + 1],
                 &set->data[insert_ind],
                 (set->size - insert_ind) * sizeof(tag_t));
     }
-    set->data[insert_ind] = tag;
+
+    set->data[insert_ind] = e_ref;
     set->size++;
 }
 
-bool ts_add(tag_tContainer* set, tag_t tag) {
+bool ts_add(tag_set_t* set, tag_t tag) {
+    void** e_ref = malloc(sizeof(void*));
+    if (!e_ref) false;
+    *e_ref = (void*)&tag;
+
     size_t insert_index = ts_insert_index(set, tag);
     if (insert_index < set->size && 
-        tag_eq(&tag, &set->data[insert_index])) return true;
+        tag_eq(&tag, (tag_t*)set->data[insert_index])) return true;
 
     if (set->size == set->capacity && 
-        !tag_container_resize(set)) 
+        !container_resize(set, NULL)) 
         return false;
 
     ts_insert(set, tag, insert_index);
     return true;
 }
 
-bool ts_in(tag_tContainer* set, tag_t tag) {
+bool ts_in(tag_set_t* set, tag_t tag) {
     size_t insert_index = ts_insert_index(set, tag);
     return (insert_index < set->size && 
-        tag_eq(&tag, &set->data[insert_index]));
+        tag_eq(&tag, (tag_t*)set->data[insert_index]));
 }
 
-tag_tContainer* ts_union(tag_tContainer* U, tag_tContainer* V) {
+tag_set_t* ts_union(tag_set_t* U, tag_set_t* V) {
     if (U->size == 0) {
-        tag_tContainer* set_union = mk_tag_container(V->size);
+        tag_set_t* set_union = mk_container(V->size);
         if (!set_union) return NULL;
         memcpy(set_union->data, V->data, V->size * sizeof(tag_t));
         set_union->size = V->size;
         return set_union;
     }
     if (V->size == 0) {
-        tag_tContainer* set_union= mk_tag_container(U->size);
+        tag_set_t* set_union= mk_container(U->size);
         if (!set_union) return NULL;
         memcpy(set_union->data, U->data, U->size * sizeof(tag_t));
         set_union->size = U->size;
@@ -358,23 +391,23 @@ tag_tContainer* ts_union(tag_tContainer* U, tag_tContainer* V) {
     size_t u_ptr = 0;
     size_t v_ptr = 0;
     size_t insert_ind = 0;
-    tag_tContainer* set_union = mk_tag_container(U->size + V->size);
+    tag_set_t* set_union = mk_container(U->size + V->size);
     if (!set_union) return NULL;
 
     while (u_ptr < U->size && v_ptr < V->size) {
-        tag_t* curr_u_tag = &U->data[u_ptr];
-        tag_t* curr_v_tag = &V->data[v_ptr];
+        tag_t* curr_u_tag = (tag_t*)U->data[u_ptr];
+        tag_t* curr_v_tag = (tag_t*)V->data[v_ptr];
         switch (tag_cmp(curr_u_tag, curr_v_tag)) {
             case -1:
-                set_union->data[insert_ind++] = *curr_u_tag;
+                set_union->data[insert_ind++] = (void*)curr_u_tag;
                 u_ptr++;
                 break;
             case 0: 
-                set_union->data[insert_ind++] = *curr_u_tag;
+                set_union->data[insert_ind++] = (void*)curr_u_tag;
                 u_ptr++; v_ptr++;
                 break;
             case 1:
-                set_union->data[insert_ind++] = *curr_v_tag;
+                set_union->data[insert_ind++] = (void*)curr_v_tag;
                 v_ptr++;
                 break;
         }
@@ -388,15 +421,15 @@ tag_tContainer* ts_union(tag_tContainer* U, tag_tContainer* V) {
     return set_union;
 };
 
-tag_tContainer* ts_intersection(tag_tContainer* U, tag_tContainer* V) {
-    tag_tContainer* set_intersection = mk_tag_container(min(U->size, V->size));
+tag_set_t* ts_intersection(tag_set_t* U, tag_set_t* V) {
+    tag_set_t* set_intersection = mk_container(min(U->size, V->size));
     if (!set_intersection) return NULL;
 
-    tag_tContainer* anchor = U->size > V->size ? V : U;
-    tag_tContainer* ot = U->size > V->size ? U : V;
+    tag_set_t* anchor = U->size > V->size ? V : U;
+    tag_set_t* ot = U->size > V->size ? U : V;
     size_t insert_ind = 0;
     for (size_t i = 0; i < anchor->size; i++) {
-        if (ts_in(ot, anchor->data[i])) {
+        if (ts_in(ot, *(tag_t*)anchor->data[i])) {
             set_intersection->data[insert_ind++] = anchor->data[i];
         }
     }
@@ -409,15 +442,7 @@ int _tag_cmp(const void* u, const void* v) {
     return tag_cmp((tag_t*)u, (tag_t*)v);
 }
 
-bool ts_is_valid(tag_tContainer* set) {
+bool ts_is_valid(tag_set_t* set) {
     return set->size <= set->capacity &&
         is_sorted((void*)set->data, set->size, sizeof(tag_t), &_tag_cmp);
-}
-
-bool tv_pushback(tag_tContainer* vec, tag_t tag) {
-    if (vec->size == vec->capacity && 
-        !tag_container_resize(vec)) return false;
-    
-    vec->data[vec->size++] = tag;
-    return true;
 }

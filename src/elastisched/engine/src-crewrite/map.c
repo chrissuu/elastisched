@@ -147,7 +147,7 @@ map* mk_map(uint64_t (*hash_fn)(const void* e),
 void map_free(map* dict) {
     if (!dict) return;
 
-    for (size_t i = 0; i < dict->buckets->capacity; i++) {
+    for (size_t i = 0; i < dict->buckets->data->capacity; i++) {
         dll* deque = (dll*)dict->buckets->data->data[i];
         if (!deque) continue;
 
