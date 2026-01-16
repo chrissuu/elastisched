@@ -20,6 +20,7 @@ void dll_remove(dll* deque, dll_node* node);
 dll_node* dll_next(dll_node* node);
 dll_node* dll_prev(dll_node* node);
 void* dll_node_get_value(dll_node* node);
+void dll_node_free(dll_node* node);
 
 size_t dll_size(dll* deque);
 

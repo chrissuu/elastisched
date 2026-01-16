@@ -155,3 +155,8 @@ dll_node* dll_prev(dll_node* node) {
 void* dll_node_get_value(dll_node* node) {
     return node->value;
 }
+
+void dll_node_free(dll_node* node) {
+    free(node);
+    return;
+}

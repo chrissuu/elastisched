@@ -5,9 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "constants.h"
 #include "dll.h"
-#include "vec.h"
+#include "container.h"
 
 typedef struct map map;
 typedef struct map set;
@@ -17,11 +16,9 @@ typedef struct item {
     void* value;
 } item;
 
-typedef struct vec_items {
-    size_t size;
-    size_t capacity;
-    item** data;
-} vec_items;
+#define INITIAL_MAP_CAPACITY 32
+
+typedef container_t vec_items_t;
 
 map* mk_map(uint64_t (*hash_fn)(const void* e),
     int (*cmp_fn)(const void* u, const void* v),
@@ -34,6 +31,6 @@ bool map_in(map* dict, void* key);
 void* map_get(map* dict, void* key);
 void map_delete(map* dict, void* key);
 size_t map_size(map* dict);
-vec_items* map_items(map* dict);
+vec_items_t* map_items(map* dict);
 
 #endif

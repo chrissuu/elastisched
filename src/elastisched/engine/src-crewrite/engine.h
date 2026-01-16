@@ -8,12 +8,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "vec.h"
-#include "set.h"
+#include "container.h"
 #include "map.h"
+#include "dll.h"
+#include "graph.h"
+#include "hash.h"
 
-#include "constants.h"
-#include "utils.h"
 
 /**
  * ============================================================================
@@ -99,12 +99,18 @@
 
 typedef uint32_t sec_t;
 
+#ifndef INTERVAL_T
+#define INTERVAL_T
 typedef struct interval {
   sec_t low;
   sec_t high;
 } interval_t;
+#endif
 
 typedef struct tag tag_t;
+typedef container_t tag_set;
+typedef container_t vec;
+
 typedef tag_t jid_t; /// an dependency ID is a Tag with an empty description
 typedef struct policy policy_t;
 
@@ -112,16 +118,6 @@ typedef struct schedule schedule_t;
 typedef struct jobs jobs_t;
 typedef struct pair pair_t;
 
-typedef struct container {
-  size_t size;
-  size_t capacity;
-  void** data;
-} container;
-
-typedef container set;
-typedef container vec;
-typedef set tag_set_t;
-typedef vec tag_vec_t;
 
 typedef struct job {
   sec_t duration;
@@ -148,11 +144,6 @@ static const sec_t HOUR = ((sec_t)60 * MINUTE);
 static const sec_t DAY = ((sec_t)24 * HOUR);
 static const sec_t WEEK = ((sec_t)7 * DAY);
 
-static const double ILLEGAL_SCHEDULE_COST = 1e12;
-
-static const double EPSILON = 1e-8;
-static const unsigned int DEFAULT_RNG_SEED = 1337;
-
 //==========================================
 //=========== INTERNAL CONSTANTS ===========
 //==========================================
@@ -165,10 +156,12 @@ static const unsigned int DEFAULT_RNG_SEED = 1337;
  * user since these intrinsics might be useful in optimizing
  * scheduling calls.
  */
-static const size_t ELASTISCHED_INITIAL_TAGCONTAINER_CAPACITY = 8;
-static const size_t ELASTISCHED_INITIAL_CONTAINER_CAPACITY = 256;
-static const size_t ELASTISCHED_INITIAL_MAP_CAPACITY = 32;
-static const size_t ELASTISCHED_INTERNAL_DLL_SZ = 3 * sizeof(size_t);
+
+static const double ILLEGAL_SCHEDULE_COST = 1e12;
+
+static const double EPSILON = 1e-8;
+static const unsigned int DEFAULT_RNG_SEED = 1337;
+
 
 // POLICY UTILS
 /**
@@ -218,9 +211,6 @@ void tag_free(tag_t *tag);
 bool tag_eq(const tag_t *U, const tag_t *V);
 int tag_cmp(const tag_t *U, const tag_t *V);
 uint64_t tag_hash(const tag_t *U);
-
-tag_set_t *mk_tag_container(size_t capacity);
-void tag_container_free(container *container);
 
 /**
  * @brief Helper function for adding tag into a set
