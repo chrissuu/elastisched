@@ -9,7 +9,7 @@ const uint8_t kPolicyRoundToGranularity = 1 << 3;
 }  // namespace
 
 Policy::Policy(uint8_t max_splits,
-               time_t min_split_duration,
+               sec_t min_split_duration,
                bool is_splittable,
                bool is_overlappable,
                bool is_invisible,
@@ -32,7 +32,7 @@ Policy::Policy(uint8_t max_splits,
 }
 
 uint8_t Policy::get_max_splits() const { return max_splits; }
-time_t Policy::get_min_split_duration() const { return min_split_duration; }
+sec_t Policy::get_min_split_duration() const { return min_split_duration; }
 bool Policy::get_round_to_granularity() const {
     return (scheduling_policies & kPolicyRoundToGranularity) != 0;
 }

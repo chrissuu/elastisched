@@ -37,7 +37,7 @@ public:
 
         cost_history.push_back(curr_cost);
 
-        std::mt19937 gen(constants::rng_seed());
+        std::mt19937 gen(constants::RNG_SEED());
         std::uniform_real_distribution<> dis(0.0, 1.0);
 
         for (int iter = 0; iter < max_iters; ++iter) {
@@ -56,7 +56,7 @@ public:
                 curr_state = next_state;
                 curr_cost = next_cost;
 
-                if ((curr_cost < best_cost) && abs(best_cost - curr_cost) > constants::epsilon) {
+                if ((curr_cost < best_cost) && abs(best_cost - curr_cost) > constants::EPSILON) {
                     best_cost = curr_cost;
                     best_state = curr_state;
                 }

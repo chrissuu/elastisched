@@ -4,6 +4,7 @@
 #include "Policy.hpp"
 #include "Tag.hpp"
 #include "constants.hpp"
+#include "types.hpp"
 #include "Interval.hpp"
 
 #include <vector>
@@ -13,7 +14,7 @@
 
 class Job {
 public:
-    time_t duration;
+    sec_t duration;
     TimeRange schedulable_time_range;
     TimeRange scheduled_time_range;
     std::vector<TimeRange> scheduled_time_ranges;
@@ -22,7 +23,7 @@ public:
     std::set<ID> dependencies;
     std::set<Tag> tags;
 
-    Job(time_t duration,
+    Job(sec_t duration,
         TimeRange schedulable_time_range,
         TimeRange scheduled_time_range,
         ID id,

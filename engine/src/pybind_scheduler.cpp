@@ -5,12 +5,12 @@
 
 namespace py = pybind11;
 
-#include "TAG.hpp"
-#include "POLICY.hpp"
-#include "JOB.hpp"
+#include "Tag.hpp"
+#include "Policy.hpp"
+#include "Job.hpp"
 #include "engine.hpp"
 #include "constants.hpp"
-#include "INTERVAL.hpp"
+#include "Interval.hpp"
 
 PYBIND11_MODULE(engine, m) {
     // Tag
@@ -33,7 +33,7 @@ PYBIND11_MODULE(engine, m) {
     // Policy
     py::class_<Policy>(m, "Policy")
         .def(py::init<>())
-        .def(py::init<uint8_t, time_t, bool, bool, bool, bool>(),
+        .def(py::init<uint8_t, sec_t, bool, bool, bool, bool>(),
              py::arg("max_splits"),
              py::arg("min_split_duration"),
              py::arg("is_splittable") = false,
@@ -48,21 +48,21 @@ PYBIND11_MODULE(engine, m) {
         .def("is_overlappable", &Policy::is_overlappable)
         .def("is_invisible", &Policy::is_invisible);
 
-    // TimeRange (Interval<time_t>)
-    py::class_<Interval<time_t>>(m, "TimeRange")
-        .def(py::init<time_t>())
-        .def(py::init<time_t, time_t>())
-        .def("get_low", &Interval<time_t>::get_low)
-        .def("get_high", &Interval<time_t>::get_high)
-        .def("overlaps", &Interval<time_t>::overlaps)
-        .def("contains", &Interval<time_t>::contains)
-        .def("length", &Interval<time_t>::length)
+    // TimeRange (Interval<sec_t>)
+    py::class_<Interval<sec_t>>(m, "TimeRange")
+        .def(py::init<sec_t>())
+        .def(py::init<sec_t, sec_t>())
+        .def("get_low", &Interval<sec_t>::get_low)
+        .def("get_high", &Interval<sec_t>::get_high)
+        .def("overlaps", &Interval<sec_t>::overlaps)
+        .def("contains", &Interval<sec_t>::contains)
+        .def("length", &Interval<sec_t>::length)
         .def(py::self == py::self)
         .def(py::self != py::self);
 
     // Job
     py::class_<Job>(m, "Job")
-        .def(py::init<time_t, Interval<time_t>, Interval<time_t>, std::string, Policy, std::set<std::string>, std::set<Tag>>())
+        .def(py::init<sec_t, Interval<sec_t>, Interval<sec_t>, std::string, Policy, std::set<std::string>, std::set<Tag>>())
         .def_readwrite("duration", &Job::duration)
         .def_readwrite("schedulable_time_range", &Job::schedulable_time_range)
         .def_readwrite("scheduled_time_range", &Job::scheduled_time_range)
@@ -88,7 +88,7 @@ PYBIND11_MODULE(engine, m) {
 
     // Cost Function
     py::class_<ScheduleCostFunction>(m, "ScheduleCostFunction")
-        .def(py::init<const Schedule&, time_t>())
+        .def(py::init<const Schedule&, sec_t>())
         .def("schedule_cost", &ScheduleCostFunction::schedule_cost);
 
     m.def("schedule", &schedule, "Run the scheduler with default configurations",
