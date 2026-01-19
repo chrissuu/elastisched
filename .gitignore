@@ -20,4 +20,10 @@ offline-packages
 elastisched.db
 elastischedcopy.db
 
+**/CMakeCache.txt
+**/cmake_install.cmake
+engine/src/Makefile
+engine/CMakeFiles
+
+
 .env

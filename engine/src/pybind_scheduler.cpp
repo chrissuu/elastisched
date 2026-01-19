@@ -8,10 +8,9 @@ namespace py = pybind11;
 #include "tag.hpp"
 #include "policy.hpp"
 #include "job.hpp"
-#include "schedule.hpp"
-#include "scheduler.hpp"
+#include "engine.hpp"
 #include "constants.hpp"
-#include "utils/Interval.hpp"
+#include "Interval.hpp"
 
 PYBIND11_MODULE(engine, m) {
     // Tag
@@ -92,13 +91,7 @@ PYBIND11_MODULE(engine, m) {
     // Cost Function
     py::class_<ScheduleCostFunction>(m, "ScheduleCostFunction")
         .def(py::init<const Schedule&, time_t>())
-        .def("schedule_cost", &ScheduleCostFunction::scheduleCost)
-        .def("busy_saturday_cost", &ScheduleCostFunction::busy_saturday_cost)
-        .def("busy_friday_afternoon_cost", &ScheduleCostFunction::busy_friday_afternoon_cost)
-        .def("busy_afternoon_exponential_cost", &ScheduleCostFunction::busy_afternoon_exponential_cost,
-             py::arg("DAYS_SINCE_MONDAY"))
-        .def("busy_day_constant_cost", &ScheduleCostFunction::busy_day_constant_cost,
-             py::arg("DAYS_SINCE_MONDAY"));
+        .def("schedule_cost", &ScheduleCostFunction::scheduleCost);
 
     m.def("schedule", &schedule, "Run the scheduler with default configurations",
           py::arg("jobs"), py::arg("granularity"));

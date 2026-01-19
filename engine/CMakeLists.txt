@@ -20,15 +20,12 @@ find_package(pybind11 QUIET)
 add_library(scheduler_lib
     src/job.cpp
     src/policy.cpp
-    src/schedule.cpp
-    src/cost_function.cpp
+    src/engine.cpp
     src/tag.cpp
 )
 
 target_include_directories(scheduler_lib PUBLIC 
-    src 
-    src/utils 
-    src/optimizer
+    src
 )
 
 if(NOT SKBUILD)
@@ -62,8 +59,6 @@ if(pybind11_FOUND AND SKBUILD)
     
     target_include_directories(engine_py PRIVATE
         src
-        src/utils
-        src/optimizer
     )
     
     target_compile_definitions(engine_py PRIVATE VERSION_INFO=${PROJECT_VERSION})

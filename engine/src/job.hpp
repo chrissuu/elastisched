@@ -4,7 +4,7 @@
 #include "policy.hpp"
 #include "tag.hpp"
 #include "constants.hpp"
-#include "utils/Interval.hpp"
+#include "Interval.hpp"
 
 #include <vector>
 #include <set>
