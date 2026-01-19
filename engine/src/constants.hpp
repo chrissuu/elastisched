@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <string>
 
-#include "utils/Interval.hpp"
+#include "Interval.hpp"
 #include "tag.hpp"
 
 #define time_t uint64_t

@@ -1,8 +1,7 @@
 #include "job.hpp"
 #include "policy.hpp"
-#include "schedule.hpp"
-#include "utils/IntervalTree.hpp"
-#include "cost_function.hpp"
+#include "engine.hpp"
+#include "IntervalTree.hpp"
 #include "tests.hpp"
 
 #include "constants.hpp"
@@ -18,7 +17,7 @@
 #include <set>
 #include <cassert>
 
-#include "optimizer/SimulatedAnnealingOptimizer.hpp"
+#include "SimulatedAnnealingOptimizer.hpp"
 
 int main() {
     std::cout << "=== Scheduler Test Suite ===\n\n";
