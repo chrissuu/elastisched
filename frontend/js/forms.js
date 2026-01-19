@@ -5,13 +5,14 @@ import {
   formatDateTimeLocalInTimeZone,
   getViewRange,
   getWeekStart,
+  overlaps,
   shiftAnchorDate,
   toLocalInputFromDate,
   toLocalInputValueInTimeZone,
   toProjectIsoFromDate,
   toProjectIsoFromLocalInput,
 } from "./utils.js";
-import { startInteractiveCreate } from "./render.js";
+import { setActive, startInteractiveCreate } from "./render.js";
 import {
   createLLMRecurrenceDraft,
   createRecurrence,
@@ -137,8 +138,9 @@ function getAiContextParts() {
 }
 
 function setLlmPreviewControls(hasPreview) {
-  if (dom.llmConfirmBtn) dom.llmConfirmBtn.disabled = !hasPreview;
-  if (dom.llmDiscardBtn) dom.llmDiscardBtn.disabled = !hasPreview;
+  const hasDraft = Boolean(state.llmDraftRecurrences?.length);
+  if (dom.llmConfirmBtn) dom.llmConfirmBtn.disabled = !hasDraft;
+  if (dom.llmDiscardBtn) dom.llmDiscardBtn.disabled = !hasDraft && !hasPreview;
 }
 
 async function clearLlmPreview() {
@@ -2876,21 +2878,53 @@ async function handleLlmSubmit(event) {
     state.llmDraftRecurrences = draft.recurrences || [];
     state.previewBlobs = Array.isArray(draft.occurrences) ? draft.occurrences : [];
     state.llmDraftNotes = draft.notes || null;
+    const hasPreview = Boolean(state.previewBlobs?.length);
+    const viewRange = getViewRange(state.view, state.anchorDate);
+    const hasPreviewInView =
+      hasPreview &&
+      state.previewBlobs.some((blob) => {
+        const defaultRange = blob.default_scheduled_timerange || {};
+        const schedRange = blob.schedulable_timerange || {};
+        const start = new Date(defaultRange.start || schedRange.start || "");
+        const end = new Date(defaultRange.end || schedRange.end || "");
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+          return false;
+        }
+        return overlaps(viewRange.start, viewRange.end, start, end);
+      });
     if (refreshView) {
-      await refreshView(state.view);
+      if (hasPreview && !hasPreviewInView) {
+        const first = state.previewBlobs[0];
+        const firstStart = new Date(
+          first?.default_scheduled_timerange?.start ||
+            first?.schedulable_timerange?.start ||
+            ""
+        );
+        if (!Number.isNaN(firstStart.getTime())) {
+          state.anchorDate = firstStart;
+          await refreshView("week");
+        } else {
+          await refreshView(state.view);
+        }
+      } else {
+        await refreshView(state.view);
+      }
     }
-    dom.llmStatus.textContent = draft.notes
-      ? `Preview ready. ${draft.notes}`
-      : "Preview ready. Does this look good?";
-    setLlmPreviewControls(Boolean(state.previewBlobs?.length));
+    if (draft.notes) {
+      dom.llmStatus.textContent = `Preview ready. ${draft.notes}`;
+    } else if (!hasPreview && state.llmDraftRecurrences?.length) {
+      dom.llmStatus.textContent =
+        "Draft created, but no preview in the current view. Try a different date range.";
+    } else {
+      dom.llmStatus.textContent = "Preview ready. Does this look good?";
+    }
+    setLlmPreviewControls(hasPreview);
   } catch (error) {
     dom.llmStatus.textContent = error?.message || "Failed to generate preview.";
     state.previewBlobs = [];
     state.llmDraftRecurrences = null;
     state.llmDraftNotes = null;
-    if (refreshView) {
-      await refreshView(state.view);
-    }
+    setActive(state.view);
   }
 }
 

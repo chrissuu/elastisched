@@ -229,6 +229,24 @@ function showInfoCard(blob, anchorRect) {
         getBlobTimeZone(blob)
       )
     : "";
+  const defaultRange = blob.default_scheduled_timerange || {};
+  const defaultLabel =
+    defaultRange.start && defaultRange.end
+      ? formatTimeRangeInTimeZone(
+          defaultRange.start,
+          defaultRange.end,
+          getBlobTimeZone(blob)
+        )
+      : "";
+  const schedulableRange = blob.schedulable_timerange || {};
+  const schedulableLabel =
+    isPreview && schedulableRange.start && schedulableRange.end
+      ? formatTimeRangeInTimeZone(
+          schedulableRange.start,
+          schedulableRange.end,
+          getBlobTimeZone(blob)
+        )
+      : "";
   const policyBadges = renderPolicyBadges(blob.policy);
   const tags = Array.isArray(blob.tags)
     ? blob.tags.map((tag) => (typeof tag === "string" ? tag.trim() : "")).filter(Boolean)
@@ -312,9 +330,16 @@ function showInfoCard(blob, anchorRect) {
   const timeBlock = showTime
     ? `
     <div class="info-divider"></div>
-    <div class="info-label">Time</div>
-    <div class="info-text">${timeLabel}</div>
+    <div class="info-label">${isPreview ? "Default scheduled" : "Time"}</div>
+    <div class="info-text">${isPreview ? (defaultLabel || timeLabel) : timeLabel}</div>
   `
+    : "";
+  const schedulableBlock = schedulableLabel
+    ? `
+      <div class="info-divider"></div>
+      <div class="info-label">Schedulable window</div>
+      <div class="info-text">${schedulableLabel}</div>
+    `
     : "";
   const previewBadge = isPreview ? `<span class="info-preview">Preview</span>` : "";
   const actions = isPreview
@@ -338,6 +363,7 @@ function showInfoCard(blob, anchorRect) {
     ${tagBlock}
     ${idBlock}
     ${timeBlock}
+    ${schedulableBlock}
     ${adjustmentsBlock}
     ${policyBadges ? `<div class="info-label">Policy</div><div class="policy-badges">${policyBadges}</div>` : ""}
   `;

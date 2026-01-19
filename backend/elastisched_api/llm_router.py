@@ -1,6 +1,12 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Request, status
 
-from elastisched_api.config import get_gemini_api_key, get_gemini_model
+from elastisched_api.config import (
+    get_gemini_api_key,
+    get_gemini_model,
+    get_max_blob_creation_retries,
+)
 from elastisched_api.llm import (
     GeminiProvider,
     Message,
@@ -62,23 +68,50 @@ def _format_context(parts) -> str:
     return "\n\n".join(blocks)
 
 
-def _normalize_llm_recurrence(recurrence: RecurrenceCreate) -> RecurrenceCreate:
+def _normalize_llm_recurrence(
+    recurrence: RecurrenceCreate, user_timezone: str, fallback_name: str
+) -> RecurrenceCreate:
     payload = dict(recurrence.payload or {})
+    recurrence_name = payload.get("recurrence_name")
+    recurrence_description = payload.get("recurrence_description")
+
+    def _apply_blob_defaults(blob: dict) -> dict:
+        if not isinstance(blob, dict):
+            return blob
+        if not blob.get("tz") and user_timezone:
+            blob["tz"] = user_timezone
+        if not blob.get("name"):
+            blob["name"] = recurrence_name or fallback_name
+        if not blob.get("description") and recurrence_description:
+            blob["description"] = recurrence_description
+        return blob
+
     if recurrence.type == "multiple":
         if "blobs" not in payload:
             if "blob" in payload:
-                payload["blobs"] = [payload.pop("blob")]
+                payload["blobs"] = [_apply_blob_defaults(payload.pop("blob"))]
             elif {"default_scheduled_timerange", "schedulable_timerange"}.issubset(payload):
-                payload = {"blobs": [payload]}
+                payload = {"blobs": [_apply_blob_defaults(payload)]}
+        if "blobs" in payload:
+            payload["blobs"] = [_apply_blob_defaults(blob) for blob in payload.get("blobs") or []]
     if recurrence.type == "single":
         if "blob" not in payload and {
             "default_scheduled_timerange",
             "schedulable_timerange",
         }.issubset(payload):
-            payload = {"blob": payload}
+            payload = {"blob": _apply_blob_defaults(payload)}
+        if "blob" in payload:
+            payload["blob"] = _apply_blob_defaults(payload.get("blob"))
     if recurrence.type == "delta":
         if "start_blob" not in payload and "blob" in payload:
             payload["start_blob"] = payload.pop("blob")
+        if "start_blob" in payload:
+            payload["start_blob"] = _apply_blob_defaults(payload.get("start_blob"))
+    if recurrence.type == "weekly":
+        if "blobs_of_week" in payload:
+            payload["blobs_of_week"] = [
+                _apply_blob_defaults(blob) for blob in payload.get("blobs_of_week") or []
+            ]
     return recurrence.model_copy(update={"payload": payload})
 
 
@@ -177,6 +210,9 @@ async def llm_recurrence_draft(
         "Blob policies are supported via blob.policy. When a task should be splittable/overlappable/invisible "
         "or rounded, include policy keys: is_splittable, is_overlappable, is_invisible, round_to_granularity, "
         "max_splits, min_split_duration_seconds.\n"
+        "Tags belong in blob.tags as a list of strings (not in description).\n"
+        "Set blob.tz to the user timezone.\n"
+        f"Current datetime: {datetime.now(timezone.utc).isoformat()} (UTC).\n"
         f"User timezone: {payload.user_timezone}. Project timezone: {payload.project_timezone}.\n"
         f"Round durations to {payload.granularity_minutes} minute increments when estimating."
     )
@@ -184,50 +220,70 @@ async def llm_recurrence_draft(
     user_lines = [payload.message]
     if context_block:
         user_lines.append("\nAdditional context:\n" + context_block)
-    messages = [
+    base_messages = [
         Message(role="system", content=system),
         Message(role="user", content="\n".join(user_lines)),
     ]
+    retries = get_max_blob_creation_retries()
+    last_error = "LLM did not return a draft recurrence."
 
     try:
-        response = await provider.generate(messages, [tool_spec])
+        for attempt in range(retries + 1):
+            messages = list(base_messages)
+            if attempt > 0:
+                messages.append(
+                    Message(
+                        role="user",
+                        content=(
+                            "The previous attempt failed validation with this error:\n"
+                            f"{last_error}\n"
+                            "Please correct the recurrence payloads and try again."
+                        ),
+                    )
+                )
+            response = await provider.generate(messages, [tool_spec])
+            if not response.tool_calls:
+                last_error = "LLM did not return a draft recurrence."
+                continue
+            call = response.tool_calls[0]
+            raw_recurrences = call.arguments.get("recurrences") or []
+            try:
+                recurrences = []
+                for index, item in enumerate(raw_recurrences, start=1):
+                    recurrences.append(
+                        _normalize_llm_recurrence(
+                            RecurrenceCreate.model_validate(item),
+                            payload.user_timezone,
+                            f"Draft {index}",
+                        )
+                    )
+            except Exception:
+                last_error = "LLM returned invalid recurrence payloads."
+                continue
+            try:
+                _validate_llm_recurrences(recurrences)
+                occurrences = build_preview_occurrences(
+                    recurrences, payload.view_start, payload.view_end
+                )
+            except HTTPException as exc:
+                last_error = str(exc.detail)
+                continue
+            preview_occurrences = [
+                PreviewOccurrence.model_validate({**item.model_dump(), "preview": True})
+                for item in occurrences
+            ]
+            notes = call.arguments.get("notes")
+            return LLMRecurrenceDraftResponse(
+                recurrences=recurrences,
+                occurrences=preview_occurrences,
+                notes=notes,
+            )
     finally:
         await provider.aclose()
 
-    if not response.tool_calls:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="LLM did not return a draft recurrence.",
-        )
-    call = response.tool_calls[0]
-    raw_recurrences = call.arguments.get("recurrences") or []
-    try:
-        recurrences = [
-            _normalize_llm_recurrence(RecurrenceCreate.model_validate(item))
-            for item in raw_recurrences
-        ]
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="LLM returned invalid recurrence payloads.",
-        ) from exc
-    _validate_llm_recurrences(recurrences)
-    try:
-        occurrences = build_preview_occurrences(
-            recurrences, payload.view_start, payload.view_end
-        )
-    except HTTPException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=exc.detail,
-        ) from exc
-    preview_occurrences = [
-        PreviewOccurrence.model_validate({**item.model_dump(), "preview": True})
-        for item in occurrences
-    ]
-    notes = call.arguments.get("notes")
-    return LLMRecurrenceDraftResponse(
-        recurrences=recurrences, occurrences=preview_occurrences, notes=notes
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=last_error,
     )
 
 
