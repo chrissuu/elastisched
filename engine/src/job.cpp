@@ -1,6 +1,6 @@
 #include "Job.hpp"
 
-Job::Job(time_t duration, TimeRange schedulable_time_range, TimeRange scheduled_time_range,
+Job::Job(sec_t duration, TimeRange schedulable_time_range, TimeRange scheduled_time_range,
         ID id, Policy policy, std::set<ID> dependencies, std::set<Tag> tags) 
 :   duration(duration),
     schedulable_time_range(schedulable_time_range),

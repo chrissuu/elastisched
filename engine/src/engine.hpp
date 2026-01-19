@@ -2,6 +2,7 @@
 #define ENGINE_HPP
 
 #include "constants.hpp"
+#include "types.hpp"
 #include "Job.hpp"
 #include "IntervalTree.hpp"
 
@@ -46,11 +47,11 @@ DependencyCheckResult check_dependency_violations(const Schedule& schedule);
 class ScheduleCostFunction {
 private:
     const Schedule& schedule_ref;
-    const time_t granularity;
+    const sec_t granularity;
     const std::set<Tag> rest_tags{};
-    IntervalTree<time_t, std::optional<std::vector<Job>>> day_based_schedule;
-    std::optional<time_t> min_time = std::nullopt;
-    std::optional<time_t> max_time = std::nullopt;
+    IntervalTree<sec_t, std::optional<std::vector<Job>>> day_based_schedule;
+    std::optional<sec_t> min_time = std::nullopt;
+    std::optional<sec_t> max_time = std::nullopt;
 
 public:
     double context_switch_cost() const;
@@ -59,7 +60,7 @@ public:
     double split_cost() const;
     double schedule_cost() const;
 
-    ScheduleCostFunction(const Schedule& schedule, time_t granularity);
+    ScheduleCostFunction(const Schedule& schedule, sec_t granularity);
 };
 
 Schedule schedule(std::vector<Job> jobs, const uint64_t granularity);
