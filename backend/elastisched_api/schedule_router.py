@@ -251,7 +251,9 @@ async def _get_or_create_schedule_state(session: AsyncSession) -> ScheduleStateM
     return state
 
 
-@schedule_router.get("/status", response_model=ScheduleStatus)
+@schedule_router.get(
+    "/status", response_model=ScheduleStatus, operation_id="get_schedule_status"
+)
 async def get_schedule_status(
     session: AsyncSession = Depends(get_session),
 ) -> ScheduleStatus:
@@ -259,7 +261,7 @@ async def get_schedule_status(
     return ScheduleStatus(dirty=state.dirty, last_run=state.last_run)
 
 
-@schedule_router.post("", response_model=ScheduleResponse)
+@schedule_router.post("", response_model=ScheduleResponse, operation_id="run_schedule")
 async def run_schedule(
     payload: ScheduleRequest,
     session: AsyncSession = Depends(get_session),

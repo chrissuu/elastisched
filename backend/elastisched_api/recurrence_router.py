@@ -333,6 +333,7 @@ def _to_occurrence_schema(
     "",
     response_model=RecurrenceRead | list[RecurrenceRead],
     status_code=status.HTTP_201_CREATED,
+    operation_id="create_recurrence",
 )
 async def create_recurrence(
     payload: RecurrenceCreate | list[RecurrenceCreate],
@@ -373,7 +374,9 @@ async def create_recurrence(
     return RecurrenceRead(id=recurrence.id, type=recurrence.type, payload=recurrence.payload)
 
 
-@recurrence_router.post("/bulk", response_model=list[RecurrenceRead])
+@recurrence_router.post(
+    "/bulk", response_model=list[RecurrenceRead], operation_id="create_recurrences_bulk"
+)
 async def create_recurrences_bulk(
     payload: list[RecurrenceCreate], session: AsyncSession = Depends(get_session)
 ) -> list[RecurrenceRead]:
@@ -399,7 +402,9 @@ async def create_recurrences_bulk(
     ]
 
 
-@recurrence_router.get("", response_model=list[RecurrenceRead])
+@recurrence_router.get(
+    "", response_model=list[RecurrenceRead], operation_id="list_recurrences"
+)
 async def list_recurrences(
     session: AsyncSession = Depends(get_session),
 ) -> list[RecurrenceRead]:
@@ -410,7 +415,9 @@ async def list_recurrences(
     ]
 
 
-@recurrence_router.get("/{recurrence_id}", response_model=RecurrenceRead)
+@recurrence_router.get(
+    "/{recurrence_id}", response_model=RecurrenceRead, operation_id="get_recurrence"
+)
 async def get_recurrence(
     recurrence_id: str, session: AsyncSession = Depends(get_session)
 ) -> RecurrenceRead:
@@ -423,7 +430,9 @@ async def get_recurrence(
     return RecurrenceRead(id=recurrence.id, type=recurrence.type, payload=recurrence.payload)
 
 
-@recurrence_router.put("/{recurrence_id}", response_model=RecurrenceRead)
+@recurrence_router.put(
+    "/{recurrence_id}", response_model=RecurrenceRead, operation_id="update_recurrence"
+)
 async def update_recurrence(
     recurrence_id: str, payload: RecurrenceUpdate, session: AsyncSession = Depends(get_session)
 ) -> RecurrenceRead:
@@ -445,7 +454,11 @@ async def update_recurrence(
     return RecurrenceRead(id=recurrence.id, type=recurrence.type, payload=recurrence.payload)
 
 
-@recurrence_router.delete("/{recurrence_id}", status_code=status.HTTP_204_NO_CONTENT)
+@recurrence_router.delete(
+    "/{recurrence_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    operation_id="delete_recurrence",
+)
 async def delete_recurrence(
     recurrence_id: str, session: AsyncSession = Depends(get_session)
 ) -> None:
@@ -460,7 +473,9 @@ async def delete_recurrence(
     await _mark_schedule_dirty(session)
 
 
-@occurrence_router.get("", response_model=list[OccurrenceRead])
+@occurrence_router.get(
+    "", response_model=list[OccurrenceRead], operation_id="list_occurrences"
+)
 async def list_occurrences(
     start: datetime = Query(..., description="Range start"),
     end: datetime = Query(..., description="Range end"),

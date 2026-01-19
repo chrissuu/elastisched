@@ -72,7 +72,12 @@ def _to_schema(blob: BlobModel) -> BlobRead:
     )
 
 
-@router.post("", response_model=BlobRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=BlobRead,
+    status_code=status.HTTP_201_CREATED,
+    operation_id="create_blob",
+)
 async def create_blob(
     payload: BlobCreate, session: AsyncSession = Depends(get_session)
 ) -> BlobRead:
@@ -107,7 +112,7 @@ async def create_blob(
     return _to_schema(blob)
 
 
-@router.get("", response_model=list[BlobRead])
+@router.get("", response_model=list[BlobRead], operation_id="list_blobs")
 async def list_blobs(
     overlaps_start: datetime | None = Query(default=None),
     overlaps_end: datetime | None = Query(default=None),
@@ -128,7 +133,7 @@ async def list_blobs(
     return [_to_schema(blob) for blob in result.scalars().all()]
 
 
-@router.get("/{blob_id}", response_model=BlobRead)
+@router.get("/{blob_id}", response_model=BlobRead, operation_id="get_blob")
 async def get_blob(
     blob_id: str, session: AsyncSession = Depends(get_session)
 ) -> BlobRead:
@@ -139,7 +144,7 @@ async def get_blob(
     return _to_schema(blob)
 
 
-@router.put("/{blob_id}", response_model=BlobRead)
+@router.put("/{blob_id}", response_model=BlobRead, operation_id="update_blob")
 async def update_blob(
     blob_id: str, payload: BlobUpdate, session: AsyncSession = Depends(get_session)
 ) -> BlobRead:
@@ -191,7 +196,7 @@ async def update_blob(
     return _to_schema(blob)
 
 
-@router.delete("/{blob_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{blob_id}", status_code=status.HTTP_204_NO_CONTENT, operation_id="delete_blob")
 async def delete_blob(
     blob_id: str, session: AsyncSession = Depends(get_session)
 ) -> None:

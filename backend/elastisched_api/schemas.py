@@ -81,3 +81,14 @@ class ScheduleRequest(BaseModel):
 
 class ScheduleResponse(ScheduleStatus):
     occurrences: list[OccurrenceRead]
+
+
+class LLMChatRequest(BaseModel):
+    message: str = Field(min_length=1)
+    system: str | None = None
+    max_steps: int | None = Field(default=6, ge=1, le=10)
+
+
+class LLMChatResponse(BaseModel):
+    text: str | None = None
+    tool_calls: list[dict] = Field(default_factory=list)
