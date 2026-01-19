@@ -78,7 +78,11 @@ class GeminiProvider(BaseModelProvider):
         if tool_payload:
             payload["tools"] = tool_payload
         url = f"{self._api_base}/models/{self._model}:generateContent"
-        response = await self._client.post(url, params={"key": self._api_key}, json=payload)
+        response = await self._client.post(
+            url,
+            headers={"x-goog-api-key": self._api_key},
+            json=payload,
+        )
         response.raise_for_status()
         data = response.json()
         candidates = data.get("candidates") or []

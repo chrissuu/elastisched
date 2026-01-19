@@ -162,6 +162,46 @@ async function updateRecurrence(recurrenceId, type, payload) {
   return response.json();
 }
 
+async function createLLMRecurrenceDraft(payload) {
+  const response = await fetch(`${API_BASE}/llm/recurrence-draft`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let detail = "Failed to generate draft schedule";
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      detail = data.detail || detail;
+    } else {
+      detail = (await response.text()) || detail;
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+async function estimateTaskDuration(payload) {
+  const response = await fetch(`${API_BASE}/llm/estimate-duration`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let detail = "Failed to estimate duration";
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      detail = data.detail || detail;
+    } else {
+      detail = (await response.text()) || detail;
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
 export {
   ensureOccurrences,
   fetchOccurrences,
@@ -172,4 +212,6 @@ export {
   createRecurrencesBulk,
   deleteRecurrence,
   updateRecurrence,
+  createLLMRecurrenceDraft,
+  estimateTaskDuration,
 };

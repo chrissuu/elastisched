@@ -3,13 +3,22 @@ import { dom } from "./dom.js";
 import {
   addDays,
   formatDateTimeLocalInTimeZone,
+  getViewRange,
   getWeekStart,
   shiftAnchorDate,
+  toLocalInputFromDate,
   toLocalInputValueInTimeZone,
+  toProjectIsoFromDate,
   toProjectIsoFromLocalInput,
 } from "./utils.js";
 import { startInteractiveCreate } from "./render.js";
-import { createRecurrence, updateRecurrence } from "./api.js";
+import {
+  createLLMRecurrenceDraft,
+  createRecurrence,
+  createRecurrencesBulk,
+  estimateTaskDuration,
+  updateRecurrence,
+} from "./api.js";
 import { confirmDialog } from "./popups.js";
 import { bindDateTimePickers, syncDateTimeDisplays } from "./datetime_picker.js";
 import { deleteOccurrenceWithUndo, deleteRecurrenceWithUndo } from "./actions.js";
@@ -33,6 +42,9 @@ const slotDependencyStore = new WeakMap();
 let isDraggingForm = false;
 let dragOffset = { x: 0, y: 0 };
 let formPosition = null;
+let isDraggingLlm = false;
+let llmDragOffset = { x: 0, y: 0 };
+let llmPosition = null;
 
 const weeklyFieldPlacement = {
   dependency: {
@@ -97,6 +109,46 @@ function toggleHelp(show) {
   dom.helpModal.classList.toggle("active", isActive);
   dom.helpPanel.classList.toggle("active", isActive);
   dom.helpModal.setAttribute("aria-hidden", (!isActive).toString());
+}
+
+function toggleLlm(show) {
+  if (!dom.llmPanel) return;
+  const isActive = typeof show === "boolean" ? show : !dom.llmPanel.classList.contains("active");
+  dom.llmPanel.classList.toggle("active", isActive);
+  dom.llmPanel.classList.toggle("floating", isActive);
+  dom.llmPanel.setAttribute("aria-hidden", (!isActive).toString());
+  if (isActive && llmPosition) {
+    dom.llmPanel.style.left = `${llmPosition.x}px`;
+    dom.llmPanel.style.top = `${llmPosition.y}px`;
+    dom.llmPanel.style.right = "auto";
+  }
+  if (!isActive && dom.llmStatus) {
+    dom.llmStatus.textContent = "";
+  }
+}
+
+function getAiContextParts() {
+  const parts = [];
+  const raw = dom.blobForm?.aiContext?.value?.trim();
+  if (raw) {
+    parts.push({ type: "text", content: raw, label: "User notes" });
+  }
+  return parts;
+}
+
+function setLlmPreviewControls(hasPreview) {
+  if (dom.llmConfirmBtn) dom.llmConfirmBtn.disabled = !hasPreview;
+  if (dom.llmDiscardBtn) dom.llmDiscardBtn.disabled = !hasPreview;
+}
+
+async function clearLlmPreview() {
+  state.previewBlobs = [];
+  state.llmDraftRecurrences = null;
+  state.llmDraftNotes = null;
+  setLlmPreviewControls(false);
+  if (refreshView) {
+    await refreshView(state.view);
+  }
 }
 
 function setActiveSettingsTab(tabName) {
@@ -285,15 +337,27 @@ function setBlobTypeOnContainer(container, nextType) {
       if (type === BLOB_TYPES.EVENT) {
         state.selectionStep = "schedulable";
         dom.formStatus.textContent = "Click start/end for schedulable range.";
-      } else if (!state.pendingDefaultRange) {
-        state.selectionStep = "default";
-        dom.formStatus.textContent = "Click start/end for default range.";
+      } else if (!state.pendingSchedulableRange) {
+        state.selectionStep = "schedulable";
+        dom.formStatus.textContent = "Click start/end for schedulable range.";
       }
     }
   }
   const hiddenInput = container.querySelector("[data-blob-type-input]");
   if (hiddenInput) {
     hiddenInput.value = type;
+  }
+  const estimateButton = container.querySelector('[data-action="estimate-duration"]');
+  const estimateStatus = container.querySelector("[data-slot-estimate-status]");
+  if (container === nonWeeklyField && dom.estimateDurationBtn) {
+    dom.estimateDurationBtn.disabled = type === BLOB_TYPES.EVENT;
+    dom.estimateDurationBtn.classList.toggle("is-disabled", type === BLOB_TYPES.EVENT);
+    if (dom.estimateStatus) dom.estimateStatus.textContent = "";
+  }
+  if (estimateButton) {
+    estimateButton.disabled = type === BLOB_TYPES.EVENT;
+    estimateButton.classList.toggle("is-disabled", type === BLOB_TYPES.EVENT);
+    if (estimateStatus) estimateStatus.textContent = "";
   }
   container.querySelectorAll("[data-blob-type]").forEach((button) => {
     const isActive = button.dataset.blobType === type;
@@ -1275,16 +1339,6 @@ function createWeeklySlot(slotData = {}) {
       </div>
       <input type="hidden" name="slotBlobType" value="${slotType}" data-blob-type-input />
     </div>
-    <div class="weekly-slot-row time-range-row default-range-row">
-      <label>
-        Default start
-        <input type="time" name="slotDefaultStart" value="${defaultStart}" required />
-      </label>
-      <label>
-        Default end
-        <input type="time" name="slotDefaultEnd" value="${defaultEnd}" required />
-      </label>
-    </div>
     <div class="weekly-slot-row time-range-row schedulable-range-row">
       <label>
         Schedulable start
@@ -1293,6 +1347,16 @@ function createWeeklySlot(slotData = {}) {
       <label>
         Schedulable end
         <input type="time" name="slotSchedEnd" value="${schedEnd}" required />
+      </label>
+    </div>
+    <div class="weekly-slot-row time-range-row default-range-row">
+      <label>
+        Default start
+        <input type="time" name="slotDefaultStart" value="${defaultStart}" required />
+      </label>
+      <label>
+        Default end
+        <input type="time" name="slotDefaultEnd" value="${defaultEnd}" required />
       </label>
     </div>
     <div class="weekly-slot-row slot-meta">
@@ -1631,6 +1695,28 @@ function createMultipleSlot(slotData = {}) {
       </div>
       <input type="hidden" name="multiBlobType" value="${slotType}" data-blob-type-input />
     </div>
+    <div class="weekly-slot-row time-range-row schedulable-range-row">
+      <label>
+        Schedulable start
+        <div class="datetime-field">
+          <input type="text" class="datetime-display" placeholder="Select date/time" readonly />
+          <button type="button" class="ghost small datetime-trigger" aria-label="Pick date">
+            📅
+          </button>
+          <input type="hidden" name="multiSchedStart" data-datetime-input />
+        </div>
+      </label>
+      <label>
+        Schedulable end
+        <div class="datetime-field">
+          <input type="text" class="datetime-display" placeholder="Select date/time" readonly />
+          <button type="button" class="ghost small datetime-trigger" aria-label="Pick date">
+            📅
+          </button>
+          <input type="hidden" name="multiSchedEnd" data-datetime-input />
+        </div>
+      </label>
+    </div>
     <div class="weekly-slot-row time-range-row default-range-row">
       <label>
         Default start
@@ -1653,27 +1739,11 @@ function createMultipleSlot(slotData = {}) {
         </div>
       </label>
     </div>
-    <div class="weekly-slot-row time-range-row schedulable-range-row">
-      <label>
-        Schedulable start
-        <div class="datetime-field">
-          <input type="text" class="datetime-display" placeholder="Select date/time" readonly />
-          <button type="button" class="ghost small datetime-trigger" aria-label="Pick date">
-            📅
-          </button>
-          <input type="hidden" name="multiSchedStart" data-datetime-input />
-        </div>
-      </label>
-      <label>
-        Schedulable end
-        <div class="datetime-field">
-          <input type="text" class="datetime-display" placeholder="Select date/time" readonly />
-          <button type="button" class="ghost small datetime-trigger" aria-label="Pick date">
-            📅
-          </button>
-          <input type="hidden" name="multiSchedEnd" data-datetime-input />
-        </div>
-      </label>
+    <div class="weekly-slot-row estimate-row">
+      <button type="button" class="ghost" data-action="estimate-duration">
+        Estimate task duration
+      </button>
+      <span class="form-status" data-slot-estimate-status></span>
     </div>
     <div class="weekly-slot-row slot-meta">
       <label>
@@ -2038,6 +2108,9 @@ function resetFormMode() {
   createMultipleSlot();
   if (dom.multipleSlotStatus) {
     dom.multipleSlotStatus.textContent = "";
+  }
+  if (dom.estimateStatus) {
+    dom.estimateStatus.textContent = "";
   }
   updateRecurrenceUI();
   setFormMode("create");
@@ -2766,6 +2839,84 @@ function handleHelpClick() {
   toggleHelp(true);
 }
 
+function handleLlmOpen() {
+  toggleLlm(true);
+  setLlmPreviewControls(Boolean(state.previewBlobs?.length));
+}
+
+function handleCloseLlm() {
+  toggleLlm(false);
+}
+
+async function handleLlmSubmit(event) {
+  event.preventDefault();
+  if (!dom.llmStatus) return;
+  const formData = new FormData(dom.llmForm);
+  const message = formData.get("llmPrompt")?.toString().trim() || "";
+  if (!message) {
+    dom.llmStatus.textContent = "Add a prompt to continue.";
+    return;
+  }
+  dom.llmStatus.textContent = "Generating preview...";
+  setLlmPreviewControls(false);
+  const contextRaw = formData.get("llmContext")?.toString().trim() || "";
+  const context = contextRaw ? [{ type: "text", content: contextRaw, label: "User notes" }] : [];
+  const range = getViewRange(state.view, state.anchorDate);
+  const payload = {
+    message,
+    context,
+    view_start: toProjectIsoFromDate(range.start, appConfig.projectTimeZone),
+    view_end: toProjectIsoFromDate(range.end, appConfig.projectTimeZone),
+    user_timezone: appConfig.userTimeZone,
+    project_timezone: appConfig.projectTimeZone,
+    granularity_minutes: appConfig.minuteGranularity,
+  };
+  try {
+    const draft = await createLLMRecurrenceDraft(payload);
+    state.llmDraftRecurrences = draft.recurrences || [];
+    state.previewBlobs = Array.isArray(draft.occurrences) ? draft.occurrences : [];
+    state.llmDraftNotes = draft.notes || null;
+    if (refreshView) {
+      await refreshView(state.view);
+    }
+    dom.llmStatus.textContent = draft.notes
+      ? `Preview ready. ${draft.notes}`
+      : "Preview ready. Does this look good?";
+    setLlmPreviewControls(Boolean(state.previewBlobs?.length));
+  } catch (error) {
+    dom.llmStatus.textContent = error?.message || "Failed to generate preview.";
+    state.previewBlobs = [];
+    state.llmDraftRecurrences = null;
+    state.llmDraftNotes = null;
+    if (refreshView) {
+      await refreshView(state.view);
+    }
+  }
+}
+
+async function handleLlmConfirm() {
+  if (!state.llmDraftRecurrences?.length) {
+    if (dom.llmStatus) dom.llmStatus.textContent = "No draft to confirm yet.";
+    return;
+  }
+  if (dom.llmStatus) dom.llmStatus.textContent = "Saving draft...";
+  try {
+    await createRecurrencesBulk(state.llmDraftRecurrences);
+    await clearLlmPreview();
+    if (dom.llmStatus) dom.llmStatus.textContent = "Saved.";
+    toggleLlm(false);
+  } catch (error) {
+    if (dom.llmStatus) {
+      dom.llmStatus.textContent = error?.message || "Unable to save draft.";
+    }
+  }
+}
+
+async function handleLlmDiscard() {
+  await clearLlmPreview();
+  if (dom.llmStatus) dom.llmStatus.textContent = "Preview cleared.";
+}
+
 function handleCloseSettings() {
   toggleSettings(false);
   dom.settingsStatus.textContent = "";
@@ -2778,6 +2929,129 @@ function handleCloseHelp() {
 function handleCloseForm() {
   toggleForm(false);
   resetFormMode();
+}
+
+function setEstimateStatus(target, message) {
+  if (!target) return;
+  target.textContent = message || "";
+}
+
+function applyEstimatedDuration({
+  schedStartValue,
+  schedEndValue,
+  minutes,
+  defaultStartInput,
+  defaultEndInput,
+  statusTarget,
+}) {
+  const startDate = new Date(schedStartValue);
+  const endDate = new Date(schedEndValue);
+  if ([startDate, endDate].some((dt) => Number.isNaN(dt.getTime()))) {
+    setEstimateStatus(statusTarget, "Select a schedulable range first.");
+    return false;
+  }
+  const rawEnd = new Date(startDate.getTime() + minutes * 60000);
+  const boundedEnd = rawEnd > endDate ? endDate : rawEnd;
+  if (boundedEnd <= startDate) {
+    setEstimateStatus(statusTarget, "Estimated duration exceeds schedulable range.");
+    return false;
+  }
+  if (defaultStartInput) {
+    defaultStartInput.value = schedStartValue;
+    defaultStartInput.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  if (defaultEndInput) {
+    defaultEndInput.value = toLocalInputFromDate(boundedEnd);
+    defaultEndInput.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  const clamped = rawEnd > endDate;
+  setEstimateStatus(
+    statusTarget,
+    clamped
+      ? "Estimated duration was clamped to the schedulable end."
+      : "Default range updated from estimate."
+  );
+  syncDateTimeDisplays();
+  return true;
+}
+
+async function handleEstimateDuration() {
+  if (!dom.blobForm || !dom.estimateStatus) return;
+  const blobType = normalizeBlobType(dom.blobForm.blobType?.value);
+  if (blobType === BLOB_TYPES.EVENT) {
+    setEstimateStatus(dom.estimateStatus, "Duration estimates apply to tasks.");
+    return;
+  }
+  const recurrenceType = dom.blobForm.recurrenceType?.value || "single";
+  const isSingle = recurrenceType === "single";
+  const name = isSingle
+    ? dom.blobForm.recurrenceName?.value?.trim()
+    : dom.blobForm.blobName?.value?.trim();
+  const description = isSingle
+    ? dom.blobForm.recurrenceDescription?.value?.trim()
+    : dom.blobForm.blobDescription?.value?.trim();
+  const schedStartValue = dom.blobForm.schedulableStart?.value;
+  const schedEndValue = dom.blobForm.schedulableEnd?.value;
+  if (!schedStartValue || !schedEndValue) {
+    setEstimateStatus(dom.estimateStatus, "Select a schedulable range first.");
+    return;
+  }
+  setEstimateStatus(dom.estimateStatus, "Estimating...");
+  try {
+    const response = await estimateTaskDuration({
+      name: name || "Task",
+      description: description || null,
+      context: getAiContextParts(),
+      granularity_minutes: appConfig.minuteGranularity,
+    });
+    applyEstimatedDuration({
+      schedStartValue,
+      schedEndValue,
+      minutes: response.rounded_minutes,
+      defaultStartInput: dom.blobForm.defaultStart,
+      defaultEndInput: dom.blobForm.defaultEnd,
+      statusTarget: dom.estimateStatus,
+    });
+  } catch (error) {
+    setEstimateStatus(dom.estimateStatus, error?.message || "Estimate failed.");
+  }
+}
+
+async function handleEstimateDurationForSlot(slot) {
+  if (!slot) return;
+  const slotType = normalizeBlobType(slot.dataset.blobType || BLOB_TYPES.TASK);
+  const statusTarget = slot.querySelector("[data-slot-estimate-status]");
+  if (slotType === BLOB_TYPES.EVENT) {
+    setEstimateStatus(statusTarget, "Duration estimates apply to tasks.");
+    return;
+  }
+  const name = slot.querySelector('[name="multiName"]')?.value?.trim();
+  const description = slot.querySelector('[name="multiDescription"]')?.value?.trim();
+  const schedStartValue = slot.querySelector('[name="multiSchedStart"]')?.value;
+  const schedEndValue = slot.querySelector('[name="multiSchedEnd"]')?.value;
+  if (!schedStartValue || !schedEndValue) {
+    setEstimateStatus(statusTarget, "Select a schedulable range first.");
+    return;
+  }
+  setEstimateStatus(statusTarget, "Estimating...");
+  try {
+    const response = await estimateTaskDuration({
+      name: name || "Task",
+      description: description || null,
+      context: getAiContextParts(),
+      granularity_minutes: appConfig.minuteGranularity,
+    });
+    applyEstimatedDuration({
+      schedStartValue,
+      schedEndValue,
+      minutes: response.rounded_minutes,
+      defaultStartInput: slot.querySelector('[name="multiDefaultStart"]'),
+      defaultEndInput: slot.querySelector('[name="multiDefaultEnd"]'),
+      statusTarget,
+    });
+  } catch (error) {
+    setEstimateStatus(statusTarget, error?.message || "Estimate failed.");
+  }
 }
 
 function bindDraggableForm() {
@@ -2812,6 +3086,46 @@ function bindDraggableForm() {
     if (!isDraggingForm) return;
     isDraggingForm = false;
     dom.formPanel.classList.remove("dragging");
+  };
+
+  header.addEventListener("pointerdown", onPointerDown);
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", stopDrag);
+  window.addEventListener("pointercancel", stopDrag);
+}
+
+function bindDraggableLlmPanel() {
+  if (!dom.llmPanel) return;
+  const header = dom.llmPanel.querySelector(".form-header");
+  if (!header) return;
+
+  const onPointerDown = (event) => {
+    if (event.button !== 0) return;
+    if (event.target.closest("button")) return;
+    const rect = dom.llmPanel.getBoundingClientRect();
+    isDraggingLlm = true;
+    llmDragOffset = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    dom.llmPanel.classList.add("dragging");
+    dom.llmPanel.setPointerCapture?.(event.pointerId);
+  };
+
+  const onPointerMove = (event) => {
+    if (!isDraggingLlm) return;
+    const nextX = Math.max(12, event.clientX - llmDragOffset.x);
+    const nextY = Math.max(12, event.clientY - llmDragOffset.y);
+    llmPosition = { x: nextX, y: nextY };
+    dom.llmPanel.style.left = `${nextX}px`;
+    dom.llmPanel.style.top = `${nextY}px`;
+    dom.llmPanel.style.right = "auto";
+  };
+
+  const stopDrag = () => {
+    if (!isDraggingLlm) return;
+    isDraggingLlm = false;
+    dom.llmPanel.classList.remove("dragging");
   };
 
   header.addEventListener("pointerdown", onPointerDown);
@@ -2864,6 +3178,11 @@ function bindFormHandlers(onRefresh) {
       event.stopPropagation();
     });
   }
+  if (dom.llmPanel) {
+    dom.llmPanel.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+  }
   dom.blobForm.addEventListener("submit", handleBlobSubmit);
   dom.settingsForm.addEventListener("submit", handleSettingsSubmit);
   if (dom.deleteRecurrenceBtn) {
@@ -2879,8 +3198,12 @@ function bindFormHandlers(onRefresh) {
     dom.starOccurrenceBtn.addEventListener("click", toggleStarOccurrence);
   }
   bindDraggableForm();
+  bindDraggableLlmPanel();
   bindDateTimePickers();
   dom.toggleFormBtn.addEventListener("click", handleAddClick);
+  if (dom.llmScheduleBtn) {
+    dom.llmScheduleBtn.addEventListener("click", handleLlmOpen);
+  }
   dom.settingsBtn.addEventListener("click", handleSettingsClick);
   if (dom.helpBtn) {
     dom.helpBtn.addEventListener("click", handleHelpClick);
@@ -2892,6 +3215,18 @@ function bindFormHandlers(onRefresh) {
   }
   if (dom.helpBackdrop) {
     dom.helpBackdrop.addEventListener("click", handleCloseHelp);
+  }
+  if (dom.closeLlmBtn) {
+    dom.closeLlmBtn.addEventListener("click", handleCloseLlm);
+  }
+  if (dom.llmForm) {
+    dom.llmForm.addEventListener("submit", handleLlmSubmit);
+  }
+  if (dom.llmConfirmBtn) {
+    dom.llmConfirmBtn.addEventListener("click", handleLlmConfirm);
+  }
+  if (dom.llmDiscardBtn) {
+    dom.llmDiscardBtn.addEventListener("click", handleLlmDiscard);
   }
   dom.closeFormBtn.addEventListener("click", handleCloseForm);
   dom.prevDayBtn.addEventListener("click", handlePrevDay);
@@ -2907,6 +3242,17 @@ function bindFormHandlers(onRefresh) {
   if (dom.addMultipleSlotBtn) {
     dom.addMultipleSlotBtn.addEventListener("click", () => {
       createMultipleSlot();
+    });
+  }
+  if (dom.estimateDurationBtn) {
+    dom.estimateDurationBtn.addEventListener("click", handleEstimateDuration);
+  }
+  if (dom.multipleSlots) {
+    dom.multipleSlots.addEventListener("click", (event) => {
+      const button = event.target.closest('[data-action="estimate-duration"]');
+      if (!button) return;
+      const slot = button.closest(".multiple-slot");
+      handleEstimateDurationForSlot(slot);
     });
   }
   if (dom.recurrenceEnd) {
@@ -3029,6 +3375,7 @@ function bindFormHandlers(onRefresh) {
   if (dom.multipleSlots && dom.multipleSlots.children.length === 0) {
     createMultipleSlot();
   }
+  setLlmPreviewControls(Boolean(state.previewBlobs?.length));
   bindBlobTypeToggle(nonWeeklyField);
   if (settingsTabs.length) {
     settingsTabs.forEach((tab) => {

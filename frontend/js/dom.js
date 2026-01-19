@@ -35,6 +35,13 @@ const dom = {
   helpModal: document.getElementById("helpModal"),
   helpBackdrop: document.getElementById("helpBackdrop"),
   closeHelpBtn: document.getElementById("closeHelpBtn"),
+  llmScheduleBtn: document.getElementById("llmScheduleBtn"),
+  llmPanel: document.getElementById("llmPanel"),
+  closeLlmBtn: document.getElementById("closeLlmBtn"),
+  llmForm: document.getElementById("llmForm"),
+  llmStatus: document.getElementById("llmStatus"),
+  llmConfirmBtn: document.getElementById("llmConfirmBtn"),
+  llmDiscardBtn: document.getElementById("llmDiscardBtn"),
   settingsForm: document.getElementById("settingsForm"),
   settingsStatus: document.getElementById("settingsStatus"),
   alertModal: document.getElementById("alertModal"),
@@ -75,6 +82,8 @@ const dom = {
   addTagBtn: document.getElementById("addTagBtn"),
   tagList: document.getElementById("tagList"),
   tagSuggestions: document.getElementById("tagSuggestions"),
+  estimateDurationBtn: document.getElementById("estimateDurationBtn"),
+  estimateStatus: document.getElementById("estimateStatus"),
 };
 
 export { dom };

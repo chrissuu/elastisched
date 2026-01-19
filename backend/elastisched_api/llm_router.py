@@ -1,8 +1,24 @@
 from fastapi import APIRouter, HTTPException, Request, status
 
 from elastisched_api.config import get_gemini_api_key, get_gemini_model
-from elastisched_api.llm import GeminiProvider, Message, OpenAPIToolRegistry, ToolCallingRuntime
-from elastisched_api.schemas import LLMChatRequest, LLMChatResponse
+from elastisched_api.llm import (
+    GeminiProvider,
+    Message,
+    OpenAPIToolRegistry,
+    ToolCallingRuntime,
+)
+from elastisched_api.llm.base import ToolSpec
+from elastisched_api.preview import build_preview_occurrences
+from elastisched_api.schemas import (
+    LLMChatRequest,
+    LLMChatResponse,
+    LLMRecurrenceDraftRequest,
+    LLMRecurrenceDraftResponse,
+    LLMDurationEstimateRequest,
+    LLMDurationEstimateResponse,
+    PreviewOccurrence,
+    RecurrenceCreate,
+)
 
 
 llm_router = APIRouter(prefix="/llm", tags=["llm"])
@@ -34,3 +50,254 @@ async def llm_chat(payload: LLMChatRequest, request: Request) -> LLMChatResponse
         await registry.aclose()
 
     return LLMChatResponse(text=response.text, tool_calls=response.tool_calls)
+
+
+def _format_context(parts) -> str:
+    if not parts:
+        return ""
+    blocks = []
+    for idx, part in enumerate(parts, start=1):
+        label = part.label or f"Context {idx}"
+        blocks.append(f"[{label} | {part.type}]\n{part.content}")
+    return "\n\n".join(blocks)
+
+
+def _normalize_llm_recurrence(recurrence: RecurrenceCreate) -> RecurrenceCreate:
+    payload = dict(recurrence.payload or {})
+    if recurrence.type == "multiple":
+        if "blobs" not in payload:
+            if "blob" in payload:
+                payload["blobs"] = [payload.pop("blob")]
+            elif {"default_scheduled_timerange", "schedulable_timerange"}.issubset(payload):
+                payload = {"blobs": [payload]}
+    if recurrence.type == "single":
+        if "blob" not in payload and {
+            "default_scheduled_timerange",
+            "schedulable_timerange",
+        }.issubset(payload):
+            payload = {"blob": payload}
+    if recurrence.type == "delta":
+        if "start_blob" not in payload and "blob" in payload:
+            payload["start_blob"] = payload.pop("blob")
+    return recurrence.model_copy(update={"payload": payload})
+
+
+def _validate_llm_recurrences(recurrences: list[RecurrenceCreate]) -> None:
+    missing: list[str] = []
+    for idx, recurrence in enumerate(recurrences, start=1):
+        payload = recurrence.payload or {}
+        blobs: list[dict] = []
+        if recurrence.type == "weekly":
+            blobs = payload.get("blobs_of_week") or []
+        elif recurrence.type == "multiple":
+            blobs = payload.get("blobs") or []
+        elif recurrence.type == "delta":
+            blob = payload.get("start_blob")
+            if isinstance(blob, dict):
+                blobs = [blob]
+        else:
+            blob = payload.get("blob")
+            if isinstance(blob, dict):
+                blobs = [blob]
+        if not blobs:
+            continue
+        for blob_idx, blob in enumerate(blobs, start=1):
+            default_tr = blob.get("default_scheduled_timerange") or {}
+            sched_tr = blob.get("schedulable_timerange") or {}
+            if not default_tr.get("start"):
+                missing.append(
+                    f"recurrence {idx} ({recurrence.type}) blob {blob_idx} missing default_scheduled_timerange.start"
+                )
+            if not default_tr.get("end"):
+                missing.append(
+                    f"recurrence {idx} ({recurrence.type}) blob {blob_idx} missing default_scheduled_timerange.end"
+                )
+            if not sched_tr.get("start"):
+                missing.append(
+                    f"recurrence {idx} ({recurrence.type}) blob {blob_idx} missing schedulable_timerange.start"
+                )
+            if not sched_tr.get("end"):
+                missing.append(
+                    f"recurrence {idx} ({recurrence.type}) blob {blob_idx} missing schedulable_timerange.end"
+                )
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Missing datetime fields: " + "; ".join(missing),
+        )
+
+
+@llm_router.post(
+    "/recurrence-draft",
+    response_model=LLMRecurrenceDraftResponse,
+    operation_id="llm_recurrence_draft",
+)
+async def llm_recurrence_draft(
+    payload: LLMRecurrenceDraftRequest,
+) -> LLMRecurrenceDraftResponse:
+    api_key = get_gemini_api_key()
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="GEMINI_API_KEY is not configured",
+        )
+    provider = GeminiProvider(api_key=api_key, model=get_gemini_model())
+    tool_spec = ToolSpec(
+        name="propose_recurrences",
+        description="Return draft recurrences for the scheduler.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "recurrences": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string"},
+                            "payload": {"type": "object"},
+                        },
+                        "required": ["type", "payload"],
+                    },
+                },
+                "notes": {"type": "string"},
+            },
+            "required": ["recurrences"],
+        },
+    )
+    system = (
+        "You are a scheduling assistant for Elastisched.\n"
+        "Use the propose_recurrences tool to return draft recurrences.\n"
+        "Supported recurrence types: single, multiple, weekly, delta, date.\n"
+        "Each payload must follow Elastisched recurrence payloads. Use ISO-8601 datetimes with timezone offsets.\n"
+        "Always include schedulable_timerange and default_scheduled_timerange for blobs.\n"
+        "Each timerange must include start and end datetimes.\n"
+        "Ensure default_scheduled_timerange is within schedulable_timerange.\n"
+        "Provide recurrence_name and recurrence_description when available.\n"
+        "For multiple recurrences, include payload.blobs (a list of blobs).\n"
+        "Blob policies are supported via blob.policy. When a task should be splittable/overlappable/invisible "
+        "or rounded, include policy keys: is_splittable, is_overlappable, is_invisible, round_to_granularity, "
+        "max_splits, min_split_duration_seconds.\n"
+        f"User timezone: {payload.user_timezone}. Project timezone: {payload.project_timezone}.\n"
+        f"Round durations to {payload.granularity_minutes} minute increments when estimating."
+    )
+    context_block = _format_context(payload.context)
+    user_lines = [payload.message]
+    if context_block:
+        user_lines.append("\nAdditional context:\n" + context_block)
+    messages = [
+        Message(role="system", content=system),
+        Message(role="user", content="\n".join(user_lines)),
+    ]
+
+    try:
+        response = await provider.generate(messages, [tool_spec])
+    finally:
+        await provider.aclose()
+
+    if not response.tool_calls:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="LLM did not return a draft recurrence.",
+        )
+    call = response.tool_calls[0]
+    raw_recurrences = call.arguments.get("recurrences") or []
+    try:
+        recurrences = [
+            _normalize_llm_recurrence(RecurrenceCreate.model_validate(item))
+            for item in raw_recurrences
+        ]
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="LLM returned invalid recurrence payloads.",
+        ) from exc
+    _validate_llm_recurrences(recurrences)
+    try:
+        occurrences = build_preview_occurrences(
+            recurrences, payload.view_start, payload.view_end
+        )
+    except HTTPException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.detail,
+        ) from exc
+    preview_occurrences = [
+        PreviewOccurrence.model_validate({**item.model_dump(), "preview": True})
+        for item in occurrences
+    ]
+    notes = call.arguments.get("notes")
+    return LLMRecurrenceDraftResponse(
+        recurrences=recurrences, occurrences=preview_occurrences, notes=notes
+    )
+
+
+@llm_router.post(
+    "/estimate-duration",
+    response_model=LLMDurationEstimateResponse,
+    operation_id="llm_estimate_duration",
+)
+async def llm_estimate_duration(
+    payload: LLMDurationEstimateRequest,
+) -> LLMDurationEstimateResponse:
+    api_key = get_gemini_api_key()
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="GEMINI_API_KEY is not configured",
+        )
+    provider = GeminiProvider(api_key=api_key, model=get_gemini_model())
+    tool_spec = ToolSpec(
+        name="estimate_duration",
+        description="Estimate task duration in minutes.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "estimated_minutes": {"type": "integer", "minimum": 1},
+                "rationale": {"type": "string"},
+            },
+            "required": ["estimated_minutes"],
+        },
+    )
+    system = (
+        "Estimate a realistic duration for the task described.\n"
+        "Return only by calling estimate_duration."
+    )
+    context_block = _format_context(payload.context)
+    user_lines = [
+        f"Task name: {payload.name}",
+        f"Task description: {payload.description or 'None'}",
+    ]
+    if context_block:
+        user_lines.append("\nAdditional context:\n" + context_block)
+    user_lines.append(
+        f"Round to {payload.granularity_minutes} minute increments."
+    )
+    messages = [
+        Message(role="system", content=system),
+        Message(role="user", content="\n".join(user_lines)),
+    ]
+
+    try:
+        response = await provider.generate(messages, [tool_spec])
+    finally:
+        await provider.aclose()
+
+    if not response.tool_calls:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="LLM did not return a duration estimate.",
+        )
+    call = response.tool_calls[0]
+    estimated = int(call.arguments.get("estimated_minutes") or 0)
+    if estimated <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="LLM returned an invalid duration.",
+        )
+    granularity = max(1, payload.granularity_minutes)
+    rounded = max(granularity, int(round(estimated / granularity) * granularity))
+    return LLMDurationEstimateResponse(
+        estimated_minutes=estimated,
+        rounded_minutes=rounded,
+        rationale=call.arguments.get("rationale"),
+    )

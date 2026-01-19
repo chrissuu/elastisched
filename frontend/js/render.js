@@ -33,6 +33,19 @@ function getPolicyFlags(policy = {}) {
   return { splittable, overlappable, invisible };
 }
 
+function getCalendarBlobs() {
+  const preview = Array.isArray(state.previewBlobs) ? state.previewBlobs : [];
+  return preview.length ? state.blobs.concat(preview) : state.blobs;
+}
+
+function getBlobById(blobId) {
+  if (!blobId) return null;
+  const primary = state.blobs.find((item) => item.id === blobId);
+  if (primary) return primary;
+  const preview = Array.isArray(state.previewBlobs) ? state.previewBlobs : [];
+  return preview.find((item) => item.id === blobId) || null;
+}
+
 function isOccurrenceStarred(blob) {
   const payload = blob.recurrence_payload || {};
   const occurrenceStart = blob.schedulable_timerange?.start;
@@ -207,6 +220,7 @@ function showInfoCard(blob, anchorRect) {
   const blobName = blob.name || "Untitled";
   const blobDescription = blob.description || recurrenceDescription;
   const blobId = blob.id;
+  const isPreview = Boolean(blob.preview);
   const effectiveRange = getEffectiveOccurrenceRange(blob);
   const timeLabel = effectiveRange
     ? formatTimeRangeInTimeZone(
@@ -302,13 +316,20 @@ function showInfoCard(blob, anchorRect) {
     <div class="info-text">${timeLabel}</div>
   `
     : "";
-  const html = `
-    <div class="info-title">
-      ${blobName}
+  const previewBadge = isPreview ? `<span class="info-preview">Preview</span>` : "";
+  const actions = isPreview
+    ? ""
+    : `
       <button class="info-close" type="button" aria-label="Delete options">×</button>
       <button class="info-star-btn ${starred ? "active" : ""}" type="button" aria-label="${starred ? "Unstar" : "Star"}">
         <span class="info-star" aria-hidden="true">★</span>
       </button>
+    `;
+  const html = `
+    <div class="info-title">
+      ${blobName}
+      ${previewBadge}
+      ${actions}
     </div>
     ${blobDescription ? `<div class="info-text">${blobDescription}</div>` : ""}
     ${recurrenceTypeBlock}
@@ -400,7 +421,7 @@ function updateCaret(caretEl, minutes, hourHeight) {
 }
 
 async function toggleStarFromCalendar(blob) {
-  if (!blob?.recurrence_id) return;
+  if (!blob?.recurrence_id || blob.preview) return;
   const wasLocked = state.infoCardLocked;
   const lockedId = state.lockedBlobId;
   const occurrenceStart = blob.schedulable_timerange?.start;
@@ -475,7 +496,8 @@ async function handleInfoCardDelete(event) {
   if (!button) return;
   const blobId = dom.infoCard?.dataset?.blobId || state.lockedBlobId;
   if (!blobId) return;
-  const blob = state.blobs.find((item) => item.id === blobId);
+  const blob = getBlobById(blobId);
+  if (blob?.preview) return;
   if (!blob?.recurrence_id) return;
   const choice = await choiceDialog("Delete this occurrence or the full recurrence?", {
     confirmText: "Delete recurrence",
@@ -518,7 +540,7 @@ function renderDay() {
   });
 
   const fullDayEvents = [];
-  const blocks = state.blobs
+  const blocks = getCalendarBlobs()
     .map((blob) => {
       const blobTimeZone = getBlobTimeZone(blob);
       const viewDayParts = getZonedParts(state.anchorDate, blobTimeZone);
@@ -546,6 +568,7 @@ function renderDay() {
           type: getTagType(blob.tags),
           colorClass: getRecurrenceColorClass(blob),
           starred: isOccurrenceStarred(blob),
+          preview: Boolean(blob.preview),
         });
         return null;
       }
@@ -600,7 +623,7 @@ function renderDay() {
           ${fullDayEvents
             .map(
               (event) => `
-              <div class="full-day-chip ${event.type} ${event.colorClass}" data-blob-id="${event.id}">
+              <div class="full-day-chip ${event.type} ${event.colorClass} ${event.preview ? "preview" : ""}" data-blob-id="${event.id}" data-preview="${event.preview ? "true" : "false"}">
                 <button class="full-day-chip-button" type="button" title="${event.title || "Untitled"}">
                   <span>${event.title || "Untitled"}</span>
                 </button>
@@ -618,7 +641,7 @@ function renderDay() {
       (block) => {
         const policyBadges = renderPolicyBadges(block.policy, { compact: true });
         return `
-        <div class="day-block ${block.type} ${block.colorClass} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStartIso}" data-sched-end="${block.schedEndIso}" data-original-start="${block.originalStartIso}" data-original-end="${block.originalEndIso}" data-adjusted="${block.adjusted ? "true" : "false"}">
+        <div class="day-block ${block.type} ${block.colorClass} ${block.preview ? "preview" : ""} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-preview="${block.preview ? "true" : "false"}" data-sched-start="${block.schedStartIso}" data-sched-end="${block.schedEndIso}" data-original-start="${block.originalStartIso}" data-original-end="${block.originalEndIso}" data-adjusted="${block.adjusted ? "true" : "false"}">
           ${
             block.showContent
               ? `
@@ -685,7 +708,8 @@ function renderDay() {
   };
 
   const applyInfoCardAndOverlay = (blockEl) => {
-    const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
+    const blob = getBlobById(blockEl.dataset.blobId);
+    if (!blob) return;
     const blobTimeZone = getBlobTimeZone(blob);
     showInfoCard(blob, blockEl.getBoundingClientRect());
     const viewParts = getZonedParts(state.anchorDate, blobTimeZone);
@@ -765,8 +789,10 @@ function renderDay() {
     if (starBtn) {
       starBtn.addEventListener("click", (event) => {
         event.stopPropagation();
-        const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
-        toggleStarFromCalendar(blob);
+        const blob = getBlobById(blockEl.dataset.blobId);
+        if (!blob?.preview) {
+          toggleStarFromCalendar(blob);
+        }
       });
     }
   });
@@ -776,14 +802,16 @@ function renderDay() {
     if (starBtn) {
       starBtn.addEventListener("click", (event) => {
         event.stopPropagation();
-        const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
-        toggleStarFromCalendar(blob);
+        const blob = getBlobById(chipEl.dataset.blobId);
+        if (!blob?.preview) {
+          toggleStarFromCalendar(blob);
+        }
       });
     }
     chipEl.addEventListener("mouseenter", () => {
       if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
       if (state.infoCardLocked) return;
-      const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
+      const blob = getBlobById(chipEl.dataset.blobId);
       showInfoCard(blob, chipEl.getBoundingClientRect());
     });
     chipEl.addEventListener("mouseleave", () => {
@@ -799,7 +827,7 @@ function renderDay() {
       }
       fullDayEls.forEach((el) => el.classList.remove("active"));
       chipEl.classList.add("active");
-      const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
+      const blob = getBlobById(chipEl.dataset.blobId);
       showInfoCard(blob, chipEl.getBoundingClientRect());
       state.infoCardLocked = true;
       state.lockedBlobId = chipEl.dataset.blobId || null;
@@ -831,8 +859,10 @@ function renderDay() {
     if (event.target.closest(".info-star-btn")) {
       const blobId = dom.infoCard?.dataset?.blobId || state.lockedBlobId;
       if (!blobId) return;
-      const blob = state.blobs.find((item) => item.id === blobId);
-      toggleStarFromCalendar(blob);
+      const blob = getBlobById(blobId);
+      if (!blob?.preview) {
+        toggleStarFromCalendar(blob);
+      }
     }
   };
   document.addEventListener("click", state.infoCardActionHandler);
@@ -851,34 +881,39 @@ function renderDay() {
       const isEvent = state.currentBlobType === "event";
       const startDate = new Date(dayStart.getTime() + startMin * 60000);
       const endDate = new Date(dayStart.getTime() + endMin * 60000);
-      if (state.selectionStep === "default" && !isEvent) {
-        state.pendingDefaultRange = { start: startDate, end: endDate };
-        state.selectionStep = "schedulable";
-        dom.formStatus.textContent = "Click start/end for schedulable range.";
-        selectionCaretDefault.classList.remove("active");
-      } else if (state.selectionStep === "schedulable" || isEvent) {
+      if (state.selectionStep === "schedulable") {
         state.pendingSchedulableRange = { start: startDate, end: endDate };
+        if (isEvent) {
+          state.pendingDefaultRange = { start: startDate, end: endDate };
+          state.selectionMode = false;
+          state.selectionStep = null;
+        } else {
+          state.selectionStep = "default";
+          dom.formStatus.textContent = "Click start/end for default range.";
+          selectionCaretSchedulable.classList.remove("active");
+          return;
+        }
+      } else if (state.selectionStep === "default") {
+        state.pendingDefaultRange = { start: startDate, end: endDate };
         state.selectionMode = false;
         state.selectionStep = null;
-        selectionOverlayDefault.classList.add("active");
-        selectionOverlaySchedulable.classList.add("active");
-        selectionCaretSchedulable.classList.remove("active");
-        const defaultRange = state.pendingDefaultRange || (isEvent
-          ? state.pendingSchedulableRange
-          : null);
-        const schedRange = state.pendingSchedulableRange;
-        if (defaultRange && schedRange) {
-          dom.blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
-          dom.blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
-          dom.blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
-          dom.blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
-          dom.blobForm.defaultStart.dispatchEvent(new Event("change", { bubbles: true }));
-          dom.blobForm.defaultEnd.dispatchEvent(new Event("change", { bubbles: true }));
-          dom.blobForm.schedulableStart.dispatchEvent(new Event("change", { bubbles: true }));
-          dom.blobForm.schedulableEnd.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-        dom.formStatus.textContent = "Ranges captured. Fill details and create.";
+        selectionCaretDefault.classList.remove("active");
       }
+      selectionOverlayDefault.classList.add("active");
+      selectionOverlaySchedulable.classList.add("active");
+      const defaultRange = state.pendingDefaultRange;
+      const schedRange = state.pendingSchedulableRange;
+      if (defaultRange && schedRange) {
+        dom.blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
+        dom.blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
+        dom.blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
+        dom.blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
+        dom.blobForm.defaultStart.dispatchEvent(new Event("change", { bubbles: true }));
+        dom.blobForm.defaultEnd.dispatchEvent(new Event("change", { bubbles: true }));
+        dom.blobForm.schedulableStart.dispatchEvent(new Event("change", { bubbles: true }));
+        dom.blobForm.schedulableEnd.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      dom.formStatus.textContent = "Ranges captured. Fill details and create.";
     };
 
     const onClick = (event) => {
@@ -991,7 +1026,7 @@ function renderWeek() {
 
   const dayEntries = days.map((date) => {
     const fullDayEvents = [];
-    const blocks = state.blobs
+    const blocks = getCalendarBlobs()
       .map((blob) => {
         const blobTimeZone = getBlobTimeZone(blob);
         const viewParts = getZonedParts(date, blobTimeZone);
@@ -1019,6 +1054,7 @@ function renderWeek() {
               type: getTagType(blob.tags),
               colorClass: getRecurrenceColorClass(blob),
               starred: isOccurrenceStarred(blob),
+              preview: Boolean(blob.preview),
             });
           return null;
         }
@@ -1057,6 +1093,7 @@ function renderWeek() {
           schedStartParts,
           schedEndParts,
           showContent,
+          preview: Boolean(blob.preview),
         };
       })
       .filter(Boolean)
@@ -1097,7 +1134,7 @@ function renderWeek() {
             ${fullDayEvents
               .map(
                 (event) => `
-                <div class="full-day-chip ${event.type} ${event.colorClass}" data-blob-id="${event.id}">
+                <div class="full-day-chip ${event.type} ${event.colorClass} ${event.preview ? "preview" : ""}" data-blob-id="${event.id}" data-preview="${event.preview ? "true" : "false"}">
                   <button class="full-day-chip-button" type="button" title="${event.title || "Untitled"}">
                     <span>${event.title || "Untitled"}</span>
                   </button>
@@ -1122,7 +1159,7 @@ function renderWeek() {
           (block) => {
             const policyBadges = renderPolicyBadges(block.policy, { compact: true });
             return `
-            <div class="day-block ${block.type} ${block.colorClass} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-sched-start="${block.schedStartIso}" data-sched-end="${block.schedEndIso}" data-original-start="${block.originalStartIso}" data-original-end="${block.originalEndIso}" data-adjusted="${block.adjusted ? "true" : "false"}">
+            <div class="day-block ${block.type} ${block.colorClass} ${block.preview ? "preview" : ""} ${block.showContent ? "" : "continuation"}" style="top: ${block.top}px; height: ${block.height}px; --stack-index: ${block.stackIndex}; --stack-count: ${block.stackCount}; --stack-step: ${block.stackStep}px;" data-blob-id="${block.id}" data-preview="${block.preview ? "true" : "false"}" data-sched-start="${block.schedStartIso}" data-sched-end="${block.schedEndIso}" data-original-start="${block.originalStartIso}" data-original-end="${block.originalEndIso}" data-adjusted="${block.adjusted ? "true" : "false"}">
               ${
                 block.showContent
                   ? `
@@ -1189,14 +1226,16 @@ function renderWeek() {
       if (starBtn) {
         starBtn.addEventListener("click", (event) => {
           event.stopPropagation();
-          const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
-          toggleStarFromCalendar(blob);
+          const blob = getBlobById(chipEl.dataset.blobId);
+          if (!blob?.preview) {
+            toggleStarFromCalendar(blob);
+          }
         });
       }
       chipEl.addEventListener("mouseenter", () => {
         if (dom.formPanel?.classList.contains("active") && !state.editingRecurrenceId) return;
         if (state.infoCardLocked) return;
-        const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
+        const blob = getBlobById(chipEl.dataset.blobId);
         showInfoCard(blob, chipEl.getBoundingClientRect());
       });
       chipEl.addEventListener("mouseleave", () => {
@@ -1214,7 +1253,7 @@ function renderWeek() {
           col.querySelectorAll(".full-day-chip").forEach((el) => el.classList.remove("active"))
         );
         chipEl.classList.add("active");
-        const blob = state.blobs.find((item) => item.id === chipEl.dataset.blobId);
+        const blob = getBlobById(chipEl.dataset.blobId);
         showInfoCard(blob, chipEl.getBoundingClientRect());
         state.infoCardLocked = true;
         state.lockedBlobId = chipEl.dataset.blobId || null;
@@ -1229,7 +1268,8 @@ function renderWeek() {
       };
 
       const applyInfoCardAndOverlay = () => {
-        const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
+        const blob = getBlobById(blockEl.dataset.blobId);
+        if (!blob) return;
         const blobTimeZone = getBlobTimeZone(blob);
         showInfoCard(blob, blockEl.getBoundingClientRect());
         const schedStartParts = getZonedParts(
@@ -1318,8 +1358,10 @@ function renderWeek() {
       if (starBtn) {
         starBtn.addEventListener("click", (event) => {
           event.stopPropagation();
-          const blob = state.blobs.find((item) => item.id === blockEl.dataset.blobId);
-          toggleStarFromCalendar(blob);
+          const blob = getBlobById(blockEl.dataset.blobId);
+          if (!blob?.preview) {
+            toggleStarFromCalendar(blob);
+          }
         });
       }
     });
@@ -1416,32 +1458,37 @@ function renderWeek() {
       const startDate = new Date(startDay.getTime() + rangeStartMin * 60000);
       const endDate = new Date(endDay.getTime() + rangeEndMin * 60000);
       const isEvent = state.currentBlobType === "event";
-      if (state.selectionStep === "default" && !isEvent) {
-        state.pendingDefaultRange = { start: startDate, end: endDate };
-        state.selectionStep = "schedulable";
-        dom.formStatus.textContent = "Click start/end for schedulable range.";
-        clearSelectionCarets(".selection-caret.default-range");
-      } else if (state.selectionStep === "schedulable" || isEvent) {
+      if (state.selectionStep === "schedulable") {
         state.pendingSchedulableRange = { start: startDate, end: endDate };
+        if (isEvent) {
+          state.pendingDefaultRange = { start: startDate, end: endDate };
+          state.selectionMode = false;
+          state.selectionStep = null;
+        } else {
+          state.selectionStep = "default";
+          dom.formStatus.textContent = "Click start/end for default range.";
+          clearSelectionCarets(".selection-caret.schedulable-range");
+          return;
+        }
+      } else if (state.selectionStep === "default") {
+        state.pendingDefaultRange = { start: startDate, end: endDate };
         state.selectionMode = false;
         state.selectionStep = null;
-        const defaultRange = state.pendingDefaultRange || (isEvent
-          ? state.pendingSchedulableRange
-          : null);
-        const schedRange = state.pendingSchedulableRange;
-        if (defaultRange && schedRange) {
-          dom.blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
-          dom.blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
-          dom.blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
-          dom.blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
-          dom.blobForm.defaultStart.dispatchEvent(new Event("change", { bubbles: true }));
-          dom.blobForm.defaultEnd.dispatchEvent(new Event("change", { bubbles: true }));
-          dom.blobForm.schedulableStart.dispatchEvent(new Event("change", { bubbles: true }));
-          dom.blobForm.schedulableEnd.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-        dom.formStatus.textContent = "Ranges captured. Fill details and create.";
-        clearSelectionCarets(".selection-caret.schedulable-range");
+        clearSelectionCarets(".selection-caret.default-range");
       }
+      const defaultRange = state.pendingDefaultRange;
+      const schedRange = state.pendingSchedulableRange;
+      if (defaultRange && schedRange) {
+        dom.blobForm.defaultStart.value = toLocalInputFromDate(defaultRange.start);
+        dom.blobForm.defaultEnd.value = toLocalInputFromDate(defaultRange.end);
+        dom.blobForm.schedulableStart.value = toLocalInputFromDate(schedRange.start);
+        dom.blobForm.schedulableEnd.value = toLocalInputFromDate(schedRange.end);
+        dom.blobForm.defaultStart.dispatchEvent(new Event("change", { bubbles: true }));
+        dom.blobForm.defaultEnd.dispatchEvent(new Event("change", { bubbles: true }));
+        dom.blobForm.schedulableStart.dispatchEvent(new Event("change", { bubbles: true }));
+        dom.blobForm.schedulableEnd.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      dom.formStatus.textContent = "Ranges captured. Fill details and create.";
     };
 
     dayColumns.forEach((column, columnIndex) => {
@@ -1767,12 +1814,10 @@ function startInteractiveCreate(options = {}) {
   const nextType = options.blobType === "event" ? "event" : state.currentBlobType || "task";
   state.currentBlobType = nextType;
   state.selectionMode = true;
-  state.selectionStep = nextType === "event" ? "schedulable" : "default";
+  state.selectionStep = "schedulable";
   state.pendingDefaultRange = null;
   state.pendingSchedulableRange = null;
-  dom.formStatus.textContent = nextType === "event"
-    ? "Click start/end for schedulable range."
-    : "Click start/end for default range.";
+  dom.formStatus.textContent = "Click start/end for schedulable range.";
   if (state.view !== "day" && state.view !== "week") {
     setActive("day");
   }

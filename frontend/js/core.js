@@ -23,6 +23,9 @@ const state = {
   scheduleLastRun: null,
   scheduleRunning: false,
   currentOccurrenceId: null,
+  previewBlobs: [],
+  llmDraftRecurrences: null,
+  llmDraftNotes: null,
 };
 
 const defaultConfig = {

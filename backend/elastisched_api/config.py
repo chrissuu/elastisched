@@ -2,7 +2,7 @@ import os
 
 
 DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///./core.db"
-DEFAULT_GEMINI_MODEL = "gemini-1.5-pro"
+DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"
 
 
 def get_database_url() -> str:
