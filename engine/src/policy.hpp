@@ -27,14 +27,14 @@ public:
            uint8_t scheduling_policies = 0,
            bool round_to_granularity = false);
 
-    uint8_t getMaxSplits() const;
-    time_t getMinSplitDuration() const;
-    bool getRoundToGranularity() const;
-    uint8_t getSchedulingPolicies() const;
+    uint8_t get_max_splits() const;
+    time_t get_min_split_duration() const;
+    bool get_round_to_granularity() const;
+    uint8_t get_scheduling_policies() const;
 
-    bool isSplittable() const;
-    bool isOverlappable() const;
-    bool isInvisible() const;
+    bool is_splittable() const;
+    bool is_overlappable() const;
+    bool is_invisible() const;
 };
 
 #endif // POLICY_HPP

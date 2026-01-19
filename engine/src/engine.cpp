@@ -1,8 +1,8 @@
 #include "engine.hpp"
 
 #include "constants.hpp"
-#include "policy.hpp"
-#include "SimulatedAnnealingOptimizer.hpp"
+#include "Policy.hpp"
+#include "Optimizer.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -22,7 +22,7 @@
 
 namespace {
 template<typename T>
-std::optional<T> safemin(std::optional<T> u, std::optional<T> v) {
+std::optional<T> safe_min(std::optional<T> u, std::optional<T> v) {
     if (u.has_value() && v.has_value()) {
         return (u.value() < v.value() ? u : v);
     } else if (u.has_value()) {
@@ -34,7 +34,7 @@ std::optional<T> safemin(std::optional<T> u, std::optional<T> v) {
 }
 
 template<typename T>
-std::optional<T> safemax(std::optional<T> u, std::optional<T> v) {
+std::optional<T> safe_max(std::optional<T> u, std::optional<T> v) {
     if (u.has_value() && v.has_value()) {
         return (u.value() > v.value() ? u : v);
     } else if (u.has_value()) {
@@ -45,68 +45,66 @@ std::optional<T> safemax(std::optional<T> u, std::optional<T> v) {
     return std::nullopt;
 }
 
-std::vector<TimeRange> getJobScheduledRanges(const Job& job) {
-    if (!job.scheduledTimeRanges.empty()) {
-        return job.scheduledTimeRanges;
+std::vector<TimeRange> get_job_scheduled_ranges(const Job& job) {
+    if (!job.scheduled_time_ranges.empty()) {
+        return job.scheduled_time_ranges;
     }
-    return {job.scheduledTimeRange};
+    return {job.scheduled_time_range};
 }
 
-std::vector<std::vector<Job>> getDisjointIntervals(std::vector<Job> jobs) {
+std::vector<std::vector<Job>> get_disjoint_intervals(std::vector<Job> jobs) {
     if (jobs.empty()) {
         return {};
     }
 
-    std::vector<std::vector<Job>> disjointIntervals;
+    std::vector<std::vector<Job>> disjoint_intervals;
 
     std::sort(jobs.begin(), jobs.end(), [](const Job& a, const Job& b) {
-        return a.schedulableTimeRange.getLow() < b.schedulableTimeRange.getLow();
+        return a.schedulable_time_range.get_low() < b.schedulable_time_range.get_low();
     });
 
-    time_t currEnd = jobs[0].schedulableTimeRange.getHigh();
-    disjointIntervals.push_back({jobs[0]});
+    time_t curr_end = jobs[0].schedulable_time_range.get_high();
+    disjoint_intervals.push_back({jobs[0]});
 
     for (size_t i = 1; i < jobs.size(); ++i) {
         auto& job = jobs[i];
 
-        if (job.schedulableTimeRange.getLow() >= currEnd) {
-            disjointIntervals.push_back({job});
-            currEnd = disjointIntervals.back().back().schedulableTimeRange.getHigh();
+        if (job.schedulable_time_range.get_low() >= curr_end) {
+            disjoint_intervals.push_back({job});
+            curr_end = disjoint_intervals.back().back().schedulable_time_range.get_high();
         } else {
-            disjointIntervals.back().push_back(std::move(job));
-            currEnd = std::max(currEnd, disjointIntervals.back().back().schedulableTimeRange.getHigh());
+            disjoint_intervals.back().push_back(std::move(job));
+            curr_end = std::max(curr_end, disjoint_intervals.back().back().schedulable_time_range.get_high());
         }
     }
 
-    return disjointIntervals;
+    return disjoint_intervals;
 }
 
-TimeRange generateRandomTimeRangeWithin(
-    const TimeRange& schedulableTimeRange,
+TimeRange generate_random_time_range_within(
+    const TimeRange& schedulable_time_range,
     time_t duration,
-    time_t GRANULARITY,
+    time_t granularity,
     std::mt19937& gen)
 {
-    time_t earliestStart = ((schedulableTimeRange.getLow() + GRANULARITY - 1) / GRANULARITY) * GRANULARITY;
+    time_t earliest_start = ((schedulable_time_range.get_low() + granularity - 1) / granularity) * granularity;
+    time_t raw_latest_start = schedulable_time_range.get_high() - duration;
+    time_t latest_start = (raw_latest_start / granularity) * granularity;
 
-    time_t rawLatestStart = schedulableTimeRange.getHigh() - duration;
-
-    time_t latestStart = (rawLatestStart / GRANULARITY) * GRANULARITY;
-
-    if (latestStart < earliestStart) {
+    if (latest_start < earliest_start) {
         throw std::invalid_argument("Schedulable timerange too small for the job duration");
     }
 
-    size_t numSlots = (latestStart - earliestStart) / GRANULARITY + 1;
+    size_t num_slots = (latest_start - earliest_start) / granularity + 1;
 
-    std::uniform_int_distribution<size_t> dis(0, numSlots - 1);
-    size_t randomSlot = dis(gen);
+    std::uniform_int_distribution<size_t> dis(0, num_slots - 1);
+    size_t random_slot = dis(gen);
 
-    time_t start = earliestStart + randomSlot * GRANULARITY;
+    time_t start = earliest_start + random_slot * granularity;
     return TimeRange(start, start + duration);
 }
 
-bool rangesOverlap(const TimeRange& candidate, const std::vector<TimeRange>& ranges) {
+bool ranges_overlap(const TimeRange& candidate, const std::vector<TimeRange>& ranges) {
     for (const auto& range : ranges) {
         if (candidate.overlaps(range)) {
             return true;
@@ -115,43 +113,43 @@ bool rangesOverlap(const TimeRange& candidate, const std::vector<TimeRange>& ran
     return false;
 }
 
-std::vector<time_t> generateSplitDurations(
+std::vector<time_t> generate_split_durations(
     time_t duration,
-    size_t segmentCount,
-    time_t minSplitDuration,
+    size_t segment_count,
+    time_t min_split_duration,
     time_t granularity,
-    bool roundToGranularity,
+    bool round_to_granularity,
     std::mt19937& gen
 ) {
-    if (segmentCount <= 1) {
+    if (segment_count <= 1) {
         return {duration};
     }
 
     time_t unit = 1;
-    if (roundToGranularity && granularity > 0 && duration % granularity == 0) {
+    if (round_to_granularity && granularity > 0 && duration % granularity == 0) {
         unit = granularity;
     } else {
-        roundToGranularity = false;
+        round_to_granularity = false;
     }
 
-    time_t minSplit = minSplitDuration > 0 ? minSplitDuration : 1;
-    if (roundToGranularity && unit > 1) {
-        minSplit = ((minSplit + unit - 1) / unit) * unit;
+    time_t min_split = min_split_duration > 0 ? min_split_duration : 1;
+    if (round_to_granularity && unit > 1) {
+        min_split = ((min_split + unit - 1) / unit) * unit;
     }
 
-    if (minSplit * segmentCount > duration) {
+    if (min_split * segment_count > duration) {
         return {};
     }
 
-    std::vector<time_t> durations(segmentCount, minSplit);
-    time_t remaining = duration - minSplit * segmentCount;
+    std::vector<time_t> durations(segment_count, min_split);
+    time_t remaining = duration - min_split * segment_count;
 
-    if (roundToGranularity && unit > 1) {
+    if (round_to_granularity && unit > 1) {
         if (remaining % unit != 0) {
             return {};
         }
         size_t increments = remaining / unit;
-        std::uniform_int_distribution<size_t> dist(0, segmentCount - 1);
+        std::uniform_int_distribution<size_t> dist(0, segment_count - 1);
         for (size_t i = 0; i < increments; ++i) {
             durations[dist(gen)] += unit;
         }
@@ -160,41 +158,41 @@ std::vector<time_t> generateSplitDurations(
 
     if (remaining > 0) {
         std::vector<time_t> cuts;
-        cuts.reserve(segmentCount + 1);
+        cuts.reserve(segment_count + 1);
         std::uniform_int_distribution<time_t> dist(0, remaining);
         cuts.push_back(0);
         cuts.push_back(remaining);
-        for (size_t i = 0; i < segmentCount - 1; ++i) {
+        for (size_t i = 0; i < segment_count - 1; ++i) {
             cuts.push_back(dist(gen));
         }
         std::sort(cuts.begin(), cuts.end());
-        for (size_t i = 0; i < segmentCount; ++i) {
+        for (size_t i = 0; i < segment_count; ++i) {
             durations[i] += (cuts[i + 1] - cuts[i]);
         }
     }
     return durations;
 }
 
-std::vector<TimeRange> placeSplitSegments(
-    const TimeRange& schedulableTimeRange,
+std::vector<TimeRange> place_split_segments(
+    const TimeRange& schedulable_time_range,
     const std::vector<time_t>& durations,
     time_t granularity,
     std::mt19937& gen
 ) {
     std::vector<TimeRange> segments;
-    std::vector<time_t> durationsCopy = durations;
-    std::shuffle(durationsCopy.begin(), durationsCopy.end(), gen);
-    for (const auto& duration : durationsCopy) {
+    std::vector<time_t> durations_copy = durations;
+    std::shuffle(durations_copy.begin(), durations_copy.end(), gen);
+    for (const auto& duration : durations_copy) {
         bool placed = false;
-        const int maxAttempts = 50;
-        for (int attempt = 0; attempt < maxAttempts; ++attempt) {
-            TimeRange candidate = generateRandomTimeRangeWithin(
-                schedulableTimeRange,
+        const int max_attempts = 50;
+        for (int attempt = 0; attempt < max_attempts; ++attempt) {
+            TimeRange candidate = generate_random_time_range_within(
+                schedulable_time_range,
                 duration,
                 granularity,
                 gen
             );
-            if (!rangesOverlap(candidate, segments)) {
+            if (!ranges_overlap(candidate, segments)) {
                 segments.push_back(candidate);
                 placed = true;
                 break;
@@ -205,202 +203,202 @@ std::vector<TimeRange> placeSplitSegments(
         }
     }
     std::sort(segments.begin(), segments.end(), [](const TimeRange& a, const TimeRange& b) {
-        return a.getLow() < b.getLow();
+        return a.get_low() < b.get_low();
     });
     return segments;
 }
 
-Schedule generateRandomScheduleNeighbor(
+Schedule generate_random_schedule_neighbor(
     Schedule s,
-    const time_t GRANULARITY,
+    const time_t granularity,
     std::mt19937& gen
 ) {
-    std::vector<Job>& jobs = s.scheduledJobs;
-    std::vector<size_t> flexibleIndices;
+    std::vector<Job>& jobs = s.scheduled_jobs;
+    std::vector<size_t> flexible_indices;
 
     for (size_t i = 0; i < jobs.size(); ++i) {
-        if (!jobs[i].isRigid()) {
-            flexibleIndices.push_back(i);
+        if (!jobs[i].is_rigid()) {
+            flexible_indices.push_back(i);
         }
     }
 
-    if (flexibleIndices.empty()) {
+    if (flexible_indices.empty()) {
         return s;
     }
 
-    std::uniform_int_distribution<> dist(0, flexibleIndices.size() - 1);
-    size_t chosenIndex = flexibleIndices[dist(gen)];
+    std::uniform_int_distribution<> dist(0, flexible_indices.size() - 1);
+    size_t chosen_index = flexible_indices[dist(gen)];
 
-    Job& randomFlexibleJob = jobs[chosenIndex];
-    Policy policy = randomFlexibleJob.policy;
-    bool canSplit = policy.isSplittable() && policy.getMaxSplits() > 0;
-    time_t minSplitDuration = policy.getMinSplitDuration();
-    time_t minSplit = minSplitDuration > 0 ? minSplitDuration : 1;
-    bool roundToGranularity = policy.getRoundToGranularity()
-        && GRANULARITY > 0
-        && (randomFlexibleJob.duration % GRANULARITY == 0);
-    if (roundToGranularity && GRANULARITY > 1) {
-        minSplit = ((minSplit + GRANULARITY - 1) / GRANULARITY) * GRANULARITY;
+    Job& random_flexible_job = jobs[chosen_index];
+    Policy policy = random_flexible_job.policy;
+    bool can_split = policy.is_splittable() && policy.get_max_splits() > 0;
+    time_t min_split_duration = policy.get_min_split_duration();
+    time_t min_split = min_split_duration > 0 ? min_split_duration : 1;
+    bool round_to_granularity = policy.get_round_to_granularity()
+        && granularity > 0
+        && (random_flexible_job.duration % granularity == 0);
+    if (round_to_granularity && granularity > 1) {
+        min_split = ((min_split + granularity - 1) / granularity) * granularity;
     }
-    size_t maxSegments = static_cast<size_t>(policy.getMaxSplits()) + 1;
-    size_t maxSegmentsByDuration = static_cast<size_t>(randomFlexibleJob.duration / minSplit);
-    size_t possibleSegments = std::min(maxSegments, maxSegmentsByDuration);
+    size_t max_segments = static_cast<size_t>(policy.get_max_splits()) + 1;
+    size_t max_segments_by_duration = static_cast<size_t>(random_flexible_job.duration / min_split);
+    size_t possible_segments = std::min(max_segments, max_segments_by_duration);
 
-    bool attemptSplit = false;
-    if (canSplit && possibleSegments >= 2) {
-        std::uniform_int_distribution<int> splitDecision(0, 1);
-        attemptSplit = (splitDecision(gen) == 1);
+    bool attempt_split = false;
+    if (can_split && possible_segments >= 2) {
+        std::uniform_int_distribution<int> split_decision(0, 1);
+        attempt_split = (split_decision(gen) == 1);
     }
 
-    if (attemptSplit) {
-        std::uniform_int_distribution<size_t> splitCountDist(2, possibleSegments);
-        size_t segmentCount = splitCountDist(gen);
-        std::vector<time_t> splitDurations = generateSplitDurations(
-            randomFlexibleJob.duration,
-            segmentCount,
-            minSplitDuration,
-            GRANULARITY,
-            roundToGranularity,
+    if (attempt_split) {
+        std::uniform_int_distribution<size_t> split_count_dist(2, possible_segments);
+        size_t segment_count = split_count_dist(gen);
+        std::vector<time_t> split_durations = generate_split_durations(
+            random_flexible_job.duration,
+            segment_count,
+            min_split_duration,
+            granularity,
+            round_to_granularity,
             gen
         );
 
-        if (!splitDurations.empty()) {
-            std::vector<TimeRange> splitRanges = placeSplitSegments(
-                randomFlexibleJob.schedulableTimeRange,
-                splitDurations,
-                GRANULARITY,
+        if (!split_durations.empty()) {
+            std::vector<TimeRange> split_ranges = place_split_segments(
+                random_flexible_job.schedulable_time_range,
+                split_durations,
+                granularity,
                 gen
             );
-            if (!splitRanges.empty()) {
-                randomFlexibleJob.setScheduledTimeRanges(splitRanges);
+            if (!split_ranges.empty()) {
+                random_flexible_job.set_scheduled_time_ranges(split_ranges);
                 return s;
             }
         }
     }
 
-    TimeRange randomTimeRange = generateRandomTimeRangeWithin(
-        randomFlexibleJob.schedulableTimeRange,
-        randomFlexibleJob.duration,
-        GRANULARITY,
+    TimeRange random_time_range = generate_random_time_range_within(
+        random_flexible_job.schedulable_time_range,
+        random_flexible_job.duration,
+        granularity,
         gen
     );
 
-    randomFlexibleJob.setScheduledTimeRanges({randomTimeRange});
+    random_flexible_job.set_scheduled_time_ranges({random_time_range});
 
     return s;
 }
 } // namespace
 
-Schedule::Schedule(std::vector<Job> scheduledJobs) : scheduledJobs(scheduledJobs) {}
+Schedule::Schedule(std::vector<Job> scheduled_jobs) : scheduled_jobs(scheduled_jobs) {}
 
-void Schedule::addJob(const Job& job) {
-    scheduledJobs.push_back(job);
+void Schedule::add_job(const Job& job) {
+    scheduled_jobs.push_back(job);
 }
 
 void Schedule::clear() {
-    scheduledJobs.clear();
+    scheduled_jobs.clear();
 }
 
 std::ostream& operator<<(std::ostream& os, const Schedule& schedule) {
-    const auto& jobs = schedule.scheduledJobs;
+    const auto& jobs = schedule.scheduled_jobs;
     os << "Schedule contains " << jobs.size() << " job(s):\n";
     for (const auto& job : jobs) {
-        os << "  - Job Name: " << job.id << ", Scheduled Time: " << job.scheduledTimeRange << "\n";
+        os << "  - Job Name: " << job.id << ", Scheduled Time: " << job.scheduled_time_range << "\n";
     }
     return os;
 }
 
-DependencyViolation::DependencyViolation(ID id, const std::set<ID>& violations)
-    : jobId(std::move(id)), violatedDependencies(violations) {}
+DependencyViolation::DependencyViolation(ID job_id, const std::set<ID>& violated_dependencies)
+    : job_id(std::move(job_id)), violated_dependencies(violated_dependencies) {}
 
 DependencyCheckResult::DependencyCheckResult()
-    : hasViolations(false), hasCyclicDependencies(false) {}
+    : has_violations(false), has_cyclic_dependencies(false) {}
 
-DependencyCheckResult checkDependencyViolations(const Schedule& schedule) {
+DependencyCheckResult check_dependency_violations(const Schedule& schedule) {
     DependencyCheckResult result;
 
-    if (schedule.scheduledJobs.empty()) {
+    if (schedule.scheduled_jobs.empty()) {
         return result;
     }
 
-    std::unordered_map<ID, const Job*> jobMap;
-    std::unordered_map<ID, time_t> earliestStart;
-    std::unordered_map<ID, time_t> latestEnd;
-    for (const auto& job : schedule.scheduledJobs) {
-        jobMap[job.id] = &job;
-        time_t minStart = job.scheduledTimeRange.getLow();
-        time_t maxEnd = job.scheduledTimeRange.getHigh();
-        if (!job.scheduledTimeRanges.empty()) {
-            minStart = job.scheduledTimeRanges.front().getLow();
-            maxEnd = job.scheduledTimeRanges.front().getHigh();
-            for (const auto& range : job.scheduledTimeRanges) {
-                minStart = std::min(minStart, range.getLow());
-                maxEnd = std::max(maxEnd, range.getHigh());
+    std::unordered_map<ID, const Job*> job_map;
+    std::unordered_map<ID, time_t> earliest_start;
+    std::unordered_map<ID, time_t> latest_end;
+    for (const auto& job : schedule.scheduled_jobs) {
+        job_map[job.id] = &job;
+        time_t min_start = job.scheduled_time_range.get_low();
+        time_t max_end = job.scheduled_time_range.get_high();
+        if (!job.scheduled_time_ranges.empty()) {
+            min_start = job.scheduled_time_ranges.front().get_low();
+            max_end = job.scheduled_time_ranges.front().get_high();
+            for (const auto& range : job.scheduled_time_ranges) {
+                min_start = std::min(min_start, range.get_low());
+                max_end = std::max(max_end, range.get_high());
             }
         }
-        earliestStart[job.id] = minStart;
-        latestEnd[job.id] = maxEnd;
+        earliest_start[job.id] = min_start;
+        latest_end[job.id] = max_end;
     }
 
-    std::unordered_map<ID, std::vector<ID>> adjList;
-    std::unordered_map<ID, int> inDegree;
+    std::unordered_map<ID, std::vector<ID>> adj_list;
+    std::unordered_map<ID, int> in_degree;
 
-    for (const auto& job : schedule.scheduledJobs) {
-        inDegree[job.id] = 0;
-        adjList[job.id] = std::vector<ID>();
+    for (const auto& job : schedule.scheduled_jobs) {
+        in_degree[job.id] = 0;
+        adj_list[job.id] = std::vector<ID>();
     }
 
-    for (const auto& job : schedule.scheduledJobs) {
-        for (const ID& depId : job.dependencies) {
-            if (jobMap.find(depId) != jobMap.end()) {
-                adjList[depId].push_back(job.id);
-                inDegree[job.id]++;
+    for (const auto& job : schedule.scheduled_jobs) {
+        for (const ID& dep_id : job.dependencies) {
+            if (job_map.find(dep_id) != job_map.end()) {
+                adj_list[dep_id].push_back(job.id);
+                in_degree[job.id]++;
             }
         }
     }
 
     std::queue<ID> queue;
-    std::vector<ID> topologicalOrder;
+    std::vector<ID> topological_order;
 
-    for (const auto& pair : inDegree) {
+    for (const auto& pair : in_degree) {
         if (pair.second == 0) {
             queue.push(pair.first);
         }
     }
 
     while (!queue.empty()) {
-        ID currentId = queue.front();
+        ID current_id = queue.front();
         queue.pop();
-        topologicalOrder.push_back(currentId);
+        topological_order.push_back(current_id);
 
-        for (ID neighborId : adjList[currentId]) {
-            inDegree[neighborId]--;
-            if (inDegree[neighborId] == 0) {
-                queue.push(neighborId);
+        for (ID neighbor_id : adj_list[current_id]) {
+            in_degree[neighbor_id]--;
+            if (in_degree[neighbor_id] == 0) {
+                queue.push(neighbor_id);
             }
         }
     }
 
-    if (topologicalOrder.size() != schedule.scheduledJobs.size()) {
-        result.hasCyclicDependencies = true;
-        result.hasViolations = true;
+    if (topological_order.size() != schedule.scheduled_jobs.size()) {
+        result.has_cyclic_dependencies = true;
+        result.has_violations = true;
         return result;
     }
 
-    for (const auto& job : schedule.scheduledJobs) {
-        std::set<ID> violatedDeps;
+    for (const auto& job : schedule.scheduled_jobs) {
+        std::set<ID> violated_deps;
 
-        for (const ID& depId : job.dependencies) {
-            if (jobMap.find(depId) != jobMap.end()) {
-                if (latestEnd[depId] > earliestStart[job.id]) {
-                    violatedDeps.insert(depId);
+        for (const ID& dep_id : job.dependencies) {
+            if (job_map.find(dep_id) != job_map.end()) {
+                if (latest_end[dep_id] > earliest_start[job.id]) {
+                    violated_deps.insert(dep_id);
                 }
             }
         }
 
-        if (!violatedDeps.empty()) {
-            result.violations.emplace_back(job.id, violatedDeps);
-            result.hasViolations = true;
+        if (!violated_deps.empty()) {
+            result.violations.emplace_back(job.id, violated_deps);
+            result.has_violations = true;
         }
     }
 
@@ -409,36 +407,36 @@ DependencyCheckResult checkDependencyViolations(const Schedule& schedule) {
 
 ScheduleCostFunction::ScheduleCostFunction(const Schedule& schedule, time_t granularity)
     :
-m_schedule(schedule),
-m_granularity(granularity)
+schedule_ref(schedule),
+granularity(granularity)
 {
-    if (schedule.scheduledJobs.size() == 0) {
+    if (schedule.scheduled_jobs.size() == 0) {
         return;
     }
 
-    for (const auto& job : schedule.scheduledJobs) {
-        for (const auto& range : getJobScheduledRanges(job)) {
-            m_min = safemin<time_t>(m_min, range.getLow());
-            m_max = safemax<time_t>(m_max, range.getHigh());
+    for (const auto& job : schedule.scheduled_jobs) {
+        for (const auto& range : get_job_scheduled_ranges(job)) {
+            min_time = safe_min<time_t>(min_time, range.get_low());
+            max_time = safe_max<time_t>(max_time, range.get_high());
         }
     }
 
-    TimeRange curr = TimeRange(0, constants::DAY - 1);
-    m_dayBasedSchedule.insert(curr, std::nullopt);
+    TimeRange curr = TimeRange(0, constants::day - 1);
+    day_based_schedule.insert(curr, std::nullopt);
 
-    while (curr.getHigh() < m_max.value()) {
-        time_t nextLow = curr.getHigh() + 1;
-        TimeRange next = TimeRange(nextLow, nextLow + constants::DAY - 1);
-        m_dayBasedSchedule.insert(next, std::nullopt);
+    while (curr.get_high() < max_time.value()) {
+        time_t next_low = curr.get_high() + 1;
+        TimeRange next = TimeRange(next_low, next_low + constants::day - 1);
+        day_based_schedule.insert(next, std::nullopt);
         curr = next;
     }
 
-    for (const auto& job : schedule.scheduledJobs) {
-        for (const auto& range : getJobScheduledRanges(job)) {
-            TimeRange currInterval = TimeRange(range.getLow()); // TimeRange representing unit of time
-            std::optional<std::vector<Job>>* currDayJobs = m_dayBasedSchedule.searchValue(currInterval);
-            if (currDayJobs) {
-                currDayJobs->emplace().push_back(job);
+    for (const auto& job : schedule.scheduled_jobs) {
+        for (const auto& range : get_job_scheduled_ranges(job)) {
+            TimeRange curr_interval = TimeRange(range.get_low()); // TimeRange representing unit of time
+            std::optional<std::vector<Job>>* curr_day_jobs = day_based_schedule.search_value(curr_interval);
+            if (curr_day_jobs) {
+                curr_day_jobs->emplace().push_back(job);
             }
         }
     }
@@ -449,28 +447,28 @@ double ScheduleCostFunction::context_switch_cost() const {
 }
 
 double ScheduleCostFunction::illegal_schedule_cost() const {
-    const std::vector<Job>& scheduledJobs = m_schedule.scheduledJobs;
-    IntervalTree<time_t, size_t> nonOverlappableJobs;
+    const std::vector<Job>& scheduled_jobs = schedule_ref.scheduled_jobs;
+    IntervalTree<time_t, size_t> non_overlappable_jobs;
 
-    for (size_t i = 0; i < scheduledJobs.size(); ++i) {
-        const Job& curr = scheduledJobs[i];
-        Policy currPolicy = curr.policy;
+    for (size_t i = 0; i < scheduled_jobs.size(); ++i) {
+        const Job& curr = scheduled_jobs[i];
+        Policy curr_policy = curr.policy;
 
-        for (const auto& range : getJobScheduledRanges(curr)) {
-            if (!curr.schedulableTimeRange.contains(range)) {
-                return constants::ILLEGAL_SCHEDULE_COST;
+        for (const auto& range : get_job_scheduled_ranges(curr)) {
+            if (!curr.schedulable_time_range.contains(range)) {
+                return constants::illegal_schedule_cost;
             }
 
-            if (!currPolicy.isOverlappable()) {
-                auto overlappingInterval = nonOverlappableJobs.searchOverlap(
+            if (!curr_policy.is_overlappable()) {
+                auto overlapping_interval = non_overlappable_jobs.search_overlap(
                     range
                 );
 
-                if (overlappingInterval != nullptr) {
-                    return constants::ILLEGAL_SCHEDULE_COST;
+                if (overlapping_interval != nullptr) {
+                    return constants::illegal_schedule_cost;
                 }
 
-                nonOverlappableJobs.insert(
+                non_overlappable_jobs.insert(
                     range,
                     i
                 );
@@ -478,47 +476,47 @@ double ScheduleCostFunction::illegal_schedule_cost() const {
         }
     }
 
-    DependencyCheckResult dependencyCheck = checkDependencyViolations(m_schedule);
-    if (dependencyCheck.hasCyclicDependencies || dependencyCheck.hasViolations) {
-        return constants::ILLEGAL_SCHEDULE_COST;
+    DependencyCheckResult dependency_check = check_dependency_violations(schedule_ref);
+    if (dependency_check.has_cyclic_dependencies || dependency_check.has_violations) {
+        return constants::illegal_schedule_cost;
     }
 
     return 0.0f;
 }
 
 double ScheduleCostFunction::overlap_cost() const {
-    const std::vector<Job>& scheduledJobs = m_schedule.scheduledJobs;
-    if (scheduledJobs.size() < 2) {
+    const std::vector<Job>& scheduled_jobs = schedule_ref.scheduled_jobs;
+    if (scheduled_jobs.size() < 2) {
         return 0.0f;
     }
-    const double granularity = m_granularity > 0 ? static_cast<double>(m_granularity) : 1.0;
-    IntervalTree<time_t, size_t> overlapTree;
+    const double granularity_value = granularity > 0 ? static_cast<double>(granularity) : 1.0;
+    IntervalTree<time_t, size_t> overlap_tree;
     double cost = 0.0f;
-    for (size_t i = 0; i < scheduledJobs.size(); ++i) {
-        for (const auto& current : getJobScheduledRanges(scheduledJobs[i])) {
-            const auto overlaps = overlapTree.findOverlapping(current);
+    for (size_t i = 0; i < scheduled_jobs.size(); ++i) {
+        for (const auto& current : get_job_scheduled_ranges(scheduled_jobs[i])) {
+            const auto overlaps = overlap_tree.find_overlapping(current);
             for (const auto* interval : overlaps) {
-                cost += static_cast<double>(current.overlap_length(*interval)) / granularity;
+                cost += static_cast<double>(current.overlap_length(*interval)) / granularity_value;
             }
-            overlapTree.insert(current, i);
+            overlap_tree.insert(current, i);
         }
     }
     return cost;
 }
 
 double ScheduleCostFunction::split_cost() const {
-    const std::vector<Job>& scheduledJobs = m_schedule.scheduledJobs;
+    const std::vector<Job>& scheduled_jobs = schedule_ref.scheduled_jobs;
     double cost = 0.0f;
-    for (const auto& job : scheduledJobs) {
-        const auto ranges = getJobScheduledRanges(job);
+    for (const auto& job : scheduled_jobs) {
+        const auto ranges = get_job_scheduled_ranges(job);
         if (ranges.size() > 1) {
-            cost += (static_cast<double>(ranges.size() - 1) * constants::SPLIT_COST_FACTOR);
+            cost += (static_cast<double>(ranges.size() - 1) * constants::split_cost_factor);
         }
     }
     return cost;
 }
 
-double ScheduleCostFunction::scheduleCost() const {
+double ScheduleCostFunction::schedule_cost() const {
     double cost = illegal_schedule_cost() + overlap_cost() + split_cost();
     return cost;
 }
@@ -527,67 +525,67 @@ double ScheduleCostFunction::scheduleCost() const {
  *
  * @param rigid := a linked list containing nodes which cannot be moved
  * @param flexible := a linked list containing all flexible nodes
- * @param GRANULARITY := the smallest schedulable delta
+ * @param granularity := the smallest schedulable delta
  *
  * Returns the approximately best Schedule.
  *
  */
-std::pair<Schedule, std::vector<double>> scheduleJobs(
+std::pair<Schedule, std::vector<double>> schedule_jobs(
     std::vector<Job> jobs,
-    const time_t GRANULARITY,
-    const double INITIAL_TEMP,
-    const double FINAL_TEMP,
-    const uint64_t NUM_ITERS
+    const time_t granularity,
+    const double initial_temp,
+    const double final_temp,
+    const uint64_t num_iters
 ) {
     if (jobs.size() == 0) {
         return std::make_pair<Schedule, std::vector<double>>(Schedule(), {});
     };
 
     for (auto& job : jobs) {
-        if (job.isRigid()) {
-            job.scheduledTimeRange = job.schedulableTimeRange;
-            job.setScheduledTimeRanges({job.scheduledTimeRange});
+        if (job.is_rigid()) {
+            job.scheduled_time_range = job.schedulable_time_range;
+            job.set_scheduled_time_ranges({job.scheduled_time_range});
         }
     }
 
-    std::vector<std::vector<Job>> disjointJobs = getDisjointIntervals(jobs);
-    (void)disjointJobs;
+    std::vector<std::vector<Job>> disjoint_jobs = get_disjoint_intervals(jobs);
+    (void)disjoint_jobs;
     std::mt19937 gen(constants::rng_seed());
 
-    Schedule initialSchedule = Schedule(jobs);
+    Schedule initial_schedule = Schedule(jobs);
 
-    ScheduleCostFunction initialCostFunction = ScheduleCostFunction(initialSchedule, GRANULARITY);
-    (void)initialCostFunction;
+    ScheduleCostFunction initial_cost_function = ScheduleCostFunction(initial_schedule, granularity);
+    (void)initial_cost_function;
 
     SimulatedAnnealingOptimizer<Schedule> optimizer = SimulatedAnnealingOptimizer<Schedule>(
-        [GRANULARITY](Schedule s) {
-            ScheduleCostFunction costFunction = ScheduleCostFunction(s, GRANULARITY);
-            return costFunction.scheduleCost();
+        [granularity](Schedule s) {
+            ScheduleCostFunction cost_function = ScheduleCostFunction(s, granularity);
+            return cost_function.schedule_cost();
         },
-        [GRANULARITY, &gen](Schedule s) {
-            return generateRandomScheduleNeighbor(
+        [granularity, &gen](Schedule s) {
+            return generate_random_schedule_neighbor(
                 s,
-                GRANULARITY,
+                granularity,
                 gen);
         },
-        INITIAL_TEMP,
-        FINAL_TEMP,
-        NUM_ITERS
+        initial_temp,
+        final_temp,
+        num_iters
     );
 
-    Schedule bestSchedule = optimizer.optimize(initialSchedule);
-    std::vector<double> costHistory = optimizer.getCostHistory();
+    Schedule best_schedule = optimizer.optimize(initial_schedule);
+    std::vector<double> cost_history = optimizer.get_cost_history();
 
-    return std::make_pair(bestSchedule, costHistory);
+    return std::make_pair(best_schedule, cost_history);
 }
 
 Schedule schedule(
     std::vector<Job> jobs,
-    const uint64_t GRANULARITY
+    const uint64_t granularity
 ) {
-    std::pair<Schedule, std::vector<double>> s = scheduleJobs(
+    std::pair<Schedule, std::vector<double>> s = schedule_jobs(
         jobs,
-        GRANULARITY,
+        granularity,
         10.0f,
         1e-4,
         1000000

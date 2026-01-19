@@ -1,7 +1,7 @@
 #ifndef TESTS_H
 #define TESTS_H
-#include "job.hpp"
-#include "policy.hpp"
+#include "Job.hpp"
+#include "Policy.hpp"
 #include "engine.hpp"
 #include "IntervalTree.hpp"
 
@@ -18,75 +18,75 @@
 #include <set>
 #include <cassert>
 
-#include "SimulatedAnnealingOptimizer.hpp"
+#include "Optimizer.hpp"
 
 void test_basic_scheduling() {
     std::cout << "Running basic scheduler test...\n";
     
-    const time_t GRANULARITY = 15 * constants::MINUTE; // 15 minutes
+    const time_t granularity = 15 * constants::minute; // 15 minutes
     
     std::vector<Job> jobs;
     
-    Policy flexiblePolicy(0, 0.0, 0); // Not splittable, not overlappable
-    std::set<ID> noDependencies;
-    std::set<Tag> workTags = {Tag("work")};
+    Policy flexible_policy(0, 0.0, 0); // Not splittable, not overlappable
+    std::set<ID> no_dependencies;
+    std::set<Tag> work_tags = {Tag("work")};
     
     TimeRange job1_schedulable(
-        9 * constants::HOUR,  // 9 AM
-        17 * constants::HOUR // 5 PM
+        9 * constants::hour,  // 9 AM
+        17 * constants::hour // 5 PM
     );
-    TimeRange job1_scheduled(9 * constants::HOUR, 10 * constants::HOUR); // Will be set by scheduler
+    TimeRange job1_scheduled(9 * constants::hour, 10 * constants::hour); // Will be set by scheduler
     
     jobs.emplace_back(
-        constants::HOUR, // 1 hour duration
+        constants::hour, // 1 hour duration
         job1_schedulable,
         job1_scheduled,
         "meeting1",
-        flexiblePolicy,
-        noDependencies,
-        workTags
+        flexible_policy,
+        no_dependencies,
+        work_tags
     );
     
     TimeRange job2_schedulable(
-        10 * constants::HOUR, // 10 AM
-        16 * constants::HOUR  // 4 PM
+        10 * constants::hour, // 10 AM
+        16 * constants::hour  // 4 PM
     );
-    TimeRange job2_scheduled(10 * constants::HOUR, 10 * constants::HOUR + 30 * constants::MINUTE);
+    TimeRange job2_scheduled(10 * constants::hour, 10 * constants::hour + 30 * constants::minute);
     
     jobs.emplace_back(
-        30 * constants::MINUTE, // 30 minutes duration
+        30 * constants::minute, // 30 minutes duration
         job2_schedulable,
         job2_scheduled,
         "task1",
-        flexiblePolicy,
-        noDependencies,
-        workTags
+        flexible_policy,
+        no_dependencies,
+        work_tags
     );
     
     TimeRange job3_schedulable(
-        8 * constants::HOUR,  // 8 AM
-        18 * constants::HOUR  // 6 PM
+        8 * constants::hour,  // 8 AM
+        18 * constants::hour  // 6 PM
     );
-    TimeRange job3_scheduled(16 * constants::HOUR, 18 * constants::HOUR);
+    TimeRange job3_scheduled(16 * constants::hour, 18 * constants::hour);
     
     jobs.emplace_back(
-        2 * constants::HOUR, // 2 hours duration
+        2 * constants::hour, // 2 hours duration
         job3_schedulable,
         job3_scheduled,
         "project1",
-        flexiblePolicy,
-        noDependencies,
-        workTags
+        flexible_policy,
+        no_dependencies,
+        work_tags
     );
     
-    Schedule result = schedule(jobs, GRANULARITY);
+    Schedule result = schedule(jobs, granularity);
     
-    std::cout << "Scheduled " << result.scheduledJobs.size() << " jobs\n";
+    std::cout << "Scheduled " << result.scheduled_jobs.size() << " jobs\n";
     
-    for (const auto& job : result.scheduledJobs) {
-        time_t start_hours = job.scheduledTimeRange.getLow() / (constants::HOUR_TO_MINUTES * constants::MINUTE);
-        time_t start_minutes = (job.scheduledTimeRange.getLow() % (constants::HOUR_TO_MINUTES * constants::MINUTE)) / constants::MINUTE;
-        time_t duration_minutes = job.duration / constants::MINUTE;
+    for (const auto& job : result.scheduled_jobs) {
+        time_t start_hours = job.scheduled_time_range.get_low() / (constants::hour_to_minutes * constants::minute);
+        time_t start_minutes = (job.scheduled_time_range.get_low() % (constants::hour_to_minutes * constants::minute)) / constants::minute;
+        time_t duration_minutes = job.duration / constants::minute;
         
         std::cout << "Job " << job.id 
                   << ": Scheduled at " << start_hours << ":" 
@@ -94,10 +94,10 @@ void test_basic_scheduling() {
                   << " for " << duration_minutes << " minutes\n\n";
     }
     
-    for (const auto& job : result.scheduledJobs) {
+    for (const auto& job : result.scheduled_jobs) {
         std::cout << "Job " << job.id << "\n"
-                  << "sch.low: " << job.scheduledTimeRange.getLow() << " sch.high: " << job.scheduledTimeRange.getHigh() << "\n"
-                  << "schel.low: " << job.schedulableTimeRange.getLow() << " schel.high: " << job.schedulableTimeRange.getHigh() << "\n\n";
+                  << "sch.low: " << job.scheduled_time_range.get_low() << " sch.high: " << job.scheduled_time_range.get_high() << "\n"
+                  << "schel.low: " << job.schedulable_time_range.get_low() << " schel.high: " << job.schedulable_time_range.get_high() << "\n\n";
     }
     std::cout << "Basic scheduler test passed!\n\n";
 }
@@ -106,25 +106,25 @@ void test_empty_schedule() {
     std::cout << "Running empty schedule test...\n";
     
     std::vector<Job> empty_jobs;
-    const time_t GRANULARITY = 15 * constants::MINUTE;
+    const time_t granularity = 15 * constants::minute;
     
-    Schedule result = schedule(empty_jobs, GRANULARITY);
+    Schedule result = schedule(empty_jobs, granularity);
     
-    assert(result.scheduledJobs.empty());
+    assert(result.scheduled_jobs.empty());
     std::cout << "Empty schedule test passed!\n\n";
 }
 
 void test_rigid_job() {
     std::cout << "Running rigid job test...\n";
     
-    const time_t GRANULARITY = 15 * constants::MINUTE;
+    const time_t granularity = 15 * constants::minute;
     
-    Policy rigidPolicy(0, 0.0, 3); // Both bits set
-    std::set<ID> noDependencies;
-    std::set<Tag> meetingTags = {Tag("meeting")};
+    Policy rigid_policy(0, 0.0, 3); // Both bits set
+    std::set<ID> no_dependencies;
+    std::set<Tag> meeting_tags = {Tag("meeting")};
     
-    time_t meeting_start = 14 * constants::HOUR_TO_MINUTES * constants::MINUTE; // 2 PM
-    time_t meeting_duration = constants::HOUR_TO_MINUTES * constants::MINUTE; // 1 hour
+    time_t meeting_start = 14 * constants::hour_to_minutes * constants::minute; // 2 PM
+    time_t meeting_duration = constants::hour_to_minutes * constants::minute; // 1 hour
     
     TimeRange rigid_schedulable(meeting_start, meeting_start + meeting_duration);
     TimeRange rigid_scheduled(meeting_start, meeting_start + meeting_duration);
@@ -135,16 +135,16 @@ void test_rigid_job() {
         rigid_schedulable,
         rigid_scheduled,
         "rigid_meeting",
-        rigidPolicy,
-        noDependencies,
-        meetingTags
+        rigid_policy,
+        no_dependencies,
+        meeting_tags
     );
     
-    Schedule result = schedule(jobs, GRANULARITY);
+    Schedule result = schedule(jobs, granularity);
     
-    assert(result.scheduledJobs.size() == 1);
+    assert(result.scheduled_jobs.size() == 1);
     
-    const auto& scheduled_job = result.scheduledJobs[0];
+    const auto& scheduled_job = result.scheduled_jobs[0];
     std::cout << "Rigid job scheduled successfully\n";
     std::cout << "Rigid job test passed!\n\n";
 }
@@ -152,21 +152,21 @@ void test_rigid_job() {
 void test_friday_cost_optimization() {
     std::cout << "Running Friday cost optimization test...\n";
     
-    const time_t GRANULARITY = 15 * constants::MINUTE; // 15 minutes
+    const time_t granularity = 15 * constants::minute; // 15 minutes
 
-    time_t thursday_start = 3 * constants::DAY;  // Thursday 9 AM
-    time_t thursday_end = 3 * constants::DAY + 17 * constants::HOUR_TO_MINUTES * constants::MINUTE;   // Thursday 5 PM
-    time_t friday_start = 4 * constants::DAY;  // Friday 9 AM
-    time_t friday_end = 5 * constants::DAY;     // Friday 5 PM
+    time_t thursday_start = 3 * constants::day;  // Thursday 9 AM
+    time_t thursday_end = 3 * constants::day + 17 * constants::hour_to_minutes * constants::minute;   // Thursday 5 PM
+    time_t friday_start = 4 * constants::day;  // Friday 9 AM
+    time_t friday_end = 5 * constants::day;     // Friday 5 PM
     
-    Policy flexiblePolicy(0, 0.0, 0); // Not splittable, not overlappable
-    std::set<ID> noDependencies;
-    std::set<Tag> workTags = {Tag("work")};
+    Policy flexible_policy(0, 0.0, 0); // Not splittable, not overlappable
+    std::set<ID> no_dependencies;
+    std::set<Tag> work_tags = {Tag("work")};
     
     TimeRange schedulable_range(thursday_start, friday_end);
     
-    time_t initial_friday_time = friday_start + 2 * constants::HOUR_TO_MINUTES * constants::MINUTE; // Friday 11 AM
-    time_t job_duration = 2 * constants::HOUR_TO_MINUTES * constants::MINUTE; // 2 hours
+    time_t initial_friday_time = friday_start + 2 * constants::hour_to_minutes * constants::minute; // Friday 11 AM
+    time_t job_duration = 2 * constants::hour_to_minutes * constants::minute; // 2 hours
     TimeRange initial_scheduled(initial_friday_time, initial_friday_time + job_duration);
     
     std::vector<Job> jobs;
@@ -175,28 +175,28 @@ void test_friday_cost_optimization() {
         schedulable_range,
         initial_scheduled,
         "friday_task",
-        flexiblePolicy,
-        noDependencies,
-        workTags
+        flexible_policy,
+        no_dependencies,
+        work_tags
     );
     
     std::cout << "Initial schedule: Friday 11:00 AM - 1:00 PM\n";
     std::cout << "Job can be rescheduled between Thursday 9 AM and Friday 5 PM\n";
     std::cout << "Expected: Optimizer should move job to Thursday due to lower cost\n";
     
-    Schedule result = schedule(jobs, GRANULARITY);
+    Schedule result = schedule(jobs, granularity);
     
-    assert(result.scheduledJobs.size() == 1);
+    assert(result.scheduled_jobs.size() == 1);
     
-    const auto& optimized_job = result.scheduledJobs[0];
-    time_t scheduled_start = optimized_job.scheduledTimeRange.getLow();
+    const auto& optimized_job = result.scheduled_jobs[0];
+    time_t scheduled_start = optimized_job.scheduled_time_range.get_low();
     
     bool moved_to_thursday = scheduled_start < friday_start;
     
-    time_t days_from_monday = scheduled_start / constants::DAY;
-    time_t time_of_day = scheduled_start % constants::DAY;
-    time_t hours = time_of_day / (constants::HOUR_TO_MINUTES * constants::MINUTE);
-    time_t minutes = (time_of_day % (constants::HOUR_TO_MINUTES * constants::MINUTE)) / constants::MINUTE;
+    time_t days_from_monday = scheduled_start / constants::day;
+    time_t time_of_day = scheduled_start % constants::day;
+    time_t hours = time_of_day / (constants::hour_to_minutes * constants::minute);
+    time_t minutes = (time_of_day % (constants::hour_to_minutes * constants::minute)) / constants::minute;
     
     std::string day_name;
     switch(days_from_monday) {

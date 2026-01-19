@@ -12,7 +12,7 @@ private:
     T high;
 
     friend std::ostream& operator<<(std::ostream& os, const Interval<T>& interval) {
-        os << "Low: " << interval.getLow() << " High: " << interval.getHigh();
+        os << "Low: " << interval.get_low() << " High: " << interval.get_high();
         return os;
     }
 
@@ -25,11 +25,11 @@ public:
         }
     }
 
-    T getLow() const { return low; }
-    T getHigh() const { return high; }
+    T get_low() const { return low; }
+    T get_high() const { return high; }
 
     bool operator==(const Interval& other) const {
-        return low == other.getLow() && high == other.getHigh();
+        return low == other.get_low() && high == other.get_high();
     }
 
     bool operator!=(const Interval& other) const {
@@ -38,22 +38,22 @@ public:
 
     bool overlaps(const Interval& other) const {
         if (low == high) {
-            return other.getLow() <= low && low < other.getHigh();
+            return other.get_low() <= low && low < other.get_high();
         }
-        if (other.getLow() == other.getHigh()) {
-            return low <= other.getLow() && other.getLow() < high;
+        if (other.get_low() == other.get_high()) {
+            return low <= other.get_low() && other.get_low() < high;
         }
-        return !(high <= other.getLow() || other.getHigh() <= low);
+        return !(high <= other.get_low() || other.get_high() <= low);
     }
 
     bool contains(const Interval& other) const {
-        return low <= other.getLow() && other.getHigh() <= high;
+        return low <= other.get_low() && other.get_high() <= high;
     }
 
     T overlap_length(const Interval& other) const {
         if (!this->overlaps(other)) return 0;
-        const T start = std::max(low, other.getLow());
-        const T end = std::min(high, other.getHigh());
+        const T start = std::max(low, other.get_low());
+        const T end = std::min(high, other.get_high());
         return end > start ? end - start : 0;
     }
 

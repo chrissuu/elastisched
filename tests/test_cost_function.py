@@ -14,7 +14,7 @@ def _make_job(
     policy = policy or engine.Policy(0, 0, 0)
     tr_schedulable = engine.TimeRange(schedulable_low, schedulable_high)
     tr_scheduled = engine.TimeRange(scheduled_low, scheduled_high)
-    duration = tr_scheduled.getHigh() - tr_scheduled.getLow()
+    duration = tr_scheduled.get_high() - tr_scheduled.get_low()
     return engine.Job(
         duration,
         tr_schedulable,
@@ -84,7 +84,7 @@ def test_split_cost_counts_number_of_splits():
         scheduled_high=2 * HOUR,
         job_id="split_job",
     )
-    job.scheduledTimeRanges = [
+    job.scheduled_time_ranges = [
         engine.TimeRange(HOUR, 2 * HOUR),
         engine.TimeRange(3 * HOUR, 4 * HOUR),
     ]
@@ -100,7 +100,7 @@ def test_split_cost_counts_number_of_splits():
 #                                     Day.SATURDAY * DAY + Hour.ELEVEN_PM * HOUR)
 #     tr_scheduled = engine.TimeRange(Day.THURSDAY * DAY + Hour.ELEVEN_PM * HOUR, 
 #                                     Day.THURSDAY * DAY + Hour.ELEVEN_PM * HOUR + 30 * MINUTE)
-#     duration = tr_scheduled.getHigh() - tr_scheduled.getLow()
+#     duration = tr_scheduled.get_high() - tr_scheduled.get_low()
 
 #     job = engine.Job(
 #         duration,
@@ -128,7 +128,7 @@ def test_split_cost_counts_number_of_splits():
 #                                         (day + 1) * DAY + Hour.ELEVEN_PM * HOUR)
 #         tr_scheduled = engine.TimeRange(day * DAY + Hour.ELEVEN_PM * HOUR, 
 #                                         day * DAY + Hour.ELEVEN_PM * HOUR + 30 * MINUTE)
-#         duration = tr_scheduled.getHigh() - tr_scheduled.getLow()
+#         duration = tr_scheduled.get_high() - tr_scheduled.get_low()
 
 #         job = engine.Job(
 #             duration,
@@ -156,7 +156,7 @@ def test_split_cost_counts_number_of_splits():
 #                                       WEEK + Day.SUNDAY * DAY + Hour.ELEVEN_PM * HOUR)
 #     tr_scheduled = engine.TimeRange(WEEK + Day.SATURDAY * DAY + Hour.ELEVEN_PM * HOUR, 
 #                                     WEEK + Day.SATURDAY * DAY + Hour.ELEVEN_PM * HOUR + 30 * MINUTE)
-#     duration = tr_scheduled.getHigh() - tr_scheduled.getLow()
+#     duration = tr_scheduled.get_high() - tr_scheduled.get_low()
 
 #     job = engine.Job(
 #         duration,
@@ -185,7 +185,7 @@ def test_split_cost_counts_number_of_splits():
 #                                     (day + 1) * DAY + Hour.ELEVEN_PM * HOUR)
 #     tr_scheduled = engine.TimeRange(day * DAY + Hour.ELEVEN_PM * HOUR, 
 #                                     day * DAY + Hour.ELEVEN_PM * HOUR + 30 * MINUTE)
-#     duration = tr_scheduled.getHigh() - tr_scheduled.getLow()
+#     duration = tr_scheduled.get_high() - tr_scheduled.get_low()
 
 #     job = engine.Job(
 #         duration,
@@ -213,7 +213,7 @@ def test_split_cost_counts_number_of_splits():
 #                                     Day.SATURDAY * DAY + Hour.ELEVEN_PM * HOUR)
 #     tr_scheduled = engine.TimeRange(Day.FRIDAY * DAY + 1 * MINUTE, 
 #                                     Day.FRIDAY * DAY + 30 * MINUTE)
-#     duration = tr_scheduled.getHigh() - tr_scheduled.getLow()
+#     duration = tr_scheduled.get_high() - tr_scheduled.get_low()
 
 #     job = engine.Job(
 #         duration,

@@ -22,8 +22,10 @@ elastischedcopy.db
 
 **/CMakeCache.txt
 **/cmake_install.cmake
-engine/src/Makefile
+engine/Makefile
 engine/CMakeFiles
-
+engine/*.a
+engine/*.o
+engine/bin/*
 
 .env

@@ -1,8 +1,8 @@
 #ifndef JOB_HPP
 #define JOB_HPP
 
-#include "policy.hpp"
-#include "tag.hpp"
+#include "Policy.hpp"
+#include "Tag.hpp"
 #include "constants.hpp"
 #include "Interval.hpp"
 
@@ -14,26 +14,26 @@
 class Job {
 public:
     time_t duration;
-    TimeRange schedulableTimeRange;
-    TimeRange scheduledTimeRange;
-    std::vector<TimeRange> scheduledTimeRanges;
+    TimeRange schedulable_time_range;
+    TimeRange scheduled_time_range;
+    std::vector<TimeRange> scheduled_time_ranges;
     ID id;
     Policy policy;
     std::set<ID> dependencies;
     std::set<Tag> tags;
 
     Job(time_t duration,
-        TimeRange schedulableTimeRange,
-        TimeRange scheduledTimeRange,
+        TimeRange schedulable_time_range,
+        TimeRange scheduled_time_range,
         ID id,
         Policy policy,
         std::set<ID> dependencies,
         std::set<Tag> tags);
 
-    bool isRigid() const;
-    const std::vector<TimeRange>& getScheduledTimeRanges() const;
-    void setScheduledTimeRanges(std::vector<TimeRange> ranges);
-    std::string toString() const;
+    bool is_rigid() const;
+    const std::vector<TimeRange>& get_scheduled_time_ranges() const;
+    void set_scheduled_time_ranges(std::vector<TimeRange> ranges);
+    std::string to_string() const;
 };
 
 #endif // JOB_HPP

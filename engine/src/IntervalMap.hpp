@@ -7,7 +7,7 @@
 #include <algorithm>
 #include "Interval.hpp"
 
-enum Color { RED, BLACK };
+enum Color { red, black };
 
 template<typename T, typename U>
 struct Node {
@@ -20,7 +20,7 @@ struct Node {
     Color color;
 
     Node(const Interval<T>& i, U v)
-        : interval(i), value(v), max(i.getHigh()), color(RED),
+        : interval(i), value(v), max(i.get_high()), color(red),
           left(nullptr), right(nullptr), parent(nullptr) {}
 };
 
@@ -29,7 +29,7 @@ class IntervalMap {
 private:
     Node<T, U>* root;
 
-    void leftRotate(Node<T, U>* x) {
+    void left_rotate(Node<T, U>* x) {
         Node<T, U>* y = x->right;
         
         x->right = y->left;
@@ -49,11 +49,11 @@ private:
         y->left = x;
         x->parent = y;
 
-        updateMax(x);
-        updateMax(y);
+        update_max(x);
+        update_max(y);
     }
 
-    void rightRotate(Node<T, U>* y) {
+    void right_rotate(Node<T, U>* y) {
         Node<T, U>* x = y->left;
         
         y->left = x->right;
@@ -73,14 +73,14 @@ private:
         x->right = y;
         y->parent = x;
 
-        updateMax(y);
-        updateMax(x);
+        update_max(y);
+        update_max(x);
     }
 
-    void updateMax(Node<T, U>* node) {
+    void update_max(Node<T, U>* node) {
         if (!node) return;
         
-        node->max = node->interval.getHigh();
+        node->max = node->interval.get_high();
         if (node->left && node->left->max > node->max) {
             node->max = node->left->max;
         }
@@ -89,135 +89,135 @@ private:
         }
     }
 
-    void insertFixup(Node<T, U>* z) {
-        while (z->parent && z->parent->color == RED) {
+    void insert_fixup(Node<T, U>* z) {
+        while (z->parent && z->parent->color == red) {
             if (z->parent == z->parent->parent->left) {
                 Node<T, U>* y = z->parent->parent->right;
-                if (y && y->color == RED) {
-                    z->parent->color = BLACK;
-                    y->color = BLACK;
-                    z->parent->parent->color = RED;
+                if (y && y->color == red) {
+                    z->parent->color = black;
+                    y->color = black;
+                    z->parent->parent->color = red;
                     z = z->parent->parent;
                 } else {
                     if (z == z->parent->right) {
                         z = z->parent;
-                        leftRotate(z);
+                        left_rotate(z);
                     }
-                    z->parent->color = BLACK;
-                    z->parent->parent->color = RED;
-                    rightRotate(z->parent->parent);
+                    z->parent->color = black;
+                    z->parent->parent->color = red;
+                    right_rotate(z->parent->parent);
                 }
             } else {
                 Node<T, U>* y = z->parent->parent->left;
-                if (y && y->color == RED) {
-                    z->parent->color = BLACK;
-                    y->color = BLACK;
-                    z->parent->parent->color = RED;
+                if (y && y->color == red) {
+                    z->parent->color = black;
+                    y->color = black;
+                    z->parent->parent->color = red;
                     z = z->parent->parent;
                 } else {
                     if (z == z->parent->left) {
                         z = z->parent;
-                        rightRotate(z);
+                        right_rotate(z);
                     }
-                    z->parent->color = BLACK;
-                    z->parent->parent->color = RED;
-                    leftRotate(z->parent->parent);
+                    z->parent->color = black;
+                    z->parent->parent->color = red;
+                    left_rotate(z->parent->parent);
                 }
             }
         }
-        root->color = BLACK;
+        root->color = black;
     }
 
-    void updateMaxToRoot(Node<T, U>* node) {
+    void update_max_to_root(Node<T, U>* node) {
         while (node) {
-            updateMax(node);
+            update_max(node);
             node = node->parent;
         }
     }
 
-    void insertNode(Node<T, U>* newNode) {
+    void insert_node(Node<T, U>* new_node) {
         Node<T, U>* y = nullptr;
         Node<T, U>* x = root;
 
         while (x) {
             y = x;
-            if (newNode->interval.getLow() < x->interval.getLow()) {
+            if (new_node->interval.get_low() < x->interval.get_low()) {
                 x = x->left;
             } else {
                 x = x->right;
             }
         }
 
-        newNode->parent = y;
+        new_node->parent = y;
 
         if (!y) {
-            root = newNode;
-            root->color = BLACK;
-        } else if (newNode->interval.getLow() < y->interval.getLow()) {
-            y->left = newNode;
-            updateMaxToRoot(y);
-            insertFixup(newNode);
+            root = new_node;
+            root->color = black;
+        } else if (new_node->interval.get_low() < y->interval.get_low()) {
+            y->left = new_node;
+            update_max_to_root(y);
+            insert_fixup(new_node);
         } else {
-            y->right = newNode;
-            updateMaxToRoot(y);
-            insertFixup(newNode);
+            y->right = new_node;
+            update_max_to_root(y);
+            insert_fixup(new_node);
         }
     }
 
-    void findOverlapping(const Node<T, U>* node, const Interval<T>& key, std::vector<const U*>& result) const {
+    void find_overlapping(const Node<T, U>* node, const Interval<T>& key, std::vector<const U*>& result) const {
         if (!node) return;
 
         if (node->interval.overlaps(key)) {
             result.push_back(&node->value);
         }
 
-        if (node->left && node->left->max >= key.getLow()) {
-            findOverlapping(node->left, key, result);
+        if (node->left && node->left->max >= key.get_low()) {
+            find_overlapping(node->left, key, result);
         }
-        if (node->right && node->interval.getLow() <= key.getHigh()) {
-            findOverlapping(node->right, key, result);
+        if (node->right && node->interval.get_low() <= key.get_high()) {
+            find_overlapping(node->right, key, result);
         }
     }
 
-    void findOverlappingKV(const Node<T, U>* node, const Interval<T>& key, std::vector<std::pair<const Interval<T>*, const U*>>& result) const {
+    void find_overlapping_kv(const Node<T, U>* node, const Interval<T>& key, std::vector<std::pair<const Interval<T>*, const U*>>& result) const {
         if (!node) return;
 
         if (node->interval.overlaps(key)) {
             result.emplace_back(&node->interval, &node->value);
         }
 
-        if (node->left && node->left->max >= key.getLow()) {
-            findOverlappingKV(node->left, key, result);
+        if (node->left && node->left->max >= key.get_low()) {
+            find_overlapping_kv(node->left, key, result);
         }
-        if (node->right && node->interval.getLow() <= key.getHigh()) {
-            findOverlappingKV(node->right, key, result);
+        if (node->right && node->interval.get_low() <= key.get_high()) {
+            find_overlapping_kv(node->right, key, result);
         }
     }
 
-    bool queryOverlap(const Node<T, U>* node, const Interval<T>& key) const {
+    bool query_overlap(const Node<T, U>* node, const Interval<T>& key) const {
         if (!node) return false;
         if (node->interval.overlaps(key)) return true;
-        if (node->left && node->left->max >= key.getLow()) {
-            if (queryOverlap(node->left, key)) return true;
+        if (node->left && node->left->max >= key.get_low()) {
+            if (query_overlap(node->left, key)) return true;
         }
-        if (node->right && node->interval.getLow() <= key.getHigh()) {
-            if (queryOverlap(node->right, key)) return true;
+        if (node->right && node->interval.get_low() <= key.get_high()) {
+            if (query_overlap(node->right, key)) return true;
         }
         return false;
     }
 
-    void printNode(const Node<T, U>* node, int depth = 0) const {
+    void print_node(const Node<T, U>* node, int depth = 0) const {
         if (!node) return;
-        printNode(node->left, depth + 1);
+        print_node(node->left, depth + 1);
         std::cout << std::string(depth * 4, ' ') << node->interval << " | val: " << node->value << " | max: " << node->max
-                  << " | color: " << (node->color == RED ? "RED" : "BLACK") << std::endl;
-        printNode(node->right, depth + 1);
+                  << " | color: " << (node->color == red ? "red" : "black") << std::endl;
+        print_node(node->right, depth + 1);
     }
 
-    void destroyTree(Node<T, U>* node) {
+    void destroy_tree(Node<T, U>* node) {
         if (!node) return;
-        destroyTree(node->left);
-        destroyTree(node->right);
+        destroy_tree(node->left);
+        destroy_tree(node->right);
         delete node;
     }
 
@@ -225,61 +225,61 @@ public:
     IntervalMap() : root(nullptr) {}
 
     ~IntervalMap() {
-        destroyTree(root);
+        destroy_tree(root);
     }
 
     IntervalMap(const IntervalMap& other) : root(nullptr) {
         if (other.root) {
-            root = copyTree(other.root, nullptr);
+            root = copy_tree(other.root, nullptr);
         }
     }
 
     IntervalMap& operator=(const IntervalMap& other) {
         if (this != &other) {
-            destroyTree(root);
+            destroy_tree(root);
             root = nullptr;
             if (other.root) {
-                root = copyTree(other.root, nullptr);
+                root = copy_tree(other.root, nullptr);
             }
         }
         return *this;
     }
 
 private:
-    Node<T, U>* copyTree(const IntervalMapNode<T, U>* node, IntervalMapNode<T, U>* parent) {
+    Node<T, U>* copy_tree(const IntervalMapNode<T, U>* node, IntervalMapNode<T, U>* parent) {
         if (!node) return nullptr;
         
-        Node<T, U>* newNode = new IntervalMapNode<T, U>(node->interval, node->value);
-        newNode->parent = parent;
-        newNode->max = node->max;
-        newNode->color = node->color;
+        Node<T, U>* new_node = new IntervalMapNode<T, U>(node->interval, node->value);
+        new_node->parent = parent;
+        new_node->max = node->max;
+        new_node->color = node->color;
         
-        newNode->left = copyTree(node->left, newNode);
-        newNode->right = copyTree(node->right, newNode);
+        new_node->left = copy_tree(node->left, new_node);
+        new_node->right = copy_tree(node->right, new_node);
         
-        return newNode;
+        return new_node;
     }
 
 public:
     void insert(const Interval<T>& key, const U& value) {
-        Node<T, U>* newNode = new IntervalMapNode<T, U>(key, value);
-        insertNode(newNode);
+        Node<T, U>* new_node = new IntervalMapNode<T, U>(key, value);
+        insert_node(new_node);
     }
 
     std::vector<const U*> find(const Interval<T>& key) const {
         std::vector<const U*> result;
-        findOverlapping(root, key, result);
+        find_overlapping(root, key, result);
         return result;
     }
 
     std::vector<std::pair<const Interval<T>*, const U*>> find_kv(const Interval<T>& key) const {
         std::vector<std::pair<const Interval<T>*, const U*>> result;
-        findOverlappingKV(root, key, result);
+        find_overlapping_kv(root, key, result);
         return result;
     }
 
     bool query(const Interval<T>& key) const {
-        return queryOverlap(root, key);
+        return query_overlap(root, key);
     }
 
     void print() const {
@@ -287,7 +287,7 @@ public:
             std::cout << "Empty tree" << std::endl;
             return;
         }
-        printNode(root);
+        print_node(root);
     }
 
     bool empty() const {
