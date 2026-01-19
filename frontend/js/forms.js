@@ -359,7 +359,10 @@ function getPolicyFlagsFromPolicy(policy = {}) {
   const minSplitDurationMinutes = Number.isFinite(minSplitSeconds)
     ? Math.max(0, Math.round(minSplitSeconds / 60))
     : DEFAULT_MIN_SPLIT_MINUTES;
-  const roundToGranularity = Boolean(policy.round_to_granularity);
+  const roundToGranularity =
+    typeof policy.round_to_granularity === "boolean"
+      ? policy.round_to_granularity
+      : Boolean(mask & 8);
   return { splittable, overlappable, invisible, maxSplits, minSplitDurationMinutes, roundToGranularity };
 }
 
@@ -394,7 +397,10 @@ function getPolicyPayloadFromFlags(
   roundToGranularity = false
 ) {
   const schedulingPolicies =
-    (splittable ? 1 : 0) | (overlappable ? 2 : 0) | (invisible ? 4 : 0);
+    (splittable ? 1 : 0)
+    | (overlappable ? 2 : 0)
+    | (invisible ? 4 : 0)
+    | (roundToGranularity ? 8 : 0);
   return {
     is_splittable: splittable,
     is_overlappable: overlappable,

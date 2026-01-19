@@ -10,21 +10,24 @@
  * Policy defines how jobs can be scheduled.
  * 
  * scheduling_policies is an overloaded integer
- * where the two least significant bits represent:
+ * where the least significant bits represent:
  *      -> is_splittable (bit 0)
  *      -> is_overlappable (bit 1)
+ *      -> is_invisible (bit 2)
+ *      -> round_to_granularity (bit 3)
  */
 class Policy {
 private:
     uint8_t max_splits;
     time_t min_split_duration;
-    bool round_to_granularity;
-    uint8_t scheduling_policies;  // Bitfield: bit 0 = is_splittable, bit 1 = is_overlappable, bit 2 = is_invisible
+    uint8_t scheduling_policies;  // Bitfield: bit 0 = is_splittable, bit 1 = is_overlappable, bit 2 = is_invisible, bit 3 = round_to_granularity
 
 public:
     Policy(uint8_t max_splits = 0,
            time_t min_split_duration = 0,
-           uint8_t scheduling_policies = 0,
+           bool is_splittable = false,
+           bool is_overlappable = false,
+           bool is_invisible = false,
            bool round_to_granularity = false);
 
     uint8_t get_max_splits() const;

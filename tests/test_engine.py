@@ -77,7 +77,7 @@ import pytest
 def test_scheduler_invariance_cost():
     # Given
     tag = engine.Tag(WORK_TAG)
-    policy = engine.Policy(0, 0, 0)
+    policy = engine.Policy(0, 0)
     tr_schedulable = engine.TimeRange(Day.FRIDAY * DAY, 
                                       Day.FRIDAY * DAY + Hour.ELEVEN_PM * HOUR)
     tr_scheduled = engine.TimeRange(Day.FRIDAY * DAY + Hour.FOUR_PM * HOUR, 
@@ -106,8 +106,8 @@ def test_scheduler_invariance_cost():
 
 def test_force_split_schedule(monkeypatch):
     monkeypatch.setenv("ELASTISCHED_RNG_SEED", "4242")
-    split_policy = engine.Policy(1, HOUR, 1, True)
-    rigid_policy = engine.Policy(0, 0, 0)
+    split_policy = engine.Policy(1, HOUR, True, False, False, True)
+    rigid_policy = engine.Policy(0, 0)
 
     schedulable = engine.TimeRange(Day.MONDAY * DAY + Hour.NINE_AM * HOUR,
                                    Day.MONDAY * DAY + Hour.TWELVE_PM * HOUR)
