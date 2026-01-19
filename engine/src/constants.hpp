@@ -5,7 +5,7 @@
 #include <string>
 
 #include "Interval.hpp"
-#include "tag.hpp"
+#include "Tag.hpp"
 
 #define time_t uint64_t
 #define TimeRange Interval<time_t>
@@ -13,39 +13,39 @@
 
 
 namespace constants {
-    constexpr time_t MINUTE = (uint64_t)60;
-    constexpr time_t HOUR_TO_MINUTES = (uint64_t)60;
-    constexpr time_t DAY_TO_HOURS = (uint64_t)24;
-    constexpr time_t WEEK_TO_DAYS = (uint64_t)7;
+    constexpr time_t minute = (uint64_t)60;
+    constexpr time_t hour_to_minutes = (uint64_t)60;
+    constexpr time_t day_to_hours = (uint64_t)24;
+    constexpr time_t week_to_days = (uint64_t)7;
 
-    constexpr time_t HOUR = ((uint64_t)60 * MINUTE);
-    constexpr time_t DAY = ((uint64_t)24 * HOUR);
-    constexpr time_t WEEK = ((uint64_t)7 * DAY);
+    constexpr time_t hour = ((uint64_t)60 * minute);
+    constexpr time_t day = ((uint64_t)24 * hour);
+    constexpr time_t week = ((uint64_t)7 * day);
 
-    constexpr time_t AFTERNOON_START = 17;
+    constexpr time_t afternoon_start = 17;
 
-    constexpr double FRIDAY_HOURLY_COST_FACTOR = 2.0f;
-    constexpr double SATURDAY_HOURLY_COST_FACTOR = 3.0f;
+    constexpr double friday_hourly_cost_factor = 2.0f;
+    constexpr double saturday_hourly_cost_factor = 3.0f;
 
-    constexpr double EXP_DOWNFACTOR = 0.1f;
-    constexpr double HOURLY_COST_FACTOR = 1.0f;
-    constexpr double SPLIT_COST_FACTOR = 10.0f;
+    constexpr double exp_downfactor = 0.1f;
+    constexpr double hourly_cost_factor = 1.0f;
+    constexpr double split_cost_factor = 10.0f;
 
-    const Tag WORK_TAG = Tag("ELASTISCHED_WORK_TYPE");
-    constexpr double ILLEGAL_SCHEDULE_COST = 1e12f;
+    const Tag work_tag = Tag("ELASTISCHED_WORK_TYPE");
+    constexpr double illegal_schedule_cost = 1e12f;
 
-    constexpr double EPSILON = 1e-5f;
-    constexpr uint32_t DEFAULT_RNG_SEED = 1337;
+    constexpr double epsilon = 1e-5f;
+    constexpr uint32_t default_rng_seed = 1337;
 
     inline uint32_t rng_seed() {
         const char* value = std::getenv("ELASTISCHED_RNG_SEED");
         if (!value || !*value) {
-            return DEFAULT_RNG_SEED;
+            return default_rng_seed;
         }
         char* end = nullptr;
         unsigned long parsed = std::strtoul(value, &end, 10);
         if (end == value || *end != '\0') {
-            return DEFAULT_RNG_SEED;
+            return default_rng_seed;
         }
         return static_cast<uint32_t>(parsed);
     }

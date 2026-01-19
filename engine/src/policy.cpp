@@ -1,5 +1,5 @@
 #include <cstdint>
-#include "policy.hpp"
+#include "Policy.hpp"
 
 Policy::Policy(uint8_t max_splits,
                time_t min_split_duration,
@@ -10,19 +10,19 @@ Policy::Policy(uint8_t max_splits,
           round_to_granularity(round_to_granularity),
           scheduling_policies(scheduling_policies) {}
 
-uint8_t Policy::getMaxSplits() const { return max_splits; }
-time_t Policy::getMinSplitDuration() const { return min_split_duration; }
-bool Policy::getRoundToGranularity() const { return round_to_granularity; }
-uint8_t Policy::getSchedulingPolicies() const { return scheduling_policies; }
+uint8_t Policy::get_max_splits() const { return max_splits; }
+time_t Policy::get_min_split_duration() const { return min_split_duration; }
+bool Policy::get_round_to_granularity() const { return round_to_granularity; }
+uint8_t Policy::get_scheduling_policies() const { return scheduling_policies; }
 
-bool Policy::isSplittable() const {
+bool Policy::is_splittable() const {
     return scheduling_policies & static_cast<char>(1);
 }
 
-bool Policy::isOverlappable() const {
+bool Policy::is_overlappable() const {
     return (scheduling_policies & static_cast<char>(2)) >> 1;
 }
 
-bool Policy::isInvisible() const {
+bool Policy::is_invisible() const {
     return (scheduling_policies & static_cast<char>(3)) >> 2;
 }

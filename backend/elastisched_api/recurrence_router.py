@@ -108,7 +108,7 @@ def _serialize_tags(raw_tags) -> list[str]:
     tags = []
     for tag in raw_tags or []:
         if isinstance(tag, Tag):
-            name = tag.getName()
+            name = tag.get_name()
             if name:
                 tags.append(name)
             continue

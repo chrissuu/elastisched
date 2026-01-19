@@ -11,10 +11,10 @@ private:
 public:
     Tag(const std::string& name, const std::string& description = "");
     
-    const std::string& getName() const;
-    void setName(const std::string& name);
-    const std::string& getDescription() const;
-    void setDescription(const std::string& description);
+    const std::string& get_name() const;
+    void set_name(const std::string& name);
+    const std::string& get_description() const;
+    void set_description(const std::string& description);
 
     bool operator==(const Tag& other) const;
     bool operator!=(const Tag& other) const;

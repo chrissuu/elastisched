@@ -2,7 +2,7 @@
 #define ENGINE_HPP
 
 #include "constants.hpp"
-#include "job.hpp"
+#include "Job.hpp"
 #include "IntervalTree.hpp"
 
 #include <optional>
@@ -13,11 +13,11 @@
 
 class Schedule {
 public:
-    std::vector<Job> scheduledJobs;
+    std::vector<Job> scheduled_jobs;
 
     Schedule() = default;
-    Schedule(std::vector<Job> scheduledJobs);
-    void addJob(const Job& job);
+    Schedule(std::vector<Job> scheduled_jobs);
+    void add_job(const Job& job);
     void clear();
 
 private:
@@ -27,47 +27,47 @@ private:
 std::ostream& operator<<(std::ostream& os, const Schedule& schedule);
 
 struct DependencyViolation {
-    ID jobId;
-    std::set<ID> violatedDependencies; // Dependencies that haven't been scheduled before this job
+    ID job_id;
+    std::set<ID> violated_dependencies; // Dependencies that haven't been scheduled before this job
 
-    DependencyViolation(ID id, const std::set<ID>& violations);
+    DependencyViolation(ID job_id, const std::set<ID>& violated_dependencies);
 };
 
 struct DependencyCheckResult {
-    bool hasViolations;
+    bool has_violations;
     std::vector<DependencyViolation> violations;
-    bool hasCyclicDependencies;
+    bool has_cyclic_dependencies;
 
     DependencyCheckResult();
 };
 
-DependencyCheckResult checkDependencyViolations(const Schedule& schedule);
+DependencyCheckResult check_dependency_violations(const Schedule& schedule);
 
 class ScheduleCostFunction {
 private:
-    const Schedule& m_schedule;
-    const time_t m_granularity;
-    const std::set<Tag> m_restTags;
-    IntervalTree<time_t, std::optional<std::vector<Job>>> m_dayBasedSchedule;
-    std::optional<time_t> m_min = std::nullopt;
-    std::optional<time_t> m_max = std::nullopt;
+    const Schedule& schedule_ref;
+    const time_t granularity;
+    const std::set<Tag> rest_tags{};
+    IntervalTree<time_t, std::optional<std::vector<Job>>> day_based_schedule;
+    std::optional<time_t> min_time = std::nullopt;
+    std::optional<time_t> max_time = std::nullopt;
 
 public:
     double context_switch_cost() const;
     double illegal_schedule_cost() const;
     double overlap_cost() const;
     double split_cost() const;
-    double scheduleCost() const;
+    double schedule_cost() const;
 
     ScheduleCostFunction(const Schedule& schedule, time_t granularity);
 };
 
-Schedule schedule(std::vector<Job> jobs, const uint64_t GRANULARITY);
-std::pair<Schedule, std::vector<double>> scheduleJobs(
+Schedule schedule(std::vector<Job> jobs, const uint64_t granularity);
+std::pair<Schedule, std::vector<double>> schedule_jobs(
     std::vector<Job> jobs,
-    const uint64_t GRANULARITY,
-    const double INITIAL_TEMP,
-    const double FINAL_TEMP,
-    const uint64_t NUM_ITERS);
+    const uint64_t granularity,
+    const double initial_temp,
+    const double final_temp,
+    const uint64_t num_iters);
 
 #endif // ENGINE_HPP

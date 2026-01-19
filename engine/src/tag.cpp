@@ -1,23 +1,23 @@
-#include "tag.hpp"
+#include "Tag.hpp"
 
 Tag::Tag(const std::string& name, const std::string& description)
     : name(name),
       description(description) {
 }
 
-const std::string& Tag::getName() const {
+const std::string& Tag::get_name() const {
     return this->name;
 }
 
-void Tag::setName(const std::string& name) {
+void Tag::set_name(const std::string& name) {
     this->name = name;
 }
 
-const std::string& Tag::getDescription() const {
+const std::string& Tag::get_description() const {
     return this->description;
 }
 
-void Tag::setDescription(const std::string& description) {
+void Tag::set_description(const std::string& description) {
     this->description = description;
 }
 

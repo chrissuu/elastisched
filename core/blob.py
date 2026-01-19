@@ -34,7 +34,7 @@ def _clone_tags(raw_tags: Iterable) -> Set[Tag]:
     cloned: Set[Tag] = set()
     for tag in raw_tags or []:
         if isinstance(tag, Tag):
-            cloned.add(Tag(tag.getName(), tag.getDescription()))
+            cloned.add(Tag(tag.get_name(), tag.get_description()))
             continue
         if isinstance(tag, dict):
             name = str(tag.get("name") or "").strip()
@@ -120,15 +120,15 @@ class Blob:
         description: str,
         tz: timezone
     ) -> 'Blob':
-        scheduled_tr_start_delta = job.schedulableTimeRange.getLow()
-        scheduled_tr_end_delta = job.schedulableTimeRange.getHigh()
+        scheduled_tr_start_delta = job.schedulable_time_range.get_low()
+        scheduled_tr_end_delta = job.schedulable_time_range.get_high()
         scheduled_timerange=  TimeRange(
             start=EPOCH_BEGIN + timedelta(seconds=scheduled_tr_start_delta),
             end=EPOCH_BEGIN + timedelta(seconds=scheduled_tr_end_delta)
         )
 
-        schedulable_tr_start_delta = job.schedulableTimeRange.getLow()
-        schedulable_tr_end_delta = job.schedulableTimeRange.getHigh()
+        schedulable_tr_start_delta = job.schedulable_time_range.get_low()
+        schedulable_tr_end_delta = job.schedulable_time_range.get_high()
         schedulable_timerange = TimeRange(
             start=EPOCH_BEGIN + timedelta(seconds=schedulable_tr_start_delta),
             end=EPOCH_BEGIN + timedelta(seconds=schedulable_tr_end_delta)

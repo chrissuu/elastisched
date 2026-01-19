@@ -1,11 +1,11 @@
-#include "job.hpp"
+#include "Job.hpp"
 
-Job::Job(time_t duration, TimeRange schedulableTimeRange, TimeRange scheduledTimeRange,
+Job::Job(time_t duration, TimeRange schedulable_time_range, TimeRange scheduled_time_range,
         ID id, Policy policy, std::set<ID> dependencies, std::set<Tag> tags) 
 :   duration(duration),
-    schedulableTimeRange(schedulableTimeRange),
-    scheduledTimeRange(scheduledTimeRange),
-    scheduledTimeRanges({scheduledTimeRange}),
+    schedulable_time_range(schedulable_time_range),
+    scheduled_time_range(scheduled_time_range),
+    scheduled_time_ranges({scheduled_time_range}),
     id(id),
     policy(policy),
     dependencies(dependencies),
@@ -14,44 +14,44 @@ Job::Job(time_t duration, TimeRange schedulableTimeRange, TimeRange scheduledTim
         return;
 };
 
-bool Job::isRigid() const {
-    return duration == schedulableTimeRange.length();
+bool Job::is_rigid() const {
+    return duration == schedulable_time_range.length();
 };
 
-const std::vector<TimeRange>& Job::getScheduledTimeRanges() const {
-    return scheduledTimeRanges;
+const std::vector<TimeRange>& Job::get_scheduled_time_ranges() const {
+    return scheduled_time_ranges;
 }
 
-void Job::setScheduledTimeRanges(std::vector<TimeRange> ranges) {
-    scheduledTimeRanges = std::move(ranges);
-    if (!scheduledTimeRanges.empty()) {
-        scheduledTimeRange = scheduledTimeRanges.front();
+void Job::set_scheduled_time_ranges(std::vector<TimeRange> ranges) {
+    scheduled_time_ranges = std::move(ranges);
+    if (!scheduled_time_ranges.empty()) {
+        scheduled_time_range = scheduled_time_ranges.front();
     }
 }
 
-std::string Job::toString() const {
+std::string Job::to_string() const {
     std::ostringstream oss;
     
     oss << "Job(id=" << id << ")\n";
     oss << "├─ Duration: " << duration << " seconds\n";
     
     // Format schedulable time range
-    oss << "├─ Schedulable: [" << schedulableTimeRange.getLow() 
-        << " - " << schedulableTimeRange.getHigh() << "]";
-    if (schedulableTimeRange.length() > 0) {
-        oss << " (length: " << schedulableTimeRange.length() << "s)";
+    oss << "├─ Schedulable: [" << schedulable_time_range.get_low() 
+        << " - " << schedulable_time_range.get_high() << "]";
+    if (schedulable_time_range.length() > 0) {
+        oss << " (length: " << schedulable_time_range.length() << "s)";
     }
     oss << "\n";
     
     // Format scheduled time range
     oss << "├─ Scheduled: ";
-    if (!scheduledTimeRanges.empty() || scheduledTimeRange.length() > 0) {
-        const auto& primary = scheduledTimeRanges.empty() ? scheduledTimeRange : scheduledTimeRanges.front();
-        oss << "[" << primary.getLow() 
-            << " - " << primary.getHigh() << "]";
+    if (!scheduled_time_ranges.empty() || scheduled_time_range.length() > 0) {
+        const auto& primary = scheduled_time_ranges.empty() ? scheduled_time_range : scheduled_time_ranges.front();
+        oss << "[" << primary.get_low() 
+            << " - " << primary.get_high() << "]";
         oss << " (length: " << primary.length() << "s)";
-        if (scheduledTimeRanges.size() > 1) {
-            oss << " (split segments: " << scheduledTimeRanges.size() << ")";
+        if (scheduled_time_ranges.size() > 1) {
+            oss << " (split segments: " << scheduled_time_ranges.size() << ")";
         }
     } else {
         oss << "Not scheduled";
@@ -60,13 +60,13 @@ std::string Job::toString() const {
     
     // Policy information
     oss << "├─ Policy: ";
-    if (policy.isSplittable()) {
-        oss << "Splittable (max: " << static_cast<int>(policy.getMaxSplits()) 
-            << ", min duration: " << policy.getMinSplitDuration() << "s)";
+    if (policy.is_splittable()) {
+        oss << "Splittable (max: " << static_cast<int>(policy.get_max_splits()) 
+            << ", min duration: " << policy.get_min_split_duration() << "s)";
     } else {
         oss << "Non-splittable";
     }
-    if (policy.isOverlappable()) {
+    if (policy.is_overlappable()) {
         oss << ", Overlappable";
     }
     oss << "\n";
@@ -96,7 +96,7 @@ std::string Job::toString() const {
         bool first = true;
         for (const auto& tag : tags) {
             if (!first) oss << ", ";
-            oss << tag.getName();
+            oss << tag.get_name();
             first = false;
         }
         oss << "]";

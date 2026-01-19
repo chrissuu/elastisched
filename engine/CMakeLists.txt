@@ -18,10 +18,10 @@ find_package(pybind11 QUIET)
 
 # Core scheduler library (shared between executable and Python module)
 add_library(scheduler_lib
-    src/job.cpp
-    src/policy.cpp
+    src/JOB.cpp
+    src/POLICY.cpp
     src/engine.cpp
-    src/tag.cpp
+    src/TAG.cpp
 )
 
 target_include_directories(scheduler_lib PUBLIC 

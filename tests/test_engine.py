@@ -12,7 +12,7 @@ import pytest
 #                                     Day.SATURDAY * DAY + Hour.ELEVEN_PM * HOUR)
 #     tr_scheduled = engine.TimeRange(Day.FRIDAY * DAY, 
 #                                     Day.FRIDAY * DAY + 30 * MINUTE)
-#     duration = tr_scheduled.getHigh() - tr_scheduled.getLow()
+#     duration = tr_scheduled.get_high() - tr_scheduled.get_low()
 
 #     job = engine.Job(
 #         duration,
@@ -28,10 +28,10 @@ import pytest
 #     print(cost_history)
 
 #     # Assert that
-#     for job in schedule.scheduledJobs:
-#         curr_scheduled_tr = job.scheduledTimeRange
-#         curr_schedulable_tr = job.schedulableTimeRange
-#         assert(curr_scheduled_tr.getLow() <= Day.FRIDAY * DAY + AFTERNOON_START * HOUR)
+#     for job in schedule.scheduled_jobs:
+#         curr_scheduled_tr = job.scheduled_time_range
+#         curr_schedulable_tr = job.schedulable_time_range
+#         assert(curr_scheduled_tr.get_low() <= Day.FRIDAY * DAY + AFTERNOON_START * HOUR)
 #         assert(curr_schedulable_tr.contains(curr_scheduled_tr))
 
 
@@ -44,7 +44,7 @@ import pytest
 #                                       Day.FRIDAY * DAY + Hour.ELEVEN_PM * HOUR)
 #     tr_scheduled = engine.TimeRange(Day.FRIDAY * DAY + Hour.SEVEN_PM * HOUR, 
 #                                     Day.FRIDAY * DAY + Hour.SEVEN_PM * HOUR + 30 * MINUTE)
-#     duration = tr_scheduled.getHigh() - tr_scheduled.getLow()
+#     duration = tr_scheduled.get_high() - tr_scheduled.get_low()
 
 
 #     job = engine.Job(
@@ -62,14 +62,14 @@ import pytest
 
 #     print(Day.FRIDAY * DAY + Hour.SEVEN_PM * HOUR)
 #     # Assert that
-#     for job in schedule.scheduledJobs:
-#         curr_scheduled_tr = job.scheduledTimeRange
-#         curr_schedulable_tr = job.schedulableTimeRange
+#     for job in schedule.scheduled_jobs:
+#         curr_scheduled_tr = job.scheduled_time_range
+#         curr_schedulable_tr = job.schedulable_time_range
 
 #         # Friday jobs are exponentially discounted
 #         # Singleton friday jobs should be scheduled before the
 #         # afternoon cutoff time
-#         assert(not ((curr_scheduled_tr.getLow() // HOUR) % 24) > AFTERNOON_START)
+#         assert(not ((curr_scheduled_tr.get_low() // HOUR) % 24) > AFTERNOON_START)
 #         assert(curr_schedulable_tr.contains(curr_scheduled_tr))
 
 
@@ -82,7 +82,7 @@ def test_scheduler_invariance_cost():
                                       Day.FRIDAY * DAY + Hour.ELEVEN_PM * HOUR)
     tr_scheduled = engine.TimeRange(Day.FRIDAY * DAY + Hour.FOUR_PM * HOUR, 
                                     Day.FRIDAY * DAY + Hour.FOUR_PM * HOUR + 30 * MINUTE)
-    duration = tr_scheduled.getHigh() - tr_scheduled.getLow()
+    duration = tr_scheduled.get_high() - tr_scheduled.get_low()
 
     job = engine.Job(
         duration,
@@ -97,11 +97,11 @@ def test_scheduler_invariance_cost():
     schedule, cost_history = engine.schedule_jobs([job], GRANULARITY, 1000.0, 1.0, 100000000)
     print(cost_history)
 
-    job = schedule.scheduledJobs[0]
-    curr_scheduled_tr = job.scheduledTimeRange
-    curr_schedulable_tr = job.schedulableTimeRange
+    job = schedule.scheduled_jobs[0]
+    curr_scheduled_tr = job.scheduled_time_range
+    curr_schedulable_tr = job.schedulable_time_range
     assert(curr_schedulable_tr.contains(curr_scheduled_tr))
-    assert(curr_scheduled_tr.getLow() == tr_scheduled.getLow())
+    assert(curr_scheduled_tr.get_low() == tr_scheduled.get_low())
 
 
 def test_force_split_schedule(monkeypatch):
@@ -136,11 +136,11 @@ def test_force_split_schedule(monkeypatch):
     )
 
     schedule, _ = engine.schedule_jobs([split_job, rigid_job], HOUR, 1000.0, 0.01, 50000)
-    scheduled_split = next(job for job in schedule.scheduledJobs if job.id == "split_job")
-    ranges = list(scheduled_split.scheduledTimeRanges)
+    scheduled_split = next(job for job in schedule.scheduled_jobs if job.id == "split_job")
+    ranges = list(scheduled_split.scheduled_time_ranges)
 
     assert len(ranges) == 2
-    total_duration = sum(r.getHigh() - r.getLow() for r in ranges)
+    total_duration = sum(r.get_high() - r.get_low() for r in ranges)
     assert total_duration == split_job.duration
-    assert all((r.getHigh() - r.getLow()) >= HOUR for r in ranges)
-    assert all(r.getLow() % HOUR == 0 for r in ranges)
+    assert all((r.get_high() - r.get_low()) >= HOUR for r in ranges)
+    assert all(r.get_low() % HOUR == 0 for r in ranges)

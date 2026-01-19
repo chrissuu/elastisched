@@ -13,8 +13,12 @@ struct Node {
     std::unique_ptr<Node<T, U>> left;
     std::unique_ptr<Node<T, U>> right;
     
-    Node(std::unique_ptr<Interval<T>> i, U v)
-        : interval(std::move(i)), value(v), max(interval->getHigh()), left(nullptr), right(nullptr) {}
+    Node(std::unique_ptr<Interval<T>> interval_ptr, U node_value)
+        : interval(std::move(interval_ptr)),
+          value(node_value),
+          max(interval->get_high()),
+          left(nullptr),
+          right(nullptr) {}
 };
 
 template<typename T, typename U>
@@ -23,87 +27,88 @@ private:
     std::unique_ptr<Node<T, U>> root;
     
     std::unique_ptr<Node<T, U>> insert(std::unique_ptr<Node<T, U>> node,
-                                       std::unique_ptr<Interval<T>> i,
+                                       std::unique_ptr<Interval<T>> interval_ptr,
                                        U value) {
         if (!node) {
-            return std::make_unique<Node<T, U>>(std::move(i), value);
+            return std::make_unique<Node<T, U>>(std::move(interval_ptr), value);
         }
-        
-        T intervalLow = i->getLow();
-        T intervalHigh = i->getHigh();
-        
-        if (intervalLow < node->interval->getLow()) {
-            node->left = insert(std::move(node->left), std::move(i), value);
+        T interval_low = interval_ptr->get_low();
+        T interval_high = interval_ptr->get_high();
+
+        if (interval_low < node->interval->get_low()) {
+            node->left = insert(std::move(node->left), std::move(interval_ptr), value);
         } else {
-            node->right = insert(std::move(node->right), std::move(i), value);
+            node->right = insert(std::move(node->right), std::move(interval_ptr), value);
         }
-        
-        node->max = std::max(node->max, intervalHigh);
+
+        node->max = std::max(node->max, interval_high);
         return node;
     }
-    
-    bool doOverlap(Interval<T>* i1, Interval<T>* i2) const {
-        return i1->overlaps(*i2);
-    }
-    
-    Node<T, U>* overlapSearch(Node<T, U>* node, Interval<T>& i) const {
-        if (!node)
-            return nullptr;
-            
-        if (doOverlap(node->interval.get(), &i))
-            return node;
-            
-        if (node->left && node->left->max >= i.getLow())
-            return overlapSearch(node->left.get(), i);
-            
-        return overlapSearch(node->right.get(), i);
+
+    bool do_overlap(Interval<T>* left, Interval<T>* right) const {
+        return left->overlaps(*right);
     }
 
-    void findOverlapping(const Node<T, U>* node, const Interval<T>& key, std::vector<const Interval<T>*>& result) const {
+    Node<T, U>* overlap_search(Node<T, U>* node, Interval<T>& interval) const {
+        if (!node)
+            return nullptr;
+
+        if (do_overlap(node->interval.get(), &interval))
+            return node;
+
+        if (node->left && node->left->max >= interval.get_low())
+            return overlap_search(node->left.get(), interval);
+
+        return overlap_search(node->right.get(), interval);
+    }
+
+    void find_overlapping(const Node<T, U>* node,
+                          const Interval<T>& key,
+                          std::vector<const Interval<T>*>& result) const {
         if (!node) return;
 
         if (node->interval->overlaps(key)) {
             result.push_back(node->interval.get());
         }
 
-        if (node->left && node->left->max >= key.getLow()) {
-            findOverlapping(node->left.get(), key, result);
+        if (node->left && node->left->max >= key.get_low()) {
+            find_overlapping(node->left.get(), key, result);
         }
-        if (node->right && node->interval->getLow() <= key.getHigh()) {
-            findOverlapping(node->right.get(), key, result);
+        if (node->right && node->interval->get_low() <= key.get_high()) {
+            find_overlapping(node->right.get(), key, result);
         }
     }
-    
-    std::unique_ptr<Node<T, U>> cloneNode(const std::unique_ptr<Node<T, U>>& node) const {
+
+    std::unique_ptr<Node<T, U>> clone_node(const std::unique_ptr<Node<T, U>>& node) const {
         if (!node)
             return nullptr;
-            
-        auto newInterval = std::make_unique<Interval<T>>(*node->interval);
-        auto newNode = std::make_unique<Node<T, U>>(std::move(newInterval), node->value);
-        newNode->max = node->max;
-        newNode->left = cloneNode(node->left);
-        newNode->right = cloneNode(node->right);
-        return newNode;
+
+        auto new_interval = std::make_unique<Interval<T>>(*node->interval);
+        auto new_node = std::make_unique<Node<T, U>>(std::move(new_interval), node->value);
+        new_node->max = node->max;
+        new_node->left = clone_node(node->left);
+        new_node->right = clone_node(node->right);
+        return new_node;
     }
-    
-    void printInOrder(const Node<T, U>* node) const {
+
+    void print_in_order(const Node<T, U>* node) const {
         if (!node) return;
-        printInOrder(node->left.get());
-        std::cout << "[" << node->interval->getLow() << ", " << node->interval->getHigh() 
+        print_in_order(node->left.get());
+        std::cout << "[" << node->interval->get_low() << ", " << node->interval->get_high()
                   << "] max=" << node->max << std::endl;
-        printInOrder(node->right.get());
+        print_in_order(node->right.get());
     }
 
 public:
     IntervalTree() = default;
     
     IntervalTree(const IntervalTree<T, U>& other) {
-        root = cloneNode(other.root);
+        root = clone_node(other.root);
     }
     
     IntervalTree<T, U>& operator=(const IntervalTree<T, U>& other) {
         if (this != &other) {
-            root = cloneNode(other.root);
+            root = clone_node(other.root);
         }
         return *this;
     }
@@ -118,37 +123,37 @@ public:
         root = insert(std::move(root), std::move(i), value);
     }
 
-    Interval<T>* searchOverlap(Interval<T> query) const {
-        auto result = overlapSearch(root.get(), query);
+    Interval<T>* search_overlap(Interval<T> query) const {
+        auto result = overlap_search(root.get(), query);
         return result ? result->interval.get() : nullptr;
     }
     
-    Interval<T>* searchOverlap(T low, T high) const {
-        return searchOverlap(Interval<T>(low, high));
+    Interval<T>* search_overlap(T low, T high) const {
+        return search_overlap(Interval<T>(low, high));
     }
 
-    std::vector<const Interval<T>*> findOverlapping(const Interval<T>& key) const {
+    std::vector<const Interval<T>*> find_overlapping(const Interval<T>& key) const {
         std::vector<const Interval<T>*> result;
-        findOverlapping(root.get(), key, result);
+        find_overlapping(root.get(), key, result);
         return result;
     }
-    
-    U* searchValue(T low, T high) const {
+
+    U* search_value(T low, T high) const {
         Interval<T> query(low, high);
-        auto result = overlapSearch(root.get(), query);
+        auto result = overlap_search(root.get(), query);
         return result ? &result->value : nullptr;
     }
-    
-    U* searchValue(Interval<T> interval) const {
-        return searchValue(interval.getLow(), interval.getHigh());
+
+    U* search_value(Interval<T> interval) const {
+        return search_value(interval.get_low(), interval.get_high());
     }
-    
-    bool isIn(const Interval<T>& interval) {
-        return searchOverlap(interval.getLow(), interval.getHigh()) != nullptr;
+
+    bool is_in(const Interval<T>& interval) {
+        return search_overlap(interval.get_low(), interval.get_high()) != nullptr;
     }
     
     void print() const {
-        printInOrder(root.get());
+        print_in_order(root.get());
     }
 };
 
