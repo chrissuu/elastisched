@@ -11,7 +11,7 @@ def _make_job(
     policy=None,
     job_id="job",
 ):
-    policy = policy or engine.Policy(0, 0, 0)
+    policy = policy or engine.Policy(0, 0)
     tr_schedulable = engine.TimeRange(schedulable_low, schedulable_high)
     tr_scheduled = engine.TimeRange(scheduled_low, scheduled_high)
     duration = tr_scheduled.get_high() - tr_scheduled.get_low()
@@ -53,7 +53,7 @@ def test_illegal_schedule_cost_outside_schedulable_range():
 
 
 def test_overlap_cost_counts_overlap_duration():
-    overlappable_policy = engine.Policy(0, 0, 2)
+    overlappable_policy = engine.Policy(0, 0, False, True)
     job_a = _make_job(
         schedulable_low=0,
         schedulable_high=4 * HOUR,

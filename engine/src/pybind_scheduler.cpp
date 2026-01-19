@@ -33,15 +33,13 @@ PYBIND11_MODULE(engine, m) {
     // Policy
     py::class_<Policy>(m, "Policy")
         .def(py::init<>())
-        .def(py::init<uint8_t, time_t, uint8_t>(),
+        .def(py::init<uint8_t, time_t, bool, bool, bool, bool>(),
              py::arg("max_splits"),
              py::arg("min_split_duration"),
-             py::arg("scheduling_policies"))
-        .def(py::init<uint8_t, time_t, uint8_t, bool>(),
-             py::arg("max_splits"),
-             py::arg("min_split_duration"),
-             py::arg("scheduling_policies"),
-             py::arg("round_to_granularity"))
+             py::arg("is_splittable") = false,
+             py::arg("is_overlappable") = false,
+             py::arg("is_invisible") = false,
+             py::arg("round_to_granularity") = false)
         .def("get_max_splits", &Policy::get_max_splits)
         .def("get_min_split_duration", &Policy::get_min_split_duration)
         .def("get_round_to_granularity", &Policy::get_round_to_granularity)

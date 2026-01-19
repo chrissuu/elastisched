@@ -118,27 +118,37 @@ def _policy_from_payload(policy) -> engine.Policy:
     if isinstance(policy, engine.Policy):
         return policy
     if not isinstance(policy, dict):
-        return engine.Policy(0, 0, 0)
+        return engine.Policy(0, 0)
     scheduling_policies = policy.get("scheduling_policies")
     if scheduling_policies is None:
-        scheduling_policies = 0
-        if policy.get("is_splittable"):
-            scheduling_policies |= 1
-        if policy.get("is_overlappable"):
-            scheduling_policies |= 2
-        if policy.get("is_invisible"):
-            scheduling_policies |= 4
+        is_splittable = bool(policy.get("is_splittable"))
+        is_overlappable = bool(policy.get("is_overlappable"))
+        is_invisible = bool(policy.get("is_invisible"))
+        round_to_granularity = bool(policy.get("round_to_granularity") or False)
+    else:
+        try:
+            scheduling_policies = int(scheduling_policies)
+        except (TypeError, ValueError):
+            scheduling_policies = 0
+        is_splittable = bool(scheduling_policies & 1)
+        is_overlappable = bool(scheduling_policies & 2)
+        is_invisible = bool(scheduling_policies & 4)
+        if "round_to_granularity" in policy:
+            round_to_granularity = bool(policy.get("round_to_granularity"))
+        else:
+            round_to_granularity = bool(scheduling_policies & 8)
     max_splits = int(policy.get("max_splits") or 0)
     min_split_duration = int(
         policy.get("min_split_duration_seconds")
         or policy.get("min_split_duration")
         or 0
     )
-    round_to_granularity = bool(policy.get("round_to_granularity") or False)
     return engine.Policy(
         max_splits,
         min_split_duration,
-        int(scheduling_policies),
+        is_splittable,
+        is_overlappable,
+        is_invisible,
         round_to_granularity,
     )
 
