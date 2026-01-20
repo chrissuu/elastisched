@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Elastisched | Elastic scheduling</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="nav">
+        <div class="brand">
+          <div class="logo">E</div>
+          <div>
+            <div class="title">Elastisched</div>
+            <div class="subtitle">Schedule at a glance</div>
+          </div>
+        </div>
+        <nav class="nav-links">
+          <a href="#docs">Docs</a>
+          <a href="#tips">Tips</a>
+          <a href="#shortcuts">Shortcuts</a>
+          <a href="#demos">Demos</a>
+        </nav>
+        <div class="nav-actions">
+          <a class="ghost" href="../frontend/index.html">Open app</a>
+          <button class="primary">Request demo</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero">
+          <div class="hero-copy">
+            <span class="eyebrow">Elastic scheduling</span>
+            <h1>Turn fuzzy time blocks into a schedule that actually holds.</h1>
+            <p>
+              Elastisched blends human intent with adaptive rules so your calendar stays realistic.
+              Draft faster with AI, then refine by hand with a visual cadence map.
+            </p>
+            <div class="hero-actions">
+              <button class="primary">Start planning</button>
+              <a class="ghost" href="#demos">See live demos</a>
+            </div>
+            <div class="hero-metrics">
+              <div>
+                <strong>90 sec</strong>
+                <span>average plan setup</span>
+              </div>
+              <div>
+                <strong>3x</strong>
+                <span>fewer reschedules</span>
+              </div>
+              <div>
+                <strong>24/7</strong>
+                <span>timezone aware</span>
+              </div>
+            </div>
+          </div>
+          <div class="hero-visual">
+            <div class="orb"></div>
+            <div class="schedule-card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Today</div>
+                  <div class="card-subtitle">Gentle cadence, hard edges</div>
+                </div>
+                <span class="tag">AI draft</span>
+              </div>
+              <div class="timeline">
+                <div class="slot active">
+                  <span>9:00</span>
+                  <div>
+                    <strong>Focus block</strong>
+                    <small>Writing + research</small>
+                  </div>
+                </div>
+                <div class="slot">
+                  <span>11:30</span>
+                  <div>
+                    <strong>Collab sprint</strong>
+                    <small>Team sync</small>
+                  </div>
+                </div>
+                <div class="slot warm">
+                  <span>2:00</span>
+                  <div>
+                    <strong>Studio time</strong>
+                    <small>Prototype review</small>
+                  </div>
+                </div>
+                <div class="slot">
+                  <span>4:30</span>
+                  <div>
+                    <strong>Admin wrap</strong>
+                    <small>Inbox + follow ups</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="floating-note">
+              <span>Tip</span>
+              Shift + click edits any occurrence in-place.
+            </div>
+          </div>
+        </section>
+
+        <section class="feature-grid" id="demos">
+          <article class="feature-card">
+            <div class="feature-top">
+              <span class="chip">Live demo</span>
+              <h3>Draft with natural language.</h3>
+            </div>
+            <p>Describe what you need, then watch Elastisched shape repeaters, buffers, and breaks.</p>
+            <div class="demo-panel">
+              <div class="demo-line">"Deep work Tue/Thu 2-4pm, 3 weeks."</div>
+              <div class="demo-result">Preview: 6 events + 10 min buffers.</div>
+            </div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-top">
+              <span class="chip">Live demo</span>
+              <h3>Adaptive cadence blocks.</h3>
+            </div>
+            <p>Keep recurring sessions aligned even when meetings move. Elastisched flexes around it.</p>
+            <div class="demo-panel">
+              <div class="demo-line">"Keep mornings open for deep work."</div>
+              <div class="demo-result">Protected 9-12, flexible afternoons.</div>
+            </div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-top">
+              <span class="chip">Live demo</span>
+              <h3>Explain the schedule.</h3>
+            </div>
+            <p>Every block has a reason. See why a session moved and how to lock it.</p>
+            <div class="demo-panel">
+              <div class="demo-line">"Why is standup at 10:30?"</div>
+              <div class="demo-result">Conflict avoided: client workshop.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="split" id="docs">
+          <div class="split-copy">
+            <span class="eyebrow">Docs</span>
+            <h2>Guides that get you moving in minutes.</h2>
+            <p>
+              Start with the quickstart and move into power workflows. Every doc includes real
+              scenarios, plus copy-ready prompts.
+            </p>
+            <div class="doc-links">
+              <a class="ghost" href="#">Quickstart: first schedule</a>
+              <a class="ghost" href="#">LLM prompting guide</a>
+              <a class="ghost" href="#">Recurring cadence playbook</a>
+              <a class="ghost" href="#">API + integrations</a>
+            </div>
+          </div>
+          <div class="split-panel">
+            <div class="doc-card">
+              <h4>API reference</h4>
+              <p>Connect Elastisched to your calendar stack with predictable, testable endpoints.</p>
+              <div class="doc-meta">
+                <span>REST + webhook docs</span>
+                <span>Updated weekly</span>
+              </div>
+            </div>
+            <div class="doc-card">
+              <h4>Prompt library</h4>
+              <p>Shortcuts for office hours, study blocks, flexible shifts, and sprint planning.</p>
+              <div class="doc-meta">
+                <span>18 examples</span>
+                <span>Copy + paste ready</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tips" id="tips">
+          <div class="tips-header">
+            <span class="eyebrow">Tips & tricks</span>
+            <h2>Plan faster with tiny moves.</h2>
+          </div>
+          <div class="tips-grid">
+            <article>
+              <h4>Use buffers to stay realistic</h4>
+              <p>Set default buffers so every event has a landing zone, not a cliff.</p>
+            </article>
+            <article>
+              <h4>Lock anchor sessions</h4>
+              <p>Keep a handful of fixed rituals, then let the rest breathe.</p>
+            </article>
+            <article>
+              <h4>Draft with context</h4>
+              <p>Add constraints like travel, focus energy, or deadlines to get better schedules.</p>
+            </article>
+            <article>
+              <h4>Shift-to-edit occurrences</h4>
+              <p>Edit a single event without breaking the full recurrence.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="shortcuts" id="shortcuts">
+          <div class="shortcuts-copy">
+            <span class="eyebrow">Keyboard binds</span>
+            <h2>Stay in flow with quick actions.</h2>
+            <p>Every major action is available without touching the mouse.</p>
+          </div>
+          <div class="shortcut-grid">
+            <div class="shortcut-card">
+              <span>New recurrence</span>
+              <div class="keys"><kbd>N</kbd></div>
+            </div>
+            <div class="shortcut-card">
+              <span>Undo</span>
+              <div class="keys"><kbd>Ctrl</kbd><span>+</span><kbd>Z</kbd></div>
+            </div>
+            <div class="shortcut-card">
+              <span>Redo</span>
+              <div class="keys"><kbd>Ctrl</kbd><span>+</span><kbd>Y</kbd></div>
+            </div>
+            <div class="shortcut-card">
+              <span>Navigate periods</span>
+              <div class="keys"><kbd>&larr;</kbd><span>/</span><kbd>&rarr;</kbd></div>
+            </div>
+            <div class="shortcut-card">
+              <span>Edit occurrence</span>
+              <div class="keys"><kbd>Shift</kbd><span>+</span><kbd>Click</kbd></div>
+            </div>
+            <div class="shortcut-card">
+              <span>Close panels</span>
+              <div class="keys"><kbd>Esc</kbd></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="cta">
+          <div>
+            <h2>Ready for a calmer calendar?</h2>
+            <p>Start with a single prompt. Keep the rest as flexible as you need.</p>
+          </div>
+          <div class="cta-actions">
+            <button class="primary">Launch Elastisched</button>
+            <a class="ghost" href="#">Contact sales</a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div>Elastisched</div>
+        <div>Built for teams who respect time.</div>
+        <div class="footer-links">
+          <a href="#">Privacy</a>
+          <a href="#">Security</a>
+          <a href="#">Changelog</a>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
