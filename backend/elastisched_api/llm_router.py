@@ -84,6 +84,16 @@ def _normalize_llm_recurrence(
             blob["name"] = recurrence_name or fallback_name
         if not blob.get("description") and recurrence_description:
             blob["description"] = recurrence_description
+        policy = blob.get("policy")
+        if isinstance(policy, dict) and policy.get("is_splittable"):
+            if not policy.get("max_splits"):
+                policy["max_splits"] = 1
+            if not (
+                policy.get("min_split_duration_seconds")
+                or policy.get("min_split_duration")
+            ):
+                policy["min_split_duration_seconds"] = 15 * 60
+            blob["policy"] = policy
         return blob
 
     if recurrence.type == "multiple":
@@ -209,7 +219,7 @@ async def llm_recurrence_draft(
         "For multiple recurrences, include payload.blobs (a list of blobs).\n"
         "Blob policies are supported via blob.policy. When a task should be splittable/overlappable/invisible "
         "or rounded, include policy keys: is_splittable, is_overlappable, is_invisible, round_to_granularity, "
-        "max_splits, min_split_duration_seconds.\n"
+        "max_splits, min_split_duration_seconds. If is_splittable is true, set max_splits and min_split_duration_seconds.\n"
         "Tags belong in blob.tags as a list of strings (not in description).\n"
         "Set blob.tz to the user timezone.\n"
         f"Current datetime: {datetime.now(timezone.utc).isoformat()} (UTC).\n"
