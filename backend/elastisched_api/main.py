@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -13,15 +14,16 @@ from elastisched_api.recurrence_router import (
 from elastisched_api.schedule_router import schedule_router
 
 
-app = FastAPI(title="Elastisched API")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    await init_db()
+    yield
+
+
+app = FastAPI(title="Elastisched API", lifespan=lifespan)
 _UI_DIR = Path(__file__).resolve().parents[2] / "frontend"
 if _UI_DIR.exists():
     app.mount("/ui", StaticFiles(directory=_UI_DIR, html=True), name="ui")
-
-
-@app.on_event("startup")
-async def on_startup() -> None:
-    await init_db()
 
 
 @app.get("/health", operation_id="health_check")

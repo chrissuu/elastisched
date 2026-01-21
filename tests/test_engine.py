@@ -144,3 +144,70 @@ def test_force_split_schedule(monkeypatch):
     assert total_duration == split_job.duration
     assert all((r.get_high() - r.get_low()) >= HOUR for r in ranges)
     assert all(r.get_low() % HOUR == 0 for r in ranges)
+
+
+def _make_job(
+    schedulable_low,
+    schedulable_high,
+    scheduled_low,
+    scheduled_high,
+    policy=None,
+    job_id="job",
+):
+    policy = policy or engine.Policy(0, 0)
+    tr_schedulable = engine.TimeRange(schedulable_low, schedulable_high)
+    tr_scheduled = engine.TimeRange(scheduled_low, scheduled_high)
+    duration = tr_scheduled.get_high() - tr_scheduled.get_low()
+    return engine.Job(
+        duration,
+        tr_schedulable,
+        tr_scheduled,
+        job_id,
+        policy,
+        set(),
+        set(),
+    )
+
+
+def test_timerange_overlap_contains_length():
+    range_a = engine.TimeRange(0, 2 * HOUR)
+    range_b = engine.TimeRange(HOUR, 3 * HOUR)
+    range_c = engine.TimeRange(2 * HOUR, 3 * HOUR)
+    range_inside = engine.TimeRange(30 * MINUTE, HOUR)
+
+    assert range_a.overlaps(range_b)
+    assert not range_a.overlaps(range_c)
+    assert range_a.contains(range_inside)
+    assert range_a.length() == 2 * HOUR
+
+
+def test_tag_equality_and_hashing():
+    tag_a = engine.Tag("work", "primary")
+    tag_b = engine.Tag("work", "secondary")
+    tag_c = engine.Tag("rest", "secondary")
+
+    assert tag_a == tag_b
+    assert tag_a != tag_c
+    assert len({tag_a, tag_b, tag_c}) == 2
+
+
+def test_schedule_jobs_preserves_rigid_times():
+    rigid_schedulable = engine.TimeRange(Day.MONDAY * DAY + Hour.NINE_AM * HOUR,
+                                         Day.MONDAY * DAY + Hour.TEN_AM * HOUR)
+    rigid_scheduled = engine.TimeRange(Day.MONDAY * DAY + Hour.TEN_AM * HOUR,
+                                       Day.MONDAY * DAY + Hour.ELEVEN_AM * HOUR)
+    rigid_job = engine.Job(
+        HOUR,
+        rigid_schedulable,
+        rigid_scheduled,
+        "rigid_job",
+        engine.Policy(0, 0),
+        set(),
+        set(),
+    )
+
+    schedule, _ = engine.schedule_jobs([rigid_job], HOUR, 10.0, 0.1, 500)
+    scheduled_job = schedule.scheduled_jobs[0]
+
+    assert scheduled_job.scheduled_time_range == rigid_schedulable
+    assert scheduled_job.scheduled_time_ranges[0] == rigid_schedulable

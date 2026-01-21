@@ -25,8 +25,11 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     # Ensure model metadata is registered on the current Base.
     import elastisched_api.models as models  # noqa: F401
+    metadata = Base.metadata
+    if not metadata.tables:
+        metadata = models.BlobModel.metadata
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(metadata.create_all)
         if conn.dialect.name == "sqlite":
             await _ensure_sqlite_blob_columns(conn)
             await _ensure_sqlite_scheduled_occurrence_columns(conn)
