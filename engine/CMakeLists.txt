@@ -28,22 +28,60 @@ target_include_directories(scheduler_lib PUBLIC
     src
 )
 
-if(NOT SKBUILD)
+option(ELASTISCHED_BUILD_CLI "Build the engine CLI executable" ON)
+if(NOT SKBUILD AND ELASTISCHED_BUILD_CLI)
     set(CMAKE_BINARY_DIR "..")
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-    
-    add_executable(scheduler src/main.cpp)
-    target_link_libraries(scheduler scheduler_lib)
-    
-    set_target_properties(scheduler PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-        OUTPUT_NAME "engine"
-    )
-    
-    install(TARGETS scheduler scheduler_lib
-            RUNTIME DESTINATION bin
+
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
+        add_executable(scheduler src/main.cpp)
+        target_link_libraries(scheduler scheduler_lib)
+
+        set_target_properties(scheduler PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+            OUTPUT_NAME "engine"
+        )
+
+        install(TARGETS scheduler scheduler_lib
+                RUNTIME DESTINATION bin
+                LIBRARY DESTINATION lib
+                ARCHIVE DESTINATION lib)
+    else()
+        message(STATUS "Skipping CLI build: src/main.cpp not found.")
+        install(TARGETS scheduler_lib
+                LIBRARY DESTINATION lib
+                ARCHIVE DESTINATION lib)
+    endif()
+elseif(NOT SKBUILD)
+    install(TARGETS scheduler_lib
             LIBRARY DESTINATION lib
             ARCHIVE DESTINATION lib)
+endif()
+
+option(ELASTISCHED_BUILD_TESTS "Build engine C++ tests" ON)
+if(ELASTISCHED_BUILD_TESTS)
+    enable_testing()
+    add_executable(engine_tests
+        tests/tests.cpp
+    )
+    target_link_libraries(engine_tests PRIVATE scheduler_lib)
+    target_include_directories(engine_tests PRIVATE
+        src
+        tests
+    )
+    add_test(NAME engine_tests COMMAND engine_tests)
+endif()
+
+option(ELASTISCHED_ENABLE_COVERAGE "Enable coverage instrumentation" OFF)
+if(ELASTISCHED_ENABLE_COVERAGE)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(scheduler_lib PRIVATE -O0 -g --coverage)
+        target_link_options(scheduler_lib PRIVATE --coverage)
+        if(ELASTISCHED_BUILD_TESTS)
+            target_compile_options(engine_tests PRIVATE -O0 -g --coverage)
+            target_link_options(engine_tests PRIVATE --coverage)
+        endif()
+    endif()
 endif()
 
 if(pybind11_FOUND AND SKBUILD)

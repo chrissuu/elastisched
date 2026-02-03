@@ -5,19 +5,13 @@
 #include "Optimizer.hpp"
 
 #include <algorithm>
-#include <cassert>
-#include <cmath>
 #include <cstddef>
-#include <fstream>
 #include <iostream>
-#include <limits>
-#include <map>
 #include <optional>
 #include <queue>
 #include <random>
 #include <set>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 
 namespace {
@@ -244,6 +238,22 @@ Schedule generate_random_schedule_neighbor(
     size_t max_segments = static_cast<size_t>(policy.get_max_splits()) + 1;
     size_t max_segments_by_duration = static_cast<size_t>(random_flexible_job.duration / min_split);
     size_t possible_segments = std::min(max_segments, max_segments_by_duration);
+    const bool is_currently_split = random_flexible_job.get_scheduled_time_ranges().size() > 1;
+
+    if (is_currently_split) {
+        constexpr double merge_probability = 0.3;
+        std::bernoulli_distribution merge_decision(merge_probability);
+        if (merge_decision(gen)) {
+            TimeRange random_time_range = generate_random_time_range_within(
+                random_flexible_job.schedulable_time_range,
+                random_flexible_job.duration,
+                granularity,
+                gen
+            );
+            random_flexible_job.set_scheduled_time_ranges({random_time_range});
+            return s;
+        }
+    }
 
     bool attempt_split = false;
     if (can_split && possible_segments >= 2) {

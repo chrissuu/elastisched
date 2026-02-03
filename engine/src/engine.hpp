@@ -1,7 +1,6 @@
 #ifndef ENGINE_HPP
 #define ENGINE_HPP
 
-#include "constants.hpp"
 #include "types.hpp"
 #include "Job.hpp"
 #include "IntervalTree.hpp"
@@ -61,6 +60,19 @@ public:
     double schedule_cost() const;
 
     ScheduleCostFunction(const Schedule& schedule, sec_t granularity);
+};
+
+struct EngineConfig {
+    const uint64_t granularity;
+    const double initial_temp;
+    const double final_temp;
+    const uint64_t num_iters;
+    const uint64_t num_workers;
+    const double illegal_schedule_weight;
+    const double overlap_cost_weight;
+    const double split_cost_weight;
+    const bool log_engine_run;
+    const std::string output_file;
 };
 
 Schedule schedule(std::vector<Job> jobs, const uint64_t granularity);

@@ -1,5 +1,6 @@
 #ifndef INTERVALTREE_HPP
 #define INTERVALTREE_HPP
+
 #include <memory>
 #include <iostream>
 #include <utility>

@@ -1,5 +1,6 @@
 #ifndef SIMULATED_ANNEALING_OPTIMIZER_HPP
 #define SIMULATED_ANNEALING_OPTIMIZER_HPP
+#include "constants.hpp"
 #include <functional>
 #include <random>
 #include <cmath>

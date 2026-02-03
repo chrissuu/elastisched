@@ -1,10 +1,13 @@
+# python
 **/.venv
 **/__pycache__
 **/.pytest_cache
 **/*.egg-info
+
+# vscode
 **/.vscode
-**/build
-**/logs
+
+# node / electron
 **/node_modules
 **/dist
 **/.parcel-cache
@@ -13,19 +16,28 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-src/elastisched/engine/bin
 
 offline-packages
 
+# local database
 elastisched.db
 elastischedcopy.db
 
+# env variables
+.env
+
+# engine
+**/build
 **/CMakeCache.txt
 **/cmake_install.cmake
+**/logs
+.cache
+bin/engine
 engine/Makefile
 engine/CMakeFiles
 engine/*.a
 engine/*.o
 engine/bin/*
-
-.env
+engine/bin/engine
+engine/build_tests
+src/elastisched/engine/bin
