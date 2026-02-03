@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from elastisched_api.recurrence_router import (
+from backend.recurrence_router import (
     _coerce_timerange,
     _exclusion_set,
     _normalize_recurrence_type,
@@ -11,7 +11,7 @@ from elastisched_api.recurrence_router import (
     _recurrence_tzinfo,
     _to_occurrence_schema,
 )
-from elastisched_api.schemas import OccurrenceRead, RecurrenceCreate
+from backend.schemas import OccurrenceRead, RecurrenceCreate
 from core.timerange import TimeRange
 
 

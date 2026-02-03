@@ -1,4 +1,4 @@
-from elastisched_api.llm.base import (
+from backend.llm.base import (
     BaseModelProvider,
     Message,
     ModelResponse,
@@ -6,9 +6,9 @@ from elastisched_api.llm.base import (
     ToolResult,
     ToolSpec,
 )
-from elastisched_api.llm.gemini import GeminiProvider
-from elastisched_api.llm.runtime import ToolCallingRuntime
-from elastisched_api.llm.tools import OpenAPIToolRegistry
+from backend.llm.gemini import GeminiProvider
+from backend.llm.runtime import ToolCallingRuntime
+from backend.llm.tools import OpenAPIToolRegistry
 
 __all__ = [
     "BaseModelProvider",

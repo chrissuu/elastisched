@@ -5,12 +5,12 @@
 
 namespace py = pybind11;
 
-#include "Tag.hpp"
-#include "Policy.hpp"
-#include "Job.hpp"
+#include "tag.hpp"
+#include "policy.hpp"
+#include "job.hpp"
 #include "engine.hpp"
 #include "constants.hpp"
-#include "Interval.hpp"
+#include "interval.hpp"
 
 PYBIND11_MODULE(engine, m) {
     // Tag

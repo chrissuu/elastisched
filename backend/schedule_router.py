@@ -7,13 +7,13 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import engine
-from elastisched_api.db import get_session
-from elastisched_api.models import (
+from backend.db import get_session
+from backend.models import (
     RecurrenceModel,
     ScheduledOccurrenceModel,
     ScheduleStateModel,
 )
-from elastisched_api.recurrence_router import (
+from backend.recurrence_router import (
     _coerce_timerange,
     _exclusion_set,
     _payload_end_datetime,
@@ -22,7 +22,7 @@ from elastisched_api.recurrence_router import (
     _recurrence_tzinfo,
     _to_occurrence_schema,
 )
-from elastisched_api.schemas import (
+from backend.schemas import (
     ScheduleRequest,
     ScheduleResponse,
     ScheduleStatus,

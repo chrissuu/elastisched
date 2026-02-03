@@ -2,20 +2,20 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from elastisched_api.config import (
+from backend.config import (
     get_gemini_api_key,
     get_gemini_model,
     get_max_blob_creation_retries,
 )
-from elastisched_api.llm import (
+from backend.llm import (
     GeminiProvider,
     Message,
     OpenAPIToolRegistry,
     ToolCallingRuntime,
 )
-from elastisched_api.llm.base import ToolSpec
-from elastisched_api.preview import build_preview_occurrences
-from elastisched_api.schemas import (
+from backend.llm.base import ToolSpec
+from backend.preview import build_preview_occurrences
+from backend.schemas import (
     LLMChatRequest,
     LLMChatResponse,
     LLMRecurrenceDraftRequest,

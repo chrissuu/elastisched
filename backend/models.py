@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from elastisched_api.db import Base
+from backend.db import Base
 
 
 class BlobModel(Base):

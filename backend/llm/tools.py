@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 import httpx
 
-from elastisched_api.llm.base import ToolCall, ToolResult, ToolSpec
+from backend.llm.base import ToolCall, ToolResult, ToolSpec
 
 
 @dataclass(frozen=True)

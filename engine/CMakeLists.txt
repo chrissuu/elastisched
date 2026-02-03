@@ -18,10 +18,10 @@ find_package(pybind11 QUIET)
 
 # Core scheduler library (shared between executable and Python module)
 add_library(scheduler_lib
-    src/Job.cpp
-    src/Policy.cpp
+    src/job.cpp
+    src/policy.cpp
     src/engine.cpp
-    src/Tag.cpp
+    src/tag.cpp
 )
 
 target_include_directories(scheduler_lib PUBLIC 
@@ -86,7 +86,7 @@ endif()
 
 if(pybind11_FOUND AND SKBUILD)
     pybind11_add_module(engine_py 
-        src/pybind_scheduler.cpp
+        src/pybind_engine.cpp
     )
     
     target_link_libraries(engine_py PRIVATE scheduler_lib)

@@ -16,9 +16,9 @@ async def api_client(tmp_path_factory):
     os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{db_path}"
     os.environ["ELASTISCHED_PROJECT_TZ"] = "UTC"
 
-    from elastisched_api import db as db_module
-    from elastisched_api import main as main_module
-    from elastisched_api import models as models_module
+    from backend import db as db_module
+    from backend import main as main_module
+    from backend import models as models_module
 
     importlib.reload(db_module)
     importlib.reload(models_module)
@@ -156,7 +156,7 @@ async def test_single_occurrence_scheduled_same_day_before_afternoon(
 
     fixed_now = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
 
-    import elastisched_api.schedule_router as schedule_router
+    import backend.schedule_router as schedule_router
 
     class FrozenDateTime(datetime):
         @classmethod

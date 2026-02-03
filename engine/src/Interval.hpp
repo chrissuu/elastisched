@@ -1,5 +1,5 @@
-#ifndef INTERVAL_H
-#define INTERVAL_H
+#ifndef ELASTISCHED_INTERVAL_HPP
+#define ELASTISCHED_INTERVAL_HPP
 
 #include <algorithm>
 #include <iostream>
@@ -62,4 +62,4 @@ public:
     }
 };
 
-#endif // INTERVAL_H
+#endif // ELASTISCHED_INTERVAL_HPP

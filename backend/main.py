@@ -4,14 +4,14 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from elastisched_api.db import init_db
-from elastisched_api.llm_router import llm_router
-from elastisched_api.router import router as blob_router
-from elastisched_api.recurrence_router import (
+from backend.db import init_db
+from backend.llm_router import llm_router
+from backend.router import router as blob_router
+from backend.recurrence_router import (
     occurrence_router,
     recurrence_router,
 )
-from elastisched_api.schedule_router import schedule_router
+from backend.schedule_router import schedule_router
 
 
 @asynccontextmanager

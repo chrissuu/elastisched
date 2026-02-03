@@ -1,9 +1,9 @@
-#ifndef ENGINE_HPP
-#define ENGINE_HPP
+#ifndef ELASTISCHED_ENGINE_HPP
+#define ELASTISCHED_ENGINE_HPP
 
 #include "types.hpp"
-#include "Job.hpp"
-#include "IntervalTree.hpp"
+#include "job.hpp"
+#include "interval_tree.hpp"
 
 #include <optional>
 #include <set>
@@ -62,6 +62,7 @@ public:
     ScheduleCostFunction(const Schedule& schedule, sec_t granularity);
 };
 
+// @note: currently unused
 struct EngineConfig {
     const uint64_t granularity;
     const double initial_temp;
@@ -83,4 +84,4 @@ std::pair<Schedule, std::vector<double>> schedule_jobs(
     const double final_temp,
     const uint64_t num_iters);
 
-#endif // ENGINE_HPP
+#endif // ELASTISCHED_ENGINE_HPP

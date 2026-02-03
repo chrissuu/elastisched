@@ -1,11 +1,11 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
-#include "Interval.hpp"
-#include "IntervalTree.hpp"
-#include "Job.hpp"
-#include "Policy.hpp"
-#include "Tag.hpp"
+#include "interval.hpp"
+#include "interval_tree.hpp"
+#include "job.hpp"
+#include "policy.hpp"
+#include "tag.hpp"
 #include "constants.hpp"
 #include "engine.hpp"
 

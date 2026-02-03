@@ -18,7 +18,7 @@ Elastisched is a scheduling and time management software built around "blobs": f
 
 ## Project Layout
 
-- `backend/elastisched_api`: FastAPI backend and models
+- `backend/backend`: FastAPI backend and models
 - `core`: core scheduling library
 - `engine`: C++ scheduler engine
 - `frontend`: UI (HTML/CSS/JS)

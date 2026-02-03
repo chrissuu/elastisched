@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from elastisched_api.db import get_session
-from elastisched_api.models import BlobModel
-from elastisched_api.schemas import BlobCreate, BlobRead, BlobUpdate, TimeRangeSchema
+from backend.db import get_session
+from backend.models import BlobModel
+from backend.schemas import BlobCreate, BlobRead, BlobUpdate, TimeRangeSchema
 from core.constants import DEFAULT_TZ, PROJECT_TIMEZONE
 
 

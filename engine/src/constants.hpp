@@ -1,5 +1,5 @@
-#ifndef CONSTANTS
-#define CONSTANTS
+#ifndef ELASTISCHED_CONSTANTS_HPP
+#define ELASTISCHED_CONSTANTS_HPP
 
 #include <cstdint>
 #include <cstdlib>
@@ -27,4 +27,4 @@ namespace constants {
     }
 }
 
-#endif
+#endif // ELASTISCHED_CONSTANTS_HPP

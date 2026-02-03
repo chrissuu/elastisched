@@ -1,5 +1,5 @@
-#ifndef POLICY_HPP
-#define POLICY_HPP
+#ifndef ELASTISCHED_POLICY_HPP
+#define ELASTISCHED_POLICY_HPP
 
 #include <cstdint>
 #include "types.hpp"
@@ -40,4 +40,4 @@ public:
     bool is_invisible() const;
 };
 
-#endif // POLICY_HPP
+#endif // ELASTISCHED_POLICY_HPP

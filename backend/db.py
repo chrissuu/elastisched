@@ -4,7 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from elastisched_api.config import get_database_url
+from backend.config import get_database_url
 
 
 DATABASE_URL = get_database_url()
@@ -24,7 +24,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db() -> None:
     # Ensure model metadata is registered on the current Base.
-    import elastisched_api.models as models  # noqa: F401
+    import backend.models as models  # noqa: F401
     metadata = Base.metadata
     if not metadata.tables:
         metadata = models.BlobModel.metadata

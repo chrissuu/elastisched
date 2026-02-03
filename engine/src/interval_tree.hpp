@@ -1,10 +1,10 @@
-#ifndef INTERVALTREE_HPP
-#define INTERVALTREE_HPP
+#ifndef ELASTISCHED_INTERVALTREE_HPP
+#define ELASTISCHED_INTERVALTREE_HPP
 
 #include <memory>
 #include <iostream>
 #include <utility>
-#include "Interval.hpp"
+#include "interval.hpp"
 
 template<typename T, typename U>
 struct Node {
@@ -158,4 +158,4 @@ public:
     }
 };
 
-#endif
+#endif // ELASTISCHED_INTERVALTREE_HPP

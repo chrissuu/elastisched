@@ -1,5 +1,5 @@
 #include <cstdint>
-#include "Policy.hpp"
+#include "policy.hpp"
 
 namespace {
 const uint8_t kPolicySplittable = 1 << 0;

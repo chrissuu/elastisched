@@ -1,5 +1,5 @@
-#ifndef TAG_HPP
-#define TAG_HPP
+#ifndef ELASTISCHED_TAG_HPP
+#define ELASTISCHED_TAG_HPP
 
 #include <string>
 
@@ -21,4 +21,4 @@ public:
     bool operator<(const Tag& other) const;
 };
 
-#endif // TAG_HPP
+#endif // ELASTISCHED_TAG_HPP

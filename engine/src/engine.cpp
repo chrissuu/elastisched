@@ -1,8 +1,8 @@
 #include "engine.hpp"
 
 #include "constants.hpp"
-#include "Policy.hpp"
-#include "Optimizer.hpp"
+#include "policy.hpp"
+#include "optimizer.hpp"
 
 #include <algorithm>
 #include <cstddef>

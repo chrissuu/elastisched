@@ -1,11 +1,11 @@
-#ifndef JOB_HPP
-#define JOB_HPP
+#ifndef ELASTISCHED_JOB_HPP
+#define ELASTISCHED_JOB_HPP
 
-#include "Policy.hpp"
-#include "Tag.hpp"
+#include "policy.hpp"
+#include "tag.hpp"
 #include "constants.hpp"
 #include "types.hpp"
-#include "Interval.hpp"
+#include "interval.hpp"
 
 #include <vector>
 #include <set>
@@ -37,4 +37,4 @@ public:
     std::string to_string() const;
 };
 
-#endif // JOB_HPP
+#endif // ELASTISCHED_JOB_HPP

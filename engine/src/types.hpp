@@ -1,6 +1,7 @@
 #ifndef ELASTISCHED_TYPES_HPP
 #define ELASTISCHED_TYPES_HPP
-#include "Interval.hpp"
+#include "interval.hpp"
+#include <cstdint>
 
 #ifndef ELASTISCHED_SEC_T_BITS
 #define ELASTISCHED_SEC_T_BITS 64

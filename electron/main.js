@@ -65,7 +65,7 @@ function startBackend() {
     [
       "-m",
       "uvicorn",
-      "elastisched_api.main:app",
+      "backend.main:app",
       "--host",
       API_HOST,
       "--port",

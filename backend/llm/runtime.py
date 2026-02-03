@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from elastisched_api.llm.base import BaseModelProvider, Message, ModelResponse
-from elastisched_api.llm.tools import OpenAPIToolRegistry
+from backend.llm.base import BaseModelProvider, Message, ModelResponse
+from backend.llm.tools import OpenAPIToolRegistry
 
 
 class ToolCallingRuntime:

@@ -5,7 +5,7 @@ from typing import Any
 
 import httpx
 
-from elastisched_api.llm.base import BaseModelProvider, Message, ModelResponse, ToolCall, ToolSpec
+from backend.llm.base import BaseModelProvider, Message, ModelResponse, ToolCall, ToolSpec
 
 
 class GeminiProvider(BaseModelProvider):
