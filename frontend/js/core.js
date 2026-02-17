@@ -50,6 +50,9 @@ const defaultConfig = {
   ),
   userTimeZone: window.APP_CONFIG?.userTimeZone || null,
   theme: window.APP_CONFIG?.theme || "sand",
+  profileName: window.APP_CONFIG?.profileName || "Workspace user",
+  profileEmail: window.APP_CONFIG?.profileEmail || "user@elastisched.local",
+  profileRole: window.APP_CONFIG?.profileRole || "Scheduler operator",
 };
 
 const storedConfig = (() => {

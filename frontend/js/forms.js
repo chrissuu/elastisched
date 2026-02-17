@@ -31,6 +31,7 @@ const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 const editOnlyElements = document.querySelectorAll(".edit-only");
 const settingsTabs = document.querySelectorAll(".settings-tab");
 const settingsSections = document.querySelectorAll(".settings-section");
+const sidebarLinks = document.querySelectorAll(".sidebar-link");
 const nonWeeklyField = document.querySelector(".non-weekly-field");
 const primaryDependencyField = document.querySelector(
   ".dependency-field:not(.slot-dependency-field)"
@@ -105,6 +106,14 @@ function toggleSettings(show) {
   }
 }
 
+function toggleProfile(show) {
+  if (!dom.profileModal || !dom.profilePanel) return;
+  const isActive = typeof show === "boolean" ? show : !dom.profileModal.classList.contains("active");
+  dom.profileModal.classList.toggle("active", isActive);
+  dom.profilePanel.classList.toggle("active", isActive);
+  dom.profileModal.setAttribute("aria-hidden", (!isActive).toString());
+}
+
 function toggleHelp(show) {
   const isActive = typeof show === "boolean" ? show : !dom.helpModal.classList.contains("active");
   dom.helpModal.classList.toggle("active", isActive);
@@ -163,6 +172,40 @@ function setActiveSettingsTab(tabName) {
   settingsSections.forEach((section) => {
     section.classList.toggle("active", section.dataset.settingsSection === tabName);
   });
+  const sidebarKey = tabName === "profile" ? "profile" : "settings";
+  sidebarLinks.forEach((link) => {
+    const linkId = link.getAttribute("id");
+    const isActive =
+      (sidebarKey === "profile" && linkId === "profileSettingsBtn") ||
+      (sidebarKey === "settings" && linkId === "settingsBtn");
+    link.classList.toggle("active", isActive);
+  });
+}
+
+function initialsFromName(name) {
+  const parts = (name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "U";
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
+function syncProfileUi() {
+  const name = appConfig.profileName || "Workspace user";
+  const email = appConfig.profileEmail || "user@elastisched.local";
+  const role = appConfig.profileRole || "Scheduler operator";
+  const initials = initialsFromName(name);
+  if (dom.profileName) dom.profileName.textContent = name;
+  if (dom.profileEmail) dom.profileEmail.textContent = email;
+  if (dom.profileAvatar) dom.profileAvatar.textContent = initials;
+  if (dom.profileNameLarge) dom.profileNameLarge.textContent = name;
+  if (dom.profileEmailLarge) dom.profileEmailLarge.textContent = email;
+  if (dom.profileRoleLarge) dom.profileRoleLarge.textContent = role;
+  if (dom.profileAvatarLarge) dom.profileAvatarLarge.textContent = initials;
 }
 
 function populateTimeZones() {
@@ -206,6 +249,15 @@ function hydrateSettingsForm() {
   );
   dom.settingsForm.lookaheadMinutes.value = lookaheadMinutes;
   dom.settingsForm.userTimeZone.value = appConfig.userTimeZone || "";
+  if (dom.settingsForm.profileName) {
+    dom.settingsForm.profileName.value = appConfig.profileName || "";
+  }
+  if (dom.settingsForm.profileEmail) {
+    dom.settingsForm.profileEmail.value = appConfig.profileEmail || "";
+  }
+  if (dom.settingsForm.profileRole) {
+    dom.settingsForm.profileRole.value = appConfig.profileRole || "";
+  }
 }
 
 function setFormMode(mode) {
@@ -2797,6 +2849,9 @@ function handleSettingsSubmit(event) {
   const lookaheadMinutes = Math.max(1, Number(formData.get("lookaheadMinutes") || 1));
   const userTimeZone = formData.get("userTimeZone")?.toString().trim() || "";
   const theme = formData.get("theme")?.toString().trim() || "sand";
+  const profileName = formData.get("profileName")?.toString().trim() || "";
+  const profileEmail = formData.get("profileEmail")?.toString().trim() || "";
+  const profileRole = formData.get("profileRole")?.toString().trim() || "";
   if (userTimeZone) {
     try {
       Intl.DateTimeFormat("en-US", { timeZone: userTimeZone });
@@ -2805,6 +2860,10 @@ function handleSettingsSubmit(event) {
       return;
     }
   }
+  if (profileEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail)) {
+    dom.settingsStatus.textContent = "Invalid email format.";
+    return;
+  }
   appConfig.scheduleName = scheduleName || appConfig.scheduleName;
   appConfig.subtitle = subtitle || appConfig.subtitle;
   appConfig.minuteGranularity = granularity;
@@ -2812,6 +2871,9 @@ function handleSettingsSubmit(event) {
   appConfig.includeActiveOccurrences = includeActiveOccurrences;
   appConfig.lookaheadSeconds = lookaheadMinutes * 60;
   appConfig.theme = theme;
+  appConfig.profileName = profileName || "Workspace user";
+  appConfig.profileEmail = profileEmail || "user@elastisched.local";
+  appConfig.profileRole = profileRole || "Scheduler operator";
   if (userTimeZone) {
     appConfig.userTimeZone = userTimeZone;
   }
@@ -2821,6 +2883,7 @@ function handleSettingsSubmit(event) {
   if (dom.timeZoneLabel) {
     dom.timeZoneLabel.textContent = appConfig.userTimeZone || "Local";
   }
+  syncProfileUi();
   dom.settingsStatus.textContent = "Saved. Refresh to apply granularity.";
   saveSettings(appConfig);
 }
@@ -2838,14 +2901,52 @@ function openCreateForm(blobType = BLOB_TYPES.TASK) {
 }
 
 function handleSettingsClick() {
+  sidebarLinks.forEach((link) => {
+    link.classList.toggle("active", link.getAttribute("id") === "settingsBtn");
+  });
   toggleSettings(true);
+  toggleProfile(false);
+  toggleHelp(false);
   populateTimeZones();
   hydrateSettingsForm();
+  setActiveSettingsTab("general");
   dom.settingsStatus.textContent = "";
 }
 
+function handleProfileSettingsClick() {
+  toggleSettings(true);
+  toggleProfile(false);
+  toggleHelp(false);
+  populateTimeZones();
+  hydrateSettingsForm();
+  setActiveSettingsTab("profile");
+  dom.settingsStatus.textContent = "";
+}
+
+function handleProfileClick() {
+  sidebarLinks.forEach((link) => {
+    link.classList.remove("active");
+  });
+  toggleSettings(false);
+  toggleHelp(false);
+  syncProfileUi();
+  toggleProfile(true);
+}
+
 function handleHelpClick() {
+  sidebarLinks.forEach((link) => {
+    link.classList.toggle("active", link.getAttribute("id") === "helpBtn");
+  });
+  toggleSettings(false);
+  toggleProfile(false);
   toggleHelp(true);
+}
+
+function handleCloseProfile() {
+  toggleProfile(false);
+  sidebarLinks.forEach((link) => {
+    link.classList.remove("active");
+  });
 }
 
 function handleLlmOpen() {
@@ -2961,10 +3062,16 @@ async function handleLlmDiscard() {
 function handleCloseSettings() {
   toggleSettings(false);
   dom.settingsStatus.textContent = "";
+  sidebarLinks.forEach((link) => {
+    link.classList.remove("active");
+  });
 }
 
 function handleCloseHelp() {
   toggleHelp(false);
+  sidebarLinks.forEach((link) => {
+    link.classList.remove("active");
+  });
 }
 
 function handleCloseForm() {
@@ -3245,12 +3352,36 @@ function bindFormHandlers(onRefresh) {
   if (dom.llmScheduleBtn) {
     dom.llmScheduleBtn.addEventListener("click", handleLlmOpen);
   }
-  dom.settingsBtn.addEventListener("click", handleSettingsClick);
+  if (dom.settingsBtn) {
+    dom.settingsBtn.addEventListener("click", handleSettingsClick);
+  }
+  if (dom.profileSettingsBtn) {
+    dom.profileSettingsBtn.addEventListener("click", handleProfileSettingsClick);
+  }
+  if (dom.profileBtn) {
+    dom.profileBtn.addEventListener("click", handleProfileClick);
+  }
   if (dom.helpBtn) {
     dom.helpBtn.addEventListener("click", handleHelpClick);
   }
-  dom.closeSettingsBtn.addEventListener("click", handleCloseSettings);
-  dom.settingsBackdrop.addEventListener("click", handleCloseSettings);
+  if (dom.closeSettingsBtn) {
+    dom.closeSettingsBtn.addEventListener("click", handleCloseSettings);
+  }
+  if (dom.settingsBackdrop) {
+    dom.settingsBackdrop.addEventListener("click", handleCloseSettings);
+  }
+  if (dom.closeProfileBtn) {
+    dom.closeProfileBtn.addEventListener("click", handleCloseProfile);
+  }
+  if (dom.closeProfilePrimaryBtn) {
+    dom.closeProfilePrimaryBtn.addEventListener("click", handleCloseProfile);
+  }
+  if (dom.profileBackdrop) {
+    dom.profileBackdrop.addEventListener("click", handleCloseProfile);
+  }
+  if (dom.openProfileSettingsBtn) {
+    dom.openProfileSettingsBtn.addEventListener("click", handleProfileSettingsClick);
+  }
   if (dom.closeHelpBtn) {
     dom.closeHelpBtn.addEventListener("click", handleCloseHelp);
   }
@@ -3418,6 +3549,7 @@ function bindFormHandlers(onRefresh) {
   }
   setLlmPreviewControls(Boolean(state.previewBlobs?.length));
   bindBlobTypeToggle(nonWeeklyField);
+  syncProfileUi();
   if (settingsTabs.length) {
     settingsTabs.forEach((tab) => {
       tab.addEventListener("click", () => {
@@ -3436,5 +3568,6 @@ export {
   resetFormMode,
   toggleForm,
   toggleSettings,
+  toggleProfile,
   toggleHelp,
 };

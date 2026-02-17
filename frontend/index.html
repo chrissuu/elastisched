@@ -8,7 +8,7 @@
   </head>
   <body>
     <div class="page">
-      <header class="topbar">
+      <aside class="panel sidebar">
         <div class="brand">
           <div class="logo">E</div>
           <div>
@@ -16,11 +16,36 @@
             <div class="subtitle" id="brandSubtitle">Schedule at a glance</div>
           </div>
         </div>
-        <div class="controls">
-          <button class="ghost icon settings" id="settingsBtn" title="Settings">⚙</button>
-          <button class="ghost icon help" id="helpBtn" title="Keyboard shortcuts">?</button>
-        </div>
-      </header>
+        <nav class="sidebar-nav" aria-label="Workspace menu">
+          <button class="sidebar-link active" id="settingsBtn" type="button">
+            <span class="sidebar-link-title">Settings</span>
+            <span class="sidebar-link-subtitle">Workspace and schedule defaults</span>
+          </button>
+          <button class="sidebar-link" id="profileSettingsBtn" type="button">
+            <span class="sidebar-link-title">Profile settings</span>
+            <span class="sidebar-link-subtitle">Identity and contact preferences</span>
+          </button>
+          <button class="sidebar-link" id="helpBtn" type="button">
+            <span class="sidebar-link-title">Help menu</span>
+            <span class="sidebar-link-subtitle">Keyboard shortcuts and tips</span>
+          </button>
+        </nav>
+        <button class="sidebar-profile" id="profileBtn" type="button">
+          <div class="sidebar-profile-avatar" id="profileAvatar">U</div>
+          <div class="sidebar-profile-copy">
+            <div class="sidebar-profile-name" id="profileName">Workspace user</div>
+            <div class="sidebar-profile-email" id="profileEmail">user@elastisched.local</div>
+          </div>
+        </button>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="workspace-meta">
+            <div class="workspace-eyebrow">Scheduler workspace</div>
+            <div class="workspace-title">Plan, adjust, and run your schedule</div>
+          </div>
+        </header>
 
       <div class="modal" id="settingsModal" aria-hidden="true">
         <div class="modal-backdrop" id="settingsBackdrop"></div>
@@ -32,7 +57,7 @@
             </div>
             <button class="ghost small" id="closeSettingsBtn">Close</button>
           </div>
-          <form id="settingsForm" class="blob-form">
+          <form id="settingsForm" class="blob-form settings-form">
             <div class="settings-tabs vertical" role="tablist">
               <button class="settings-tab active" type="button" data-settings-tab="general">
                 General
@@ -40,53 +65,143 @@
               <button class="settings-tab" type="button" data-settings-tab="scheduling">
                 Scheduling
               </button>
+              <button class="settings-tab" type="button" data-settings-tab="profile">
+                Profile
+              </button>
             </div>
             <div class="settings-section active" data-settings-section="general">
-              <label>
-                Schedule name
-                <input type="text" name="scheduleName" placeholder="Elastisched" />
-              </label>
-              <label>
-                Subtitle
-                <input type="text" name="subtitle" placeholder="Schedule at a glance" />
-              </label>
-              <label>
-                Theme
-                <select name="theme">
-                  <option value="sand">Sand</option>
-                  <option value="sage">Sage</option>
-                  <option value="ocean">Ocean</option>
-                  <option value="ember">Ember</option>
-                </select>
-              </label>
-              <label>
-                User timezone
-                <select name="userTimeZone"></select>
-              </label>
+              <div class="settings-section-header">
+                <div class="settings-section-title">General settings</div>
+                <div class="settings-section-copy">
+                  Configure how your workspace appears across the app.
+                </div>
+              </div>
+              <div class="settings-grid">
+                <article class="settings-card">
+                  <div class="settings-card-title">Workspace identity</div>
+                  <div class="settings-card-copy">
+                    Set the primary title and subtitle shown throughout the interface.
+                  </div>
+                  <label>
+                    Schedule name
+                    <input type="text" name="scheduleName" placeholder="Elastisched" />
+                  </label>
+                  <label>
+                    Subtitle
+                    <input type="text" name="subtitle" placeholder="Schedule at a glance" />
+                  </label>
+                </article>
+                <article class="settings-card">
+                  <div class="settings-card-title">Display preferences</div>
+                  <div class="settings-card-copy">
+                    Control your default theme and preferred local timezone.
+                  </div>
+                  <label>
+                    Theme
+                    <select name="theme">
+                      <option value="sand">Sand</option>
+                      <option value="sage">Sage</option>
+                      <option value="ocean">Ocean</option>
+                      <option value="ember">Ember</option>
+                    </select>
+                  </label>
+                  <label>
+                    User timezone
+                    <select name="userTimeZone"></select>
+                  </label>
+                </article>
+              </div>
             </div>
             <div class="settings-section" data-settings-section="scheduling">
-              <label>
-                Minute granularity
-                <input type="number" name="minuteGranularity" min="1" step="1" />
-              </label>
-              <label>
-                Finish early buffer (minutes)
-                <input type="number" name="finishEarlyBufferMinutes" min="1" step="1" />
-              </label>
-              <label class="settings-toggle">
-                <span>Reschedule ongoing events</span>
-                <input type="checkbox" name="includeActiveOccurrences" />
-              </label>
-              <label>
-                Lookahead minutes
-                <input type="number" name="lookaheadMinutes" min="1" step="1" />
-              </label>
+              <div class="settings-section-header">
+                <div class="settings-section-title">Scheduling defaults</div>
+                <div class="settings-section-copy">
+                  Define planner behavior that controls cadence and schedule regeneration.
+                </div>
+              </div>
+              <div class="settings-grid">
+                <article class="settings-card">
+                  <div class="settings-card-title">Engine behavior</div>
+                  <label>
+                    Minute granularity
+                    <input type="number" name="minuteGranularity" min="1" step="1" />
+                  </label>
+                  <label>
+                    Lookahead minutes
+                    <input type="number" name="lookaheadMinutes" min="1" step="1" />
+                  </label>
+                </article>
+                <article class="settings-card">
+                  <div class="settings-card-title">Execution options</div>
+                  <label>
+                    Finish early buffer (minutes)
+                    <input type="number" name="finishEarlyBufferMinutes" min="1" step="1" />
+                  </label>
+                  <label class="settings-toggle">
+                    <span>Reschedule ongoing events</span>
+                    <input type="checkbox" name="includeActiveOccurrences" />
+                  </label>
+                </article>
+              </div>
+            </div>
+            <div class="settings-section" data-settings-section="profile">
+              <div class="settings-section-header">
+                <div class="settings-section-title">Profile settings</div>
+                <div class="settings-section-copy">
+                  Manage the user identity shown in the sidebar and profile menu.
+                </div>
+              </div>
+              <div class="settings-grid">
+                <article class="settings-card">
+                  <div class="settings-card-title">Identity</div>
+                  <label>
+                    Full name
+                    <input type="text" name="profileName" placeholder="Workspace user" />
+                  </label>
+                  <label>
+                    Email
+                    <input type="email" name="profileEmail" placeholder="user@elastisched.local" />
+                  </label>
+                </article>
+                <article class="settings-card">
+                  <div class="settings-card-title">Role</div>
+                  <label>
+                    Team role
+                    <input type="text" name="profileRole" placeholder="Scheduler operator" />
+                  </label>
+                </article>
+              </div>
             </div>
             <div class="form-actions">
               <button type="submit" class="primary">Save</button>
               <span class="form-status" id="settingsStatus"></span>
             </div>
           </form>
+        </section>
+      </div>
+
+      <div class="modal" id="profileModal" aria-hidden="true">
+        <div class="modal-backdrop" id="profileBackdrop"></div>
+        <section class="panel form-panel modal-panel profile-panel" id="profilePanel">
+          <div class="form-header">
+            <div>
+              <div class="form-title">User profile</div>
+              <div class="form-subtitle">Profile summary and account context</div>
+            </div>
+            <button class="ghost small" id="closeProfileBtn">Close</button>
+          </div>
+          <div class="profile-overview">
+            <div class="profile-avatar-lg" id="profileAvatarLarge">U</div>
+            <div class="profile-text">
+              <div class="profile-name-lg" id="profileNameLarge">Workspace user</div>
+              <div class="profile-email-lg" id="profileEmailLarge">user@elastisched.local</div>
+              <div class="profile-role-lg" id="profileRoleLarge">Scheduler operator</div>
+            </div>
+          </div>
+          <div class="profile-actions">
+            <button class="ghost" id="openProfileSettingsBtn" type="button">Open profile settings</button>
+            <button class="primary" id="closeProfilePrimaryBtn" type="button">Done</button>
+          </div>
         </section>
       </div>
 
@@ -626,6 +741,7 @@
           <div id="viewYear" class="view"></div>
         </div>
       </section>
+      </main>
     </div>
 
     <script src="./js/constants.js"></script>
