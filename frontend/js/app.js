@@ -16,7 +16,6 @@ import {
   resetFormMode,
   toggleForm,
   toggleSettings,
-  toggleProfile,
   toggleHelp,
 } from "./forms.js";
 import {
@@ -478,10 +477,6 @@ window.addEventListener("keydown", (event) => {
     }
     if (dom.helpModal?.classList.contains("active")) {
       toggleHelp(false);
-      closedSidebarModal = true;
-    }
-    if (dom.profileModal?.classList.contains("active")) {
-      toggleProfile(false);
       closedSidebarModal = true;
     }
     if (closedSidebarModal) {

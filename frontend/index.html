@@ -28,13 +28,6 @@
             <span class="sidebar-link-subtitle">Keyboard shortcuts and tips</span>
           </button>
         </nav>
-        <button class="sidebar-profile" id="profileBtn" type="button">
-          <div class="sidebar-profile-avatar" id="profileAvatar">U</div>
-          <div class="sidebar-profile-copy">
-            <div class="sidebar-profile-name" id="profileName">Workspace user</div>
-            <div class="sidebar-profile-email" id="profileEmail">user@elastisched.local</div>
-          </div>
-        </button>
       </aside>
 
       <main class="workspace">
@@ -57,9 +50,6 @@
               </button>
               <button class="settings-tab" type="button" data-settings-tab="scheduling">
                 Scheduling
-              </button>
-              <button class="settings-tab" type="button" data-settings-tab="profile">
-                Profile
               </button>
             </div>
             <div class="settings-section active" data-settings-section="general">
@@ -173,66 +163,13 @@
                 </article>
               </div>
             </div>
-            <div class="settings-section" data-settings-section="profile">
-              <div class="settings-section-header">
-                <div class="settings-section-title">Profile settings</div>
-                <div class="settings-section-copy">
-                  Manage the user identity shown in the sidebar and profile menu.
-                </div>
-              </div>
-              <div class="settings-grid">
-                <article class="settings-card">
-                  <div class="settings-card-title">Identity</div>
-                  <label>
-                    Full name
-                    <input type="text" name="profileName" placeholder="Workspace user" />
-                  </label>
-                  <label>
-                    Email
-                    <input type="email" name="profileEmail" placeholder="user@elastisched.local" />
-                  </label>
-                </article>
-                <article class="settings-card">
-                  <div class="settings-card-title">Role</div>
-                  <label>
-                    Team role
-                    <input type="text" name="profileRole" placeholder="Scheduler operator" />
-                  </label>
-                </article>
-              </div>
-            </div>
-            <div class="form-actions">
-              <span class="form-status settings-dirty-indicator" id="settingsDirtyIndicator">
-                All changes saved.
-              </span>
-              <button type="submit" class="primary" id="settingsSaveBtn" disabled>Save changes</button>
-              <span class="form-status" id="settingsStatus"></span>
-            </div>
           </form>
-        </section>
-      </div>
-
-      <div class="modal" id="profileModal" aria-hidden="true">
-        <div class="modal-backdrop" id="profileBackdrop"></div>
-        <section class="panel form-panel modal-panel profile-panel" id="profilePanel">
-          <div class="form-header">
-            <div>
-              <div class="form-title">User profile</div>
-              <div class="form-subtitle">Profile summary and account context</div>
-            </div>
-            <button class="ghost small" id="closeProfileBtn">Close</button>
-          </div>
-          <div class="profile-overview">
-            <div class="profile-avatar-lg" id="profileAvatarLarge">U</div>
-            <div class="profile-text">
-              <div class="profile-name-lg" id="profileNameLarge">Workspace user</div>
-              <div class="profile-email-lg" id="profileEmailLarge">user@elastisched.local</div>
-              <div class="profile-role-lg" id="profileRoleLarge">Scheduler operator</div>
-            </div>
-          </div>
-          <div class="profile-actions">
-            <button class="ghost" id="openProfileSettingsBtn" type="button">Open profile settings</button>
-            <button class="primary" id="closeProfilePrimaryBtn" type="button">Done</button>
+          <div class="settings-save-dock">
+            <span class="form-status settings-dirty-indicator" id="settingsDirtyIndicator"></span>
+            <button type="submit" form="settingsForm" class="primary" id="settingsSaveBtn" disabled>
+              Save changes
+            </button>
+            <span class="form-status" id="settingsStatus"></span>
           </div>
         </section>
       </div>
