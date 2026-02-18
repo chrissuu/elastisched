@@ -110,8 +110,13 @@ PYBIND11_MODULE(engine, m) {
         .def_readwrite("log_engine_run", &EngineConfig::log_engine_run)
         .def_readwrite("output_file", &EngineConfig::output_file);
 
-    m.def("schedule", &schedule, "Run the scheduler with default configurations",
-          py::arg("jobs"), py::arg("granularity"));
+    m.def(
+        "schedule",
+        static_cast<Schedule (*)(std::vector<Job>, const uint64_t)>(&schedule),
+        "Run the scheduler with default configurations",
+        py::arg("jobs"),
+        py::arg("granularity")
+    );
     m.def(
         "schedule_with_config",
         [](std::vector<Job> jobs, const EngineConfig& config) {
@@ -122,8 +127,22 @@ PYBIND11_MODULE(engine, m) {
         py::arg("config")
     );
 
-    m.def("schedule_jobs", &schedule_jobs, "Run the scheduler",
-          py::arg("jobs"), py::arg("granularity"), py::arg("initial_temp"), py::arg("final_temp"), py::arg("num_iters"));
+    m.def(
+        "schedule_jobs",
+        static_cast<std::pair<Schedule, std::vector<double>> (*)(
+            std::vector<Job>,
+            const uint64_t,
+            const double,
+            const double,
+            const uint64_t
+        )>(&schedule_jobs),
+        "Run the scheduler",
+        py::arg("jobs"),
+        py::arg("granularity"),
+        py::arg("initial_temp"),
+        py::arg("final_temp"),
+        py::arg("num_iters")
+    );
     m.def(
         "schedule_jobs_with_config",
         [](std::vector<Job> jobs, const EngineConfig& config) {
