@@ -1927,11 +1927,8 @@ function startInteractiveCreate(options = {}) {
   state.pendingDefaultRange = null;
   state.pendingSchedulableRange = null;
   dom.formStatus.textContent = "Click start/end for schedulable range.";
-  if (state.view !== "day" && state.view !== "week") {
-    setActive("day");
-  }
-  renderAll();
-  setActive(state.view);
+  const targetView = state.view === "day" || state.view === "week" ? state.view : "day";
+  setActive(targetView);
 }
 
 export {

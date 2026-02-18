@@ -31,7 +31,7 @@ body {
 
 body {
   margin: 0;
-  background: radial-gradient(circle at 20% 15%, var(--bg-1) 0%, var(--bg-2) 40%, var(--bg-3) 100%);
+  background: #ffffff;
   color: var(--ink);
   font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
 }
@@ -101,35 +101,27 @@ body[data-theme="ember"] {
   height: 100dvh;
   padding: 24px;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 280px) minmax(0, 1fr);
   gap: 18px;
   overflow: hidden;
+}
+
+.page.sidebar-collapsed {
+  --sidebar-width: 82px;
 }
 
 .workspace {
   min-width: 0;
   display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 12px;
+  grid-template-rows: 1fr;
+  gap: 0;
   overflow: hidden;
 }
 
 .brand {
   display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: conic-gradient(from 180deg, var(--sun), var(--rose), var(--ocean));
-  color: #1f1b12;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  letter-spacing: 1px;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .title {
@@ -144,10 +136,17 @@ body[data-theme="ember"] {
 
 .sidebar {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   gap: 18px;
   border-radius: 24px;
   padding: 20px 16px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sidebar-toggle {
+  justify-self: start;
+  padding: 4px 10px;
 }
 
 .sidebar-nav {
@@ -166,6 +165,8 @@ body[data-theme="ember"] {
   padding: 10px 12px;
   text-align: left;
   cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .sidebar-link-title {
@@ -176,6 +177,9 @@ body[data-theme="ember"] {
 .sidebar-link-subtitle {
   font-size: 12px;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-link:hover {
@@ -184,14 +188,14 @@ body[data-theme="ember"] {
 }
 
 .sidebar-link.active {
-  background: #fffaf2;
+  background: var(--paper);
   border-color: rgba(58, 110, 122, 0.35);
   box-shadow: inset 0 0 0 1px rgba(58, 110, 122, 0.12);
 }
 
 .sidebar-profile {
   border: 1px solid #e0d3c1;
-  background: #fffaf2;
+  background: var(--paper);
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -233,30 +237,47 @@ body[data-theme="ember"] {
   text-overflow: ellipsis;
 }
 
-.topbar {
-  border: 1px solid #e2d6c7;
-  border-radius: 18px;
-  background: rgba(246, 241, 233, 0.7);
-  backdrop-filter: blur(6px);
-  padding: 14px 18px;
+.page.sidebar-collapsed .brand .subtitle,
+.page.sidebar-collapsed .brand .title,
+.page.sidebar-collapsed .sidebar-link-title,
+.page.sidebar-collapsed .sidebar-link-subtitle,
+.page.sidebar-collapsed .sidebar-profile-copy {
+  display: none;
 }
 
-.workspace-meta {
-  display: grid;
-  gap: 2px;
+.page.sidebar-collapsed .brand {
+  justify-content: center;
 }
 
-.workspace-eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
+.page.sidebar-collapsed .sidebar-link {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  justify-items: center;
+  align-items: center;
+  border-radius: 12px;
 }
 
-.workspace-title {
-  font-size: 20px;
+.page.sidebar-collapsed .sidebar-link::before {
+  content: attr(data-short);
+  font-size: 15px;
   font-weight: 700;
-  color: var(--ink);
+  line-height: 1;
+}
+
+.page.sidebar-collapsed .sidebar-nav {
+  justify-items: center;
+}
+
+.page.sidebar-collapsed .sidebar-profile {
+  justify-content: center;
+  padding: 8px;
+  width: 52px;
+  justify-self: center;
+}
+
+.page.sidebar-collapsed .sidebar-toggle {
+  justify-self: center;
 }
 
 .ghost {
@@ -286,7 +307,7 @@ button:disabled {
   margin: 0;
   border-radius: 18px;
   border: 1px solid #e2d6c7;
-  box-shadow: var(--shadow);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -387,7 +408,7 @@ button:disabled {
 
 #settingsPanel .blob-form {
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
   padding-right: 6px;
 }
 
@@ -901,13 +922,48 @@ body.modal-open .info-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.settings-toggle span {
+  flex: 1;
 }
 
 .settings-toggle input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(27, 26, 22, 0.24);
+  background: #d9d0c2;
+  position: relative;
+  flex: 0 0 auto;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.settings-toggle input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(27, 26, 22, 0.2);
+  transition: transform 0.18s ease;
+}
+
+.settings-toggle input[type="checkbox"]:checked {
+  background: var(--ocean);
+  border-color: var(--ocean);
+}
+
+.settings-toggle input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
 }
 
 .settings-tabs {
@@ -961,6 +1017,8 @@ body.modal-open .info-card {
   align-items: start;
   align-content: start;
   height: 100%;
+  overflow: hidden;
+  min-height: 0;
 }
 
 #settingsForm .settings-tabs {
@@ -972,8 +1030,14 @@ body.modal-open .info-card {
 #settingsForm .form-actions {
   grid-column: 2;
   grid-row: 2;
-  justify-self: end;
+  justify-self: stretch;
   align-self: end;
+  justify-content: flex-end;
+  min-height: 52px;
+  padding-top: 10px;
+  margin-top: 6px;
+  border-top: 1px solid rgba(27, 26, 22, 0.12);
+  background: var(--paper);
 }
 
 #settingsForm .settings-section {
@@ -981,6 +1045,10 @@ body.modal-open .info-card {
   grid-row: 1;
   align-content: start;
   align-items: start;
+  overflow: auto;
+  max-height: 100%;
+  padding-right: 4px;
+  min-height: 0;
 }
 
 #settingsForm label {
@@ -1029,9 +1097,24 @@ body.modal-open .info-card {
   color: var(--muted);
 }
 
-#settingsForm label > input,
+.settings-advanced-card.is-hidden {
+  display: none;
+}
+
+.settings-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#settingsForm label > input:not([type="checkbox"]),
 #settingsForm label > select {
   width: 100%;
+}
+
+#settingsForm .settings-toggle > input[type="checkbox"] {
+  width: 36px;
+  max-width: 36px;
 }
 
 .color-field {
@@ -1589,6 +1672,7 @@ body.modal-open .info-card {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .primary {
@@ -1607,6 +1691,21 @@ body.modal-open .info-card {
 .form-status {
   font-size: 12px;
   color: var(--muted);
+}
+
+.settings-dirty-indicator {
+  font-weight: 600;
+}
+
+#settingsSaveBtn {
+  min-width: 148px;
+}
+
+#settingsSaveBtn:disabled {
+  opacity: 1;
+  background: #b9b2a6;
+  color: #f4efe6;
+  cursor: not-allowed;
 }
 
 .ghost.small {
@@ -3019,12 +3118,8 @@ body.modal-open .info-card {
   }
 
   .workspace {
-    grid-template-rows: auto 1fr;
-    gap: 10px;
-  }
-
-  .workspace-title {
-    font-size: 17px;
+    grid-template-rows: 1fr;
+    gap: 0;
   }
 
   .calendar-panel {

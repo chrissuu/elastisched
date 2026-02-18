@@ -53,6 +53,23 @@ const defaultConfig = {
   profileName: window.APP_CONFIG?.profileName || "Workspace user",
   profileEmail: window.APP_CONFIG?.profileEmail || "user@elastisched.local",
   profileRole: window.APP_CONFIG?.profileRole || "Scheduler operator",
+  sidebarCollapsed: Boolean(window.APP_CONFIG?.sidebarCollapsed || false),
+  engineInitialTemp: Math.max(0.0001, Number(window.APP_CONFIG?.engineInitialTemp || 10.0)),
+  engineFinalTemp: Math.max(0.000001, Number(window.APP_CONFIG?.engineFinalTemp || 0.0001)),
+  engineNumIters: Math.max(1, Number(window.APP_CONFIG?.engineNumIters || 1000000)),
+  engineAdvancedEnabled: Boolean(window.APP_CONFIG?.engineAdvancedEnabled || false),
+  engineIllegalScheduleWeight: Math.max(
+    0,
+    Number(window.APP_CONFIG?.engineIllegalScheduleWeight || 1.0)
+  ),
+  engineOverlapCostWeight: Math.max(
+    0,
+    Number(window.APP_CONFIG?.engineOverlapCostWeight || 1.0)
+  ),
+  engineSplitCostWeight: Math.max(
+    0,
+    Number(window.APP_CONFIG?.engineSplitCostWeight || 1.0)
+  ),
 };
 
 const storedConfig = (() => {

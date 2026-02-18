@@ -9,23 +9,21 @@
   <body>
     <div class="page">
       <aside class="panel sidebar">
+        <button class="ghost small sidebar-toggle" id="sidebarToggleBtn" type="button" aria-label="Collapse sidebar">
+          ☰
+        </button>
         <div class="brand">
-          <div class="logo">E</div>
           <div>
             <div class="title" id="brandTitle">Elastisched</div>
             <div class="subtitle" id="brandSubtitle">Schedule at a glance</div>
           </div>
         </div>
         <nav class="sidebar-nav" aria-label="Workspace menu">
-          <button class="sidebar-link active" id="settingsBtn" type="button">
+          <button class="sidebar-link active" id="settingsBtn" type="button" data-short="S">
             <span class="sidebar-link-title">Settings</span>
             <span class="sidebar-link-subtitle">Workspace and schedule defaults</span>
           </button>
-          <button class="sidebar-link" id="profileSettingsBtn" type="button">
-            <span class="sidebar-link-title">Profile settings</span>
-            <span class="sidebar-link-subtitle">Identity and contact preferences</span>
-          </button>
-          <button class="sidebar-link" id="helpBtn" type="button">
+          <button class="sidebar-link" id="helpBtn" type="button" data-short="?">
             <span class="sidebar-link-title">Help menu</span>
             <span class="sidebar-link-subtitle">Keyboard shortcuts and tips</span>
           </button>
@@ -40,13 +38,6 @@
       </aside>
 
       <main class="workspace">
-        <header class="topbar">
-          <div class="workspace-meta">
-            <div class="workspace-eyebrow">Scheduler workspace</div>
-            <div class="workspace-title">Plan, adjust, and run your schedule</div>
-          </div>
-        </header>
-
       <div class="modal" id="settingsModal" aria-hidden="true">
         <div class="modal-backdrop" id="settingsBackdrop"></div>
         <section class="panel form-panel modal-panel" id="settingsPanel">
@@ -55,7 +46,9 @@
               <div class="form-title">Settings</div>
               <div class="form-subtitle">Customize labels and granularity</div>
             </div>
-            <button class="ghost small" id="closeSettingsBtn">Close</button>
+            <div class="settings-header-actions">
+              <button class="ghost small" id="closeSettingsBtn">Close</button>
+            </div>
           </div>
           <form id="settingsForm" class="blob-form settings-form">
             <div class="settings-tabs vertical" role="tablist">
@@ -142,6 +135,42 @@
                     <input type="checkbox" name="includeActiveOccurrences" />
                   </label>
                 </article>
+                <article class="settings-card">
+                  <label class="settings-toggle">
+                    <span>Enable advanced engine tuning</span>
+                    <input type="checkbox" name="engineAdvancedEnabled" />
+                  </label>
+                </article>
+                <article class="settings-card settings-advanced-card" id="advancedEngineCard">
+                  <div class="settings-card-title">Advanced engine tuning</div>
+                  <div class="settings-card-copy">
+                    Fine-tune optimization parameters.
+                  </div>
+                  <label>
+                    Initial temp
+                    <input type="number" name="engineInitialTemp" min="0.0001" step="0.0001" />
+                  </label>
+                  <label>
+                    Final temp
+                    <input type="number" name="engineFinalTemp" min="0.000001" step="0.000001" />
+                  </label>
+                  <label>
+                    Num iters
+                    <input type="number" name="engineNumIters" min="1" step="1" />
+                  </label>
+                  <label>
+                    Illegal schedule weight
+                    <input type="number" name="engineIllegalScheduleWeight" min="0" step="0.01" />
+                  </label>
+                  <label>
+                    Overlap cost weight
+                    <input type="number" name="engineOverlapCostWeight" min="0" step="0.01" />
+                  </label>
+                  <label>
+                    Split cost weight
+                    <input type="number" name="engineSplitCostWeight" min="0" step="0.01" />
+                  </label>
+                </article>
               </div>
             </div>
             <div class="settings-section" data-settings-section="profile">
@@ -173,7 +202,10 @@
               </div>
             </div>
             <div class="form-actions">
-              <button type="submit" class="primary">Save</button>
+              <span class="form-status settings-dirty-indicator" id="settingsDirtyIndicator">
+                All changes saved.
+              </span>
+              <button type="submit" class="primary" id="settingsSaveBtn" disabled>Save changes</button>
               <span class="form-status" id="settingsStatus"></span>
             </div>
           </form>

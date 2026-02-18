@@ -309,6 +309,22 @@ async def run_schedule(
     epoch_start_utc = _epoch_start_utc(start_utc, user_tz)
     granularity_minutes = max(1, int(payload.granularity_minutes or 5))
     granularity_seconds = granularity_minutes * 60
+    initial_temp = float(payload.initial_temp or 10.0)
+    final_temp = float(payload.final_temp or 1e-4)
+    num_iters = int(payload.num_iters or 1000000)
+    illegal_schedule_weight = float(payload.illegal_schedule_weight or 1.0)
+    overlap_cost_weight = float(payload.overlap_cost_weight or 1.0)
+    split_cost_weight = float(payload.split_cost_weight or 1.0)
+    if initial_temp <= 0 or final_temp <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="initial_temp and final_temp must be greater than 0.",
+        )
+    if num_iters <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="num_iters must be greater than 0.",
+        )
     include_active = True if payload.include_active_occurrences is None else bool(
         payload.include_active_occurrences
     )
@@ -362,7 +378,15 @@ async def run_schedule(
         jobs.append(job)
 
     try:
-        schedule = engine.schedule(jobs, granularity_seconds)
+        config = engine.EngineConfig()
+        config.granularity = granularity_seconds
+        config.initial_temp = initial_temp
+        config.final_temp = final_temp
+        config.num_iters = num_iters
+        config.illegal_schedule_weight = illegal_schedule_weight
+        config.overlap_cost_weight = overlap_cost_weight
+        config.split_cost_weight = split_cost_weight
+        schedule, _ = engine.schedule_jobs_with_config(jobs, config)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
