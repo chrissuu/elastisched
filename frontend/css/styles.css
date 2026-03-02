@@ -306,7 +306,7 @@ html[data-zoomed="true"] .sidebar {
 
 .sidebar-calendar-group {
   border: none;
-  border-radius: 10px;
+  border-radius: 0;
   padding: 6px;
   background: rgba(255, 255, 255, 0.4);
   align-self: start;
@@ -369,7 +369,7 @@ html[data-zoomed="true"] .sidebar {
 
 .sidebar-account-group {
   border: none;
-  border-radius: 8px;
+  border-radius: 0;
   padding: 4px 6px;
   background: rgba(255, 255, 255, 0.45);
   align-self: start;
@@ -417,7 +417,7 @@ html[data-zoomed="true"] .sidebar {
 
 .sidebar-calendar-list .integration-calendar-item {
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: 0;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
 }
