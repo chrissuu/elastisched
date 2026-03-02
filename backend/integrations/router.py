@@ -21,11 +21,6 @@ from backend.config import (
     get_google_oauth_redirect_uri,
     get_google_oauth_scopes,
 )
-from backend.analytics_db import AnalyticsSessionLocal
-from backend.analytics_models import (
-    OccurrenceCompletionEventModel,
-    ScheduleFeedbackBatchModel,
-)
 from backend.db import get_session
 from .google_calendar.adapter import GoogleCalendarAdapter
 from .google_calendar.client import (
@@ -845,6 +840,12 @@ async def export_user_data(
     payload: UserDataExportRequest,
     session: AsyncSession = Depends(get_session),
 ) -> Response:
+    from backend.analytics_db import AnalyticsSessionLocal
+    from backend.analytics_models import (
+        OccurrenceCompletionEventModel,
+        ScheduleFeedbackBatchModel,
+    )
+
     recurrences = (await session.execute(select(RecurrenceModel))).scalars().all()
     blobs = (await session.execute(select(BlobModel))).scalars().all()
     scheduled_occurrences = (await session.execute(select(ScheduledOccurrenceModel))).scalars().all()

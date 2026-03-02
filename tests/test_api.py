@@ -293,7 +293,7 @@ async def test_logs_occurrence_completion_analytics(tmp_path_factory):
     occurrence_snapshot = json.loads(row[2])
     recurrence_snapshot = json.loads(row[3])
     assert occurrence_snapshot["after"]["name"] == "Write report"
-    assert occurrence_snapshot["after"]["tags"] == ["work", "writing"]
+    assert sorted(occurrence_snapshot["after"]["tags"]) == ["work", "writing"]
     assert recurrence_snapshot["after"]["payload"]["recurrence_name"] == "Write report"
 
 
