@@ -51,6 +51,14 @@ body {
   font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
 }
 
+input[type="checkbox"] {
+  accent-color: color-mix(in srgb, var(--ocean) 72%, var(--ink) 28%);
+}
+
+input[type="number"] {
+  accent-color: color-mix(in srgb, var(--ocean) 70%, var(--ink) 30%);
+}
+
 body[data-theme="sage"] {
   --ink: #263129;
   --muted: #5f6a60;
@@ -203,9 +211,19 @@ body[data-theme="midnight"] .ghost {
 }
 
 body[data-theme="midnight"] .primary {
-  background: #6ea9c0;
-  color: #081018;
-  border-color: #6ea9c0;
+  background: color-mix(in srgb, var(--ocean) 72%, var(--ink) 28%);
+  color: #0b1219;
+  border-color: color-mix(in srgb, var(--ocean) 72%, var(--ink) 28%);
+}
+
+body[data-theme="midnight"] input[type="number"] {
+  color-scheme: dark;
+}
+
+body[data-theme="midnight"] #settingsSaveBtn {
+  background: color-mix(in srgb, var(--ocean) 64%, var(--ink) 36%);
+  border-color: color-mix(in srgb, var(--ocean) 64%, var(--ink) 36%);
+  color: var(--ink);
 }
 
 body[data-theme="midnight"] input,
