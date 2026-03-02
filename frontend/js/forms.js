@@ -353,6 +353,7 @@ function hydrateSettingsForm() {
   dom.settingsForm.scheduleName.value = appConfig.scheduleName || "";
   dom.settingsForm.subtitle.value = appConfig.subtitle || "";
   dom.settingsForm.minuteGranularity.value = appConfig.minuteGranularity || 5;
+  dom.settingsForm.tasksDisplayDays.value = appConfig.tasksDisplayDays || 3;
   dom.settingsForm.finishEarlyBufferMinutes.value =
     appConfig.finishEarlyBufferMinutes || 15;
   dom.settingsForm.includeActiveOccurrences.checked =
@@ -3069,6 +3070,7 @@ function handleSettingsSubmit(event) {
   const scheduleName = formData.get("scheduleName")?.toString().trim() || "";
   const subtitle = formData.get("subtitle")?.toString().trim() || "";
   const granularity = Math.max(1, Number(formData.get("minuteGranularity") || 1));
+  const tasksDisplayDays = Math.max(1, Number(formData.get("tasksDisplayDays") || 1));
   const finishEarlyBufferMinutes = Math.max(
     1,
     Number(formData.get("finishEarlyBufferMinutes") || 1)
@@ -3113,6 +3115,7 @@ function handleSettingsSubmit(event) {
   appConfig.scheduleName = scheduleName || appConfig.scheduleName;
   appConfig.subtitle = subtitle || appConfig.subtitle;
   appConfig.minuteGranularity = granularity;
+  appConfig.tasksDisplayDays = tasksDisplayDays;
   appConfig.finishEarlyBufferMinutes = finishEarlyBufferMinutes;
   appConfig.includeActiveOccurrences = includeActiveOccurrences;
   appConfig.lookaheadSeconds = lookaheadMinutes * 60;
@@ -3139,6 +3142,7 @@ function handleSettingsSubmit(event) {
   dom.settingsStatus.textContent = "";
   setSettingsDirty(false);
   saveSettings(appConfig);
+  window.dispatchEvent(new CustomEvent("elastisched:refresh"));
 }
 
 function handleAddClick() {

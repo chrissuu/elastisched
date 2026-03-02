@@ -60,6 +60,7 @@ const WORKSPACE_MODE = {
   SEARCH: "search",
 };
 const WORKSPACE_LOOKAHEAD_DAYS = 90;
+const TASKS_OVERDUE_LOOKBACK_DAYS = 30;
 const ZOOM_SCROLL_THRESHOLD = 1.05;
 const BASE_DEVICE_PIXEL_RATIO =
   Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
@@ -105,8 +106,9 @@ if (window.visualViewport) {
 }
 
 function getWorkspaceDataRange() {
-  const start = new Date();
-  const end = addDays(start, WORKSPACE_LOOKAHEAD_DAYS);
+  const now = new Date();
+  const start = addDays(now, -TASKS_OVERDUE_LOOKBACK_DAYS);
+  const end = addDays(now, WORKSPACE_LOOKAHEAD_DAYS);
   return { start, end };
 }
 
@@ -242,21 +244,37 @@ function escapeHtml(value) {
 
 function renderTasksPanel() {
   if (!dom.tasksList) return;
-  const items = getUpcomingOccurrences().filter(({ blob }) => isTaskOccurrence(blob));
   const userZone = appConfig.userTimeZone;
   const now = new Date();
-  const todayKey = dayKeyInZone(now, userZone);
-  const weekLimit = addDays(now, 7);
-  const todayCount = items.filter(({ range }) => dayKeyInZone(range.start, userZone) === todayKey).length;
-  const weekCount = items.filter(({ range }) => range.start < weekLimit).length;
-  if (dom.tasksUpcomingCount) dom.tasksUpcomingCount.textContent = `${items.length}`;
-  if (dom.tasksTodayCount) dom.tasksTodayCount.textContent = `${todayCount}`;
-  if (dom.tasksWeekCount) dom.tasksWeekCount.textContent = `${weekCount}`;
-
-  if (!items.length) {
-    dom.tasksList.innerHTML = `<div class="tasks-empty">No upcoming tasks in the loaded range.</div>`;
-    return;
-  }
+  const windowEnd = addDays(now, Math.max(1, Number(appConfig.tasksDisplayDays || 3)));
+  const taskItems = state.blobs
+    .filter((blob) => isTaskOccurrence(blob))
+    .map((blob) => {
+      const effective = getEffectiveOccurrenceRange(blob);
+      if (!effective?.start || !effective?.effectiveEnd) return null;
+      return {
+        blob,
+        range: {
+          start: effective.start,
+          end: effective.effectiveEnd,
+        },
+        finishedAt: effective.finishedAt || null,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.range.start - b.range.start);
+  const overdueItems = taskItems.filter(
+    (item) => !item.finishedAt && item.range.end < now
+  );
+  const windowItems = taskItems.filter(
+    (item) => !item.finishedAt && item.range.end >= now && item.range.start < windowEnd
+  );
+  const inProgressCount = windowItems.filter(
+    (item) => item.range.start <= now && now < item.range.end
+  ).length;
+  if (dom.tasksUpcomingCount) dom.tasksUpcomingCount.textContent = `${windowItems.length}`;
+  if (dom.tasksTodayCount) dom.tasksTodayCount.textContent = `${inProgressCount}`;
+  if (dom.tasksWeekCount) dom.tasksWeekCount.textContent = `${overdueItems.length}`;
 
   const dateFormatter = new Intl.DateTimeFormat(undefined, {
     timeZone: userZone,
@@ -264,29 +282,85 @@ function renderTasksPanel() {
     month: "short",
     day: "numeric",
   });
-  const markup = items
-    .slice(0, 80)
-    .map(({ blob, range }) => {
-      const timeZone = blob?.tz || userZone;
-      const title = escapeHtml(blob.name || "Untitled");
-      const description = escapeHtml(blob.description || "");
-      const dayLabel = dateFormatter.format(range.start);
-      const timeLabel = formatTimeRangeInTimeZone(range.start, range.end, timeZone);
-      return `
-        <article class="task-card">
-          <div class="task-card-main">
-            <div class="task-card-title">${title}</div>
-            ${description ? `<div class="task-card-copy">${description}</div>` : ""}
-          </div>
-          <div class="task-card-meta">
-            <div class="task-card-day">${escapeHtml(dayLabel)}</div>
-            <div class="task-card-time">${escapeHtml(timeLabel)}</div>
-          </div>
-        </article>
-      `;
-    })
-    .join("");
-  dom.tasksList.innerHTML = markup;
+  const renderTaskCards = (items, options = {}) => {
+    const emptyMessage = options.emptyMessage || "No tasks.";
+    if (!items.length) {
+      return `<div class="tasks-empty">${escapeHtml(emptyMessage)}</div>`;
+    }
+    return items
+      .slice(0, 80)
+      .map((item) => {
+        const { blob, range } = item;
+        const timeZone = blob?.tz || userZone;
+        const title = escapeHtml(blob.name || "Untitled");
+        const description = escapeHtml(blob.description || "");
+        const dayLabel = dateFormatter.format(range.start);
+        const timeLabel = formatTimeRangeInTimeZone(range.start, range.end, timeZone);
+        const isInProgress = range.start <= now && now < range.end;
+        const completeAction = options.allowRetroactiveCompletion
+          ? `
+            <button type="button" class="ghost small" data-complete-task="retroactive" data-occurrence-id="${blob.id}">
+              Mark complete
+            </button>
+          `
+          : isInProgress
+            ? `
+              <button type="button" class="ghost small" data-complete-task="now" data-occurrence-id="${blob.id}">
+                Finish now
+              </button>
+            `
+            : "";
+        const statusBadge = options.allowRetroactiveCompletion
+          ? '<span class="task-card-status overdue">Overdue</span>'
+          : isInProgress
+            ? '<span class="task-card-status active">In progress</span>'
+            : "";
+        return `
+          <article class="task-card">
+            <div class="task-card-main">
+              <div class="task-card-head">
+                <div class="task-card-title">${title}</div>
+                ${statusBadge}
+              </div>
+              ${description ? `<div class="task-card-copy">${description}</div>` : ""}
+            </div>
+            <div class="task-card-meta">
+              <div class="task-card-day">${escapeHtml(dayLabel)}</div>
+              <div class="task-card-time">${escapeHtml(timeLabel)}</div>
+              ${completeAction}
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+  };
+  const windowLabel = Math.max(1, Number(appConfig.tasksDisplayDays || 3));
+  dom.tasksList.innerHTML = `
+    <section class="tasks-column">
+      <div class="tasks-column-header">
+        <h3 class="tasks-column-title">Overdue</h3>
+        <div class="tasks-column-copy">Unfinished tasks from the past.</div>
+      </div>
+      <div class="tasks-column-list">
+        ${renderTaskCards(overdueItems, {
+          allowRetroactiveCompletion: true,
+          emptyMessage: "No overdue tasks.",
+        })}
+      </div>
+    </section>
+    <section class="tasks-column">
+      <div class="tasks-column-header">
+        <h3 class="tasks-column-title">Next ${windowLabel} day${windowLabel === 1 ? "" : "s"}</h3>
+        <div class="tasks-column-copy">Current and upcoming tasks in the active window.</div>
+      </div>
+      <div class="tasks-column-list">
+        ${renderTaskCards(windowItems, {
+          allowRetroactiveCompletion: false,
+          emptyMessage: "No tasks in this window.",
+        })}
+      </div>
+    </section>
+  `;
 }
 
 function renderSearchPanel() {
@@ -603,15 +677,24 @@ async function extendOccurrenceByMinutes(minutes) {
 async function handleFinishNow() {
   const blob = getSelectedOccurrence();
   if (!blob) return;
+  await completeTaskOccurrence(blob, { finishedAt: new Date(), rerunIfEarly: true });
+}
+
+async function completeTaskOccurrence(blob, options = {}) {
+  if (!blob) return;
   const effective = getEffectiveOccurrenceRange(blob);
   if (!effective) return;
+  const now = new Date();
+  const finishedAt =
+    options.finishedAt instanceof Date && !Number.isNaN(options.finishedAt.getTime())
+      ? options.finishedAt
+      : now;
+  const occurrenceKey = blob.schedulable_timerange?.start;
+  if (!occurrenceKey) return;
   const bufferMinutes = Math.max(1, Number(appConfig.finishEarlyBufferMinutes || 15));
   const threshold = new Date(
     effective.effectiveEnd.getTime() - bufferMinutes * 60000
   );
-  const now = new Date();
-  const occurrenceKey = blob.schedulable_timerange?.start;
-  if (!occurrenceKey) return;
   let previous = null;
   try {
     previous = await getRecurrence(blob.recurrence_id);
@@ -627,7 +710,7 @@ async function handleFinishNow() {
   const currentOverride = overrides[occurrenceKey] || {};
   overrides[occurrenceKey] = {
     ...(currentOverride || {}),
-    finished_at: toProjectIsoFromDate(now, appConfig.projectTimeZone),
+    finished_at: toProjectIsoFromDate(finishedAt, appConfig.projectTimeZone),
   };
   const nextPayload = { ...payload, occurrence_overrides: overrides };
   try {
@@ -647,12 +730,55 @@ async function handleFinishNow() {
     });
     state.loadedRange = null;
     await refreshView(state.view);
-    if (now < threshold) {
+    if (options.rerunIfEarly && finishedAt < threshold) {
       await handleRunSchedule();
     }
   } catch (error) {
     await alertDialog(error?.message || "Failed to finish occurrence.");
   }
+}
+
+async function handleTaskCompletionAction(button) {
+  if (!(button instanceof HTMLButtonElement)) return;
+  const occurrenceId = button.getAttribute("data-occurrence-id");
+  if (!occurrenceId) return;
+  const blob = state.blobs.find((item) => item.id === occurrenceId);
+  if (!blob) {
+    await alertDialog("Task occurrence not found.");
+    return;
+  }
+  const mode = button.getAttribute("data-complete-task");
+  if (mode === "retroactive") {
+    const effective = getEffectiveOccurrenceRange(blob);
+    if (!effective) return;
+    const rawEstimate = window.prompt(
+      "About how many minutes did this task take to complete?",
+      String(
+        Math.max(
+          1,
+          Math.round((effective.end.getTime() - effective.start.getTime()) / 60000)
+        )
+      )
+    );
+    if (rawEstimate === null) return;
+    const estimatedMinutes = Math.max(0, Math.round(Number(rawEstimate)));
+    if (!Number.isFinite(estimatedMinutes) || estimatedMinutes <= 0) {
+      await alertDialog("Enter a positive number of minutes.");
+      return;
+    }
+    const retroactiveFinish = new Date(
+      Math.min(
+        Date.now(),
+        effective.start.getTime() + estimatedMinutes * 60000
+      )
+    );
+    await completeTaskOccurrence(blob, {
+      finishedAt: retroactiveFinish,
+      rerunIfEarly: false,
+    });
+    return;
+  }
+  await completeTaskOccurrence(blob, { finishedAt: new Date(), rerunIfEarly: true });
 }
 
 dom.tabs.forEach((tab) => {
@@ -701,6 +827,14 @@ if (dom.nowEvents) {
 if (dom.finishNowBtn) {
   dom.finishNowBtn.addEventListener("click", () => {
     handleFinishNow();
+  });
+}
+
+if (dom.tasksList) {
+  dom.tasksList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-complete-task]");
+    if (!(button instanceof HTMLButtonElement)) return;
+    handleTaskCompletionAction(button);
   });
 }
 

@@ -340,6 +340,10 @@
                 <article class="settings-card">
                   <div class="settings-card-title">Execution options</div>
                   <label>
+                    Tasks window (days)
+                    <input type="number" name="tasksDisplayDays" min="1" step="1" />
+                  </label>
+                  <label>
                     Finish early buffer (minutes)
                     <input type="number" name="finishEarlyBufferMinutes" min="1" step="1" />
                   </label>
@@ -1158,15 +1162,15 @@
           <div class="tasks-metrics">
             <div class="tasks-metric">
               <div class="tasks-metric-value" id="tasksUpcomingCount">0</div>
-              <div class="tasks-metric-label">Upcoming</div>
+              <div class="tasks-metric-label">Window</div>
             </div>
             <div class="tasks-metric">
               <div class="tasks-metric-value" id="tasksTodayCount">0</div>
-              <div class="tasks-metric-label">Today</div>
+              <div class="tasks-metric-label">In progress</div>
             </div>
             <div class="tasks-metric">
               <div class="tasks-metric-value" id="tasksWeekCount">0</div>
-              <div class="tasks-metric-label">This week</div>
+              <div class="tasks-metric-label">Overdue</div>
             </div>
           </div>
         </div>
