@@ -442,3 +442,66 @@ async def test_flush_preference_batches_closes_partial_batch(tmp_path_factory):
     assert row is not None
     assert row[0] == 1
     assert row[1] is not None
+
+
+@pytest.mark.asyncio
+async def test_export_user_data_archive(tmp_path_factory):
+    api_client = await _build_api_client(tmp_path_factory, batch_size=2)
+    start = datetime(2024, 8, 1, 9, 0, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    occurrence_key = start.isoformat()
+    payload = {
+        "recurrence_name": "Export me",
+        "recurrence_description": "Archive test",
+        "blob": {
+            "name": "Export me",
+            "description": "Archive test",
+            "tz": "UTC",
+            "default_scheduled_timerange": {"start": start.isoformat(), "end": end.isoformat()},
+            "schedulable_timerange": {
+                "start": start.isoformat(),
+                "end": (end + timedelta(hours=2)).isoformat(),
+            },
+            "policy": {},
+            "dependencies": [],
+            "tags": ["archive"],
+        },
+    }
+
+    async with api_client as client:
+        create_resp = await client.post("/recurrences", json={"type": "single", "payload": payload})
+        assert create_resp.status_code == 201
+        created = create_resp.json()
+
+        update_resp = await client.put(
+            f"/recurrences/{created['id']}",
+            json={
+                "type": "single",
+                "payload": {
+                    **payload,
+                    "occurrence_overrides": {
+                        occurrence_key: {
+                            "finished_at": (start + timedelta(minutes=25)).isoformat(),
+                            "schedulable_timerange": {
+                                "start": (start + timedelta(minutes=15)).isoformat(),
+                                "end": (end + timedelta(minutes=15)).isoformat(),
+                            },
+                        }
+                    },
+                },
+            },
+        )
+        assert update_resp.status_code == 200
+
+        export_resp = await client.post(
+            "/integrations/user-data/export",
+            json={"client_settings": {"app_config": {"theme": "midnight"}}},
+        )
+        assert export_resp.status_code == 200
+
+    archive = json.loads(export_resp.text)
+    assert archive["format"] == "elastisched-user-data-v1"
+    assert archive["client_settings"]["app_config"]["theme"] == "midnight"
+    assert archive["recurrences"][0]["id"] == created["id"]
+    assert archive["analytics"]["occurrence_completion_events"]
+    assert archive["analytics"]["schedule_feedback_batches"]

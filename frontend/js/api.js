@@ -412,6 +412,29 @@ async function exportCalendarViews(payload) {
   };
 }
 
+async function exportUserData(payload) {
+  const response = await fetch(`${API_BASE}/integrations/user-data/export`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!response.ok) {
+    let detail = "Failed to export user data";
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await response.json();
+      detail = data.detail || detail;
+    } else {
+      detail = (await response.text()) || detail;
+    }
+    throw new Error(detail);
+  }
+  return {
+    blob: await response.blob(),
+    filename: parseFilenameFromDisposition(response.headers.get("content-disposition")),
+  };
+}
+
 async function setCalendarVisibility(calendarViewId, visible) {
   const response = await fetch(`${API_BASE}/integrations/calendars/${encodeURIComponent(calendarViewId)}/visibility`, {
     method: "PUT",
@@ -591,6 +614,7 @@ export {
   syncGoogleCalendars,
   listCalendarViews,
   exportCalendarViews,
+  exportUserData,
   setCalendarVisibility,
   setGoogleCalendarSelection,
   copyCalendarToMain,
