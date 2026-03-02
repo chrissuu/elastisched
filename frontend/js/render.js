@@ -2046,7 +2046,11 @@ function renderMonth() {
       } catch (error) {
         stars = [];
       }
-      if (!stars.length) return;
+      if (!stars.length) {
+        hideInfoCard();
+        state.infoCardAnchorHovering = false;
+        return;
+      }
       const dateIso = dayEl.getAttribute("data-date");
       const date = dateIso ? new Date(dateIso) : null;
       const dateLabel = date
