@@ -1354,7 +1354,7 @@ body.modal-open .info-card {
   gap: 8px;
   padding: 8px;
   border-radius: 14px;
-  background: rgba(27, 26, 22, 0.05);
+  background: color-mix(in srgb, var(--cream) 82%, var(--paper) 18%);
   margin: 0;
 }
 
@@ -1368,7 +1368,7 @@ body.modal-open .info-card {
 .settings-tab {
   border: 1px solid transparent;
   background: transparent;
-  color: var(--muted);
+  color: color-mix(in srgb, var(--ink) 58%, var(--muted) 42%);
   font-weight: 600;
   padding: 8px 10px;
   border-radius: 10px;
@@ -1376,8 +1376,13 @@ body.modal-open .info-card {
   text-align: left;
 }
 
+.settings-tab:hover {
+  background: color-mix(in srgb, var(--paper) 72%, var(--cream) 28%);
+  color: var(--ink);
+}
+
 .settings-tab.active {
-  background: #fffaf2;
+  background: var(--paper);
   border-color: rgba(58, 110, 122, 0.35);
   color: var(--ink);
 }
