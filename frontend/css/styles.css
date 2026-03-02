@@ -2751,8 +2751,8 @@ body.modal-open .info-card {
   gap: 6px;
   padding: 12px;
   border-radius: 14px;
-  border: 1px solid #e0d3c1;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   box-shadow: 0 18px 30px rgba(27, 26, 22, 0.2);
   opacity: 0;
   transform: translateY(6px);
@@ -2820,7 +2820,7 @@ body.modal-open .info-card {
 }
 
 .info-edit {
-  color: #2d5a65;
+  color: var(--ocean);
 }
 
 .info-move {
@@ -2902,8 +2902,8 @@ body.modal-open .info-card {
 .info-tag {
   padding: 3px 8px;
   border-radius: 999px;
-  border: 1px solid #e0d3c1;
-  background: #f8efe2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--cream);
   font-size: 11px;
   color: var(--ink);
 }
@@ -2929,8 +2929,8 @@ body.modal-open .info-card {
 .info-id-pill {
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid #e0d3c1;
-  background: #f8efe2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--cream);
   max-width: 210px;
 }
 
@@ -2966,8 +2966,8 @@ body.modal-open .info-card {
   top: -24px;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(27, 26, 22, 0.12);
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   font-size: 10px;
   line-height: 1.4;
   color: var(--ink);
@@ -3428,9 +3428,9 @@ html[data-zoomed="true"] .views {
 
 .day-track {
   position: relative;
-  background: #fffaf2;
+  background: var(--paper);
   border-radius: 16px;
-  border: 1px solid #e0d3c1;
+  border: 1px solid rgba(107, 103, 92, 0.24);
   height: calc(var(--hour-height) * 24);
   overflow: hidden;
   padding: 8px;
@@ -3468,8 +3468,8 @@ html[data-zoomed="true"] .views {
   font-size: 12px;
   font-weight: 600;
   color: var(--ink);
-  background: rgba(27, 26, 22, 0.08);
-  border: 1px solid rgba(27, 26, 22, 0.12);
+  background: color-mix(in srgb, var(--cream) 78%, var(--ink) 22%);
+  border: 1px solid rgba(107, 103, 92, 0.24);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3499,7 +3499,7 @@ html[data-zoomed="true"] .views {
   border: none;
   background: transparent;
   font-size: 12px;
-  color: rgba(27, 26, 22, 0.35);
+  color: color-mix(in srgb, var(--muted) 76%, transparent);
   cursor: pointer;
   padding: 0;
 }
