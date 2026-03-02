@@ -58,7 +58,6 @@ let llmDragOffset = { x: 0, y: 0 };
 let llmPosition = null;
 let settingsHydrating = false;
 let settingsDirty = false;
-let settingsSavedFlashTimeout = null;
 let sidebarResizeSession = null;
 
 const DEFAULT_SIDEBAR_WIDTH = 280;
@@ -224,22 +223,11 @@ function setSettingsDirty(nextDirty) {
   if (dom.settingsDirtyIndicator) {
     dom.settingsDirtyIndicator.textContent = "";
   }
-  if (settingsDirty && settingsSavedFlashTimeout) {
-    window.clearTimeout(settingsSavedFlashTimeout);
-    settingsSavedFlashTimeout = null;
-  }
 }
 
-function flashSettingsSavedState() {
+function markSettingsSavedState() {
   if (!dom.settingsSaveBtn) return;
   dom.settingsSaveBtn.classList.add("saved");
-  if (settingsSavedFlashTimeout) {
-    window.clearTimeout(settingsSavedFlashTimeout);
-  }
-  settingsSavedFlashTimeout = window.setTimeout(() => {
-    dom.settingsSaveBtn?.classList.remove("saved");
-    settingsSavedFlashTimeout = null;
-  }, 1800);
 }
 
 function updateAdvancedEngineVisibility(enabled) {
@@ -3161,7 +3149,7 @@ function handleSettingsSubmit(event) {
   }
   dom.settingsStatus.textContent = "";
   setSettingsDirty(false);
-  flashSettingsSavedState();
+  markSettingsSavedState();
   saveSettings(appConfig);
   window.dispatchEvent(new CustomEvent("elastisched:refresh"));
 }

@@ -2363,7 +2363,7 @@ body.modal-open .info-card {
 }
 
 #settingsSaveBtn.saved {
-  background: var(--forest);
+  background: color-mix(in srgb, var(--ocean) 44%, var(--ink) 56%);
   color: var(--paper);
 }
 
@@ -2375,7 +2375,8 @@ body.modal-open .info-card {
 }
 
 #settingsSaveBtn.saved:disabled {
-  background: var(--forest);
+  background: color-mix(in srgb, var(--ocean) 44%, var(--ink) 56%);
+  border-color: color-mix(in srgb, var(--ocean) 44%, var(--ink) 56%);
   color: var(--paper);
 }
 
