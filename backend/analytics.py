@@ -378,3 +378,22 @@ async def record_recurrence_update_signals(
                 batch.closed_at = now
 
         await analytics_session.commit()
+
+
+async def flush_open_preference_batches() -> int:
+    async with AnalyticsSessionLocal() as analytics_session:
+        now = _utcnow()
+        result = await analytics_session.execute(
+            select(ScheduleFeedbackBatchModel).where(
+                ScheduleFeedbackBatchModel.closed_at.is_(None)
+            )
+        )
+        batches = result.scalars().all()
+        flushed = 0
+        for batch in batches:
+            batch.closed_at = now
+            batch.updated_at = now
+            flushed += 1
+        if flushed:
+            await analytics_session.commit()
+        return flushed

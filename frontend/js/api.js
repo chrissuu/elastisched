@@ -209,6 +209,22 @@ async function updateRecurrence(recurrenceId, type, payload) {
   return response.json();
 }
 
+function flushPreferenceBatches() {
+  const url = `${API_BASE}/analytics/flush-preference-batches`;
+  if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+    try {
+      return navigator.sendBeacon(url, new Blob([], { type: "application/json" }));
+    } catch (error) {
+      // Fall through to fetch keepalive.
+    }
+  }
+  fetch(url, {
+    method: "POST",
+    keepalive: true,
+  }).catch(() => {});
+  return true;
+}
+
 async function createLLMRecurrenceDraft(payload) {
   const response = await fetch(`${API_BASE}/llm/recurrence-draft`, {
     method: "POST",
@@ -564,6 +580,7 @@ export {
   createRecurrencesBulk,
   deleteRecurrence,
   updateRecurrence,
+  flushPreferenceBatches,
   createLLMRecurrenceDraft,
   estimateTaskDuration,
   buildGoogleOAuthStartUrl,

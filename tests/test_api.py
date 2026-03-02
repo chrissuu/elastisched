@@ -381,3 +381,64 @@ async def test_batches_manual_schedule_preference_updates(tmp_path_factory):
     assert edits[-1]["after_schedulable_timerange"]["start"] == (
         start + timedelta(hours=1)
     ).isoformat()
+
+
+@pytest.mark.asyncio
+async def test_flush_preference_batches_closes_partial_batch(tmp_path_factory):
+    api_client = await _build_api_client(tmp_path_factory, batch_size=20)
+    start = datetime(2024, 7, 1, 9, 0, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    occurrence_key = start.isoformat()
+    payload = {
+        "recurrence_name": "Planning block",
+        "blob": {
+            "name": "Planning block",
+            "description": "Weekly planning",
+            "tz": "UTC",
+            "default_scheduled_timerange": {"start": start.isoformat(), "end": end.isoformat()},
+            "schedulable_timerange": {
+                "start": start.isoformat(),
+                "end": (end + timedelta(hours=2)).isoformat(),
+            },
+            "policy": {},
+            "dependencies": [],
+            "tags": ["planning"],
+        },
+    }
+
+    async with api_client as client:
+        create_resp = await client.post("/recurrences", json={"type": "single", "payload": payload})
+        assert create_resp.status_code == 201
+        created = create_resp.json()
+
+        update_payload = {
+            **payload,
+            "occurrence_overrides": {
+                occurrence_key: {
+                    "schedulable_timerange": {
+                        "start": (start + timedelta(minutes=45)).isoformat(),
+                        "end": (end + timedelta(minutes=45)).isoformat(),
+                    }
+                }
+            },
+        }
+        update_resp = await client.put(
+            f"/recurrences/{created['id']}",
+            json={"type": "single", "payload": update_payload},
+        )
+        assert update_resp.status_code == 200
+
+        flush_resp = await client.post("/analytics/flush-preference-batches")
+        assert flush_resp.status_code == 204
+
+    conn = sqlite3.connect(api_client._analytics_db_path)
+    try:
+        row = conn.execute(
+            "SELECT edit_count, closed_at FROM schedule_feedback_batches"
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    assert row[0] == 1
+    assert row[1] is not None
