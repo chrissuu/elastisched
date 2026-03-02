@@ -3365,12 +3365,12 @@ html[data-zoomed="true"] .views {
 
 .tasks-empty,
 .search-empty {
-  border: 1px dashed #d9c8b3;
+  border: 1px dashed rgba(107, 103, 92, 0.28);
   border-radius: 12px;
   padding: 14px;
   font-size: 13px;
-  color: var(--muted);
-  background: rgba(255, 250, 242, 0.6);
+  color: color-mix(in srgb, var(--ink) 68%, var(--muted) 32%);
+  background: color-mix(in srgb, var(--paper) 72%, var(--cream) 28%);
 }
 
 @keyframes fadeIn {
