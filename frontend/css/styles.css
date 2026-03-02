@@ -209,6 +209,10 @@ html[data-zoomed="true"] .workspace {
   box-shadow: none;
 }
 
+.page > .sidebar.panel {
+  border-radius: 0 !important;
+}
+
 html[data-zoomed="true"] .sidebar {
   overflow: auto;
 }
