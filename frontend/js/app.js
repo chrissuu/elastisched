@@ -393,18 +393,6 @@ function renderTasksPanel() {
   dom.tasksList.innerHTML = `
     <section class="tasks-column">
       <div class="tasks-column-header">
-        <h3 class="tasks-column-title">Overdue</h3>
-        <div class="tasks-column-copy">Unfinished tasks from the past.</div>
-      </div>
-      <div class="tasks-column-list">
-        ${renderTaskCards(overdueItems, {
-          allowRetroactiveCompletion: true,
-          emptyMessage: "No overdue tasks.",
-        })}
-      </div>
-    </section>
-    <section class="tasks-column">
-      <div class="tasks-column-header">
         <h3 class="tasks-column-title">Next ${windowLabel} day${windowLabel === 1 ? "" : "s"}</h3>
         <div class="tasks-column-copy">Current and upcoming tasks in the active window.</div>
       </div>
@@ -412,6 +400,18 @@ function renderTasksPanel() {
         ${renderTaskCards(windowItems, {
           allowRetroactiveCompletion: false,
           emptyMessage: "No tasks in this window.",
+        })}
+      </div>
+    </section>
+    <section class="tasks-column">
+      <div class="tasks-column-header">
+        <h3 class="tasks-column-title">Overdue</h3>
+        <div class="tasks-column-copy">Unfinished tasks from the past.</div>
+      </div>
+      <div class="tasks-column-list">
+        ${renderTaskCards(overdueItems, {
+          allowRetroactiveCompletion: true,
+          emptyMessage: "No overdue tasks.",
         })}
       </div>
     </section>
