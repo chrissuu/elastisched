@@ -234,9 +234,9 @@ body[data-theme="midnight"] .integration-calendar-item input[type="checkbox"] {
 }
 
 body[data-theme="midnight"] #settingsSaveBtn {
-  background: color-mix(in srgb, var(--ocean) 64%, var(--ink) 36%);
-  border-color: color-mix(in srgb, var(--ocean) 64%, var(--ink) 36%);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--ocean) 52%, var(--ink) 48%);
+  border-color: color-mix(in srgb, var(--ocean) 52%, var(--ink) 48%);
+  color: var(--paper);
 }
 
 body[data-theme="midnight"] input,
