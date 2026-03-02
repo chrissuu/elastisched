@@ -3190,8 +3190,8 @@ html[data-zoomed="true"] .views {
 }
 
 .tasks-metric {
-  border: 1px solid #decebb;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   border-radius: 12px;
   padding: 10px;
   display: grid;
