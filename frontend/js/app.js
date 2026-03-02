@@ -70,6 +70,8 @@ const BASE_VISUAL_VIEWPORT_SCALE =
   window.visualViewport && Number.isFinite(window.visualViewport.scale)
     ? window.visualViewport.scale || 1
     : 1;
+let pendingRetroactiveCompletionId = null;
+let taskCompletionLastFocusedElement = null;
 
 function getCurrentZoomFactor() {
   const viewportScale =
@@ -95,6 +97,59 @@ function syncZoomScrollMode() {
   const zoomFactor = getCurrentZoomFactor();
   const zoomed = zoomFactor > ZOOM_SCROLL_THRESHOLD;
   document.documentElement.dataset.zoomed = zoomed ? "true" : "false";
+}
+
+function setTaskCompletionStatus(message = "", error = false) {
+  if (!dom.taskCompletionStatus) return;
+  dom.taskCompletionStatus.textContent = message;
+  dom.taskCompletionStatus.classList.toggle("error", Boolean(error));
+}
+
+function toggleTaskCompletionModal(show) {
+  if (!dom.taskCompletionModal || !dom.taskCompletionPanel) return;
+  const active = Boolean(show);
+  if (active) {
+    taskCompletionLastFocusedElement = document.activeElement;
+  }
+  dom.taskCompletionModal.classList.toggle("active", active);
+  dom.taskCompletionPanel.classList.toggle("active", active);
+  dom.taskCompletionModal.setAttribute("aria-hidden", (!active).toString());
+  document.body.classList.toggle("modal-open", active);
+  if (!active) {
+    dom.taskCompletionModal.setAttribute("inert", "");
+    pendingRetroactiveCompletionId = null;
+    if (dom.taskCompletionForm) {
+      dom.taskCompletionForm.reset();
+    }
+    setTaskCompletionStatus("");
+    if (
+      taskCompletionLastFocusedElement &&
+      typeof taskCompletionLastFocusedElement.focus === "function"
+    ) {
+      taskCompletionLastFocusedElement.focus();
+    }
+    taskCompletionLastFocusedElement = null;
+    return;
+  }
+  dom.taskCompletionModal.removeAttribute("inert");
+  dom.taskCompletionMinutesInput?.focus();
+}
+
+function openRetroactiveCompletionModal(blob) {
+  if (!blob) return;
+  pendingRetroactiveCompletionId = blob.id;
+  const effective = getEffectiveOccurrenceRange(blob);
+  const defaultMinutes = effective
+    ? Math.max(1, Math.round((effective.end.getTime() - effective.start.getTime()) / 60000))
+    : 30;
+  if (dom.taskCompletionSummary) {
+    dom.taskCompletionSummary.textContent = `Estimate how long "${blob.name || "this task"}" took to complete.`;
+  }
+  if (dom.taskCompletionMinutesInput) {
+    dom.taskCompletionMinutesInput.value = String(defaultMinutes);
+  }
+  setTaskCompletionStatus("");
+  toggleTaskCompletionModal(true);
 }
 
 syncZoomScrollMode();
@@ -681,16 +736,16 @@ async function handleFinishNow() {
 }
 
 async function completeTaskOccurrence(blob, options = {}) {
-  if (!blob) return;
+  if (!blob) return false;
   const effective = getEffectiveOccurrenceRange(blob);
-  if (!effective) return;
+  if (!effective) return false;
   const now = new Date();
   const finishedAt =
     options.finishedAt instanceof Date && !Number.isNaN(options.finishedAt.getTime())
       ? options.finishedAt
       : now;
   const occurrenceKey = blob.schedulable_timerange?.start;
-  if (!occurrenceKey) return;
+  if (!occurrenceKey) return false;
   const bufferMinutes = Math.max(1, Number(appConfig.finishEarlyBufferMinutes || 15));
   const threshold = new Date(
     effective.effectiveEnd.getTime() - bufferMinutes * 60000
@@ -700,7 +755,7 @@ async function completeTaskOccurrence(blob, options = {}) {
     previous = await getRecurrence(blob.recurrence_id);
   } catch (error) {
     await alertDialog(error?.message || "Unable to load recurrence.");
-    return;
+    return false;
   }
   const payload = previous.payload || {};
   const overrides =
@@ -733,8 +788,10 @@ async function completeTaskOccurrence(blob, options = {}) {
     if (options.rerunIfEarly && finishedAt < threshold) {
       await handleRunSchedule();
     }
+    return true;
   } catch (error) {
     await alertDialog(error?.message || "Failed to finish occurrence.");
+    return false;
   }
 }
 
@@ -749,36 +806,62 @@ async function handleTaskCompletionAction(button) {
   }
   const mode = button.getAttribute("data-complete-task");
   if (mode === "retroactive") {
-    const effective = getEffectiveOccurrenceRange(blob);
-    if (!effective) return;
-    const rawEstimate = window.prompt(
-      "About how many minutes did this task take to complete?",
-      String(
-        Math.max(
-          1,
-          Math.round((effective.end.getTime() - effective.start.getTime()) / 60000)
-        )
-      )
-    );
-    if (rawEstimate === null) return;
-    const estimatedMinutes = Math.max(0, Math.round(Number(rawEstimate)));
-    if (!Number.isFinite(estimatedMinutes) || estimatedMinutes <= 0) {
-      await alertDialog("Enter a positive number of minutes.");
-      return;
-    }
-    const retroactiveFinish = new Date(
-      Math.min(
-        Date.now(),
-        effective.start.getTime() + estimatedMinutes * 60000
-      )
-    );
-    await completeTaskOccurrence(blob, {
-      finishedAt: retroactiveFinish,
-      rerunIfEarly: false,
-    });
+    openRetroactiveCompletionModal(blob);
     return;
   }
   await completeTaskOccurrence(blob, { finishedAt: new Date(), rerunIfEarly: true });
+}
+
+async function handleRetroactiveCompletionSubmit(event) {
+  event.preventDefault();
+  const occurrenceId = pendingRetroactiveCompletionId;
+  if (!occurrenceId) {
+    toggleTaskCompletionModal(false);
+    return;
+  }
+  const blob = state.blobs.find((item) => item.id === occurrenceId);
+  if (!blob) {
+    setTaskCompletionStatus("Task occurrence not found.", true);
+    return;
+  }
+  const effective = getEffectiveOccurrenceRange(blob);
+  if (!effective) {
+    setTaskCompletionStatus("Unable to read task timing.", true);
+    return;
+  }
+  const estimatedMinutes = Math.max(
+    0,
+    Math.round(Number(dom.taskCompletionMinutesInput?.value || 0))
+  );
+  if (!Number.isFinite(estimatedMinutes) || estimatedMinutes <= 0) {
+    setTaskCompletionStatus("Enter a positive number of minutes.", true);
+    dom.taskCompletionMinutesInput?.focus();
+    return;
+  }
+  const retroactiveFinish = new Date(
+    Math.min(Date.now(), effective.start.getTime() + estimatedMinutes * 60000)
+  );
+  if (dom.taskCompletionSubmitBtn) {
+    dom.taskCompletionSubmitBtn.disabled = true;
+  }
+  setTaskCompletionStatus("Saving...");
+  try {
+    const completed = await completeTaskOccurrence(blob, {
+      finishedAt: retroactiveFinish,
+      rerunIfEarly: false,
+    });
+    if (completed) {
+      toggleTaskCompletionModal(false);
+    } else {
+      setTaskCompletionStatus("Unable to mark task complete.", true);
+    }
+  } catch (error) {
+    setTaskCompletionStatus(error?.message || "Unable to mark task complete.", true);
+  } finally {
+    if (dom.taskCompletionSubmitBtn) {
+      dom.taskCompletionSubmitBtn.disabled = false;
+    }
+  }
 }
 
 dom.tabs.forEach((tab) => {
@@ -837,6 +920,16 @@ if (dom.tasksList) {
     handleTaskCompletionAction(button);
   });
 }
+
+dom.taskCompletionForm?.addEventListener("submit", handleRetroactiveCompletionSubmit);
+dom.taskCompletionCancelBtn?.addEventListener("click", () => toggleTaskCompletionModal(false));
+dom.taskCompletionCloseBtn?.addEventListener("click", () => toggleTaskCompletionModal(false));
+dom.taskCompletionBackdrop?.addEventListener("click", () => toggleTaskCompletionModal(false));
+window.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (!dom.taskCompletionModal?.classList.contains("active")) return;
+  toggleTaskCompletionModal(false);
+});
 
 if (dom.addTimePopover) {
   dom.addTimePopover.addEventListener("click", (event) => {

@@ -568,6 +568,46 @@
         </section>
       </div>
 
+      <div class="modal" id="taskCompletionModal" aria-hidden="true">
+        <div class="modal-backdrop" id="taskCompletionBackdrop"></div>
+        <section
+          class="panel modal-panel task-completion-panel"
+          id="taskCompletionPanel"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div class="form-header">
+            <div>
+              <div class="form-title">Complete overdue task</div>
+              <div class="form-subtitle" id="taskCompletionSummary">
+                Estimate how long it took so we can store completion timing.
+              </div>
+            </div>
+            <button type="button" class="ghost small" id="taskCompletionCloseBtn">Close</button>
+          </div>
+          <form id="taskCompletionForm" class="blob-form task-completion-form">
+            <label>
+              Minutes spent
+              <input
+                type="number"
+                id="taskCompletionMinutesInput"
+                name="taskCompletionMinutes"
+                min="1"
+                step="1"
+                inputmode="numeric"
+              />
+            </label>
+            <div class="form-actions">
+              <button type="button" class="ghost" id="taskCompletionCancelBtn">Cancel</button>
+              <button type="submit" class="primary" id="taskCompletionSubmitBtn">
+                Mark complete
+              </button>
+              <span class="form-status" id="taskCompletionStatus"></span>
+            </div>
+          </form>
+        </section>
+      </div>
+
       <section class="panel form-panel" id="formPanel">
         <div class="form-header">
           <div>
