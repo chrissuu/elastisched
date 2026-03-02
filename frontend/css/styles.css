@@ -138,6 +138,118 @@ body[data-theme="ember"] {
   --bg-3: #e1c8b6;
 }
 
+body[data-theme="midnight"] {
+  --ink: #e8ecf3;
+  --muted: #9ca7b7;
+  --paper: #141a23;
+  --cream: #1c2430;
+  --sun: #f0c56c;
+  --forest: #7ca68b;
+  --ocean: #6ea9c0;
+  --rose: #d6908c;
+  --shadow: 0 18px 36px rgba(0, 0, 0, 0.42);
+  --palette-sand: #66533e;
+  --palette-sage: #54685b;
+  --palette-mist: #4d6671;
+  --palette-clay: #775951;
+  --palette-moss: #66624d;
+  --palette-coral: #8a6259;
+  --palette-sky: #56778f;
+  --palette-violet: #645d84;
+  --palette-teal: #4f7a76;
+  --palette-lemon: #7f7242;
+  --palette-indigo: #546284;
+  --palette-ruby: #865565;
+  --palette-mint: #55745d;
+  --palette-slate: #5e6876;
+  --bg-1: #0c1118;
+  --bg-2: #121924;
+  --bg-3: #1a2330;
+  background: #0b0f15;
+  color: var(--ink);
+}
+
+body[data-theme="midnight"] .panel,
+body[data-theme="midnight"] .card,
+body[data-theme="midnight"] .settings-card,
+body[data-theme="midnight"] .integration-account-item,
+body[data-theme="midnight"] .integration-manual-auth,
+body[data-theme="midnight"] .integration-calendar-item,
+body[data-theme="midnight"] .task-card,
+body[data-theme="midnight"] .search-card,
+body[data-theme="midnight"] .search-input-wrap,
+body[data-theme="midnight"] .task-draft-form,
+body[data-theme="midnight"] .task-completion-panel,
+body[data-theme="midnight"] .sidebar-calendars,
+body[data-theme="midnight"] .sidebar-calendar-group,
+body[data-theme="midnight"] .sidebar-account-group,
+body[data-theme="midnight"] .month-day,
+body[data-theme="midnight"] .now-event,
+body[data-theme="midnight"] .day-chip,
+body[data-theme="midnight"] .full-day-chip {
+  background: #171f2a;
+  border-color: #2b3746;
+}
+
+body[data-theme="midnight"] .tasks-hero,
+body[data-theme="midnight"] .search-header {
+  background: linear-gradient(135deg, #17202c, #1f2a37);
+  border-color: #2c3949;
+}
+
+body[data-theme="midnight"] .ghost {
+  border-color: #344353;
+  color: var(--ink);
+}
+
+body[data-theme="midnight"] .primary {
+  background: #6ea9c0;
+  color: #081018;
+  border-color: #6ea9c0;
+}
+
+body[data-theme="midnight"] input,
+body[data-theme="midnight"] select,
+body[data-theme="midnight"] textarea,
+body[data-theme="midnight"] .datetime-display {
+  background: #0f151d;
+  color: var(--ink);
+  border-color: #344353;
+}
+
+body[data-theme="midnight"] input::placeholder,
+body[data-theme="midnight"] textarea::placeholder {
+  color: #748093;
+}
+
+body[data-theme="midnight"] .ghost:hover,
+body[data-theme="midnight"] .sidebar-link:hover,
+body[data-theme="midnight"] .sidebar-icon-link:hover {
+  background: rgba(110, 169, 192, 0.12);
+}
+
+body[data-theme="midnight"] .sidebar-link.active,
+body[data-theme="midnight"] .sidebar-icon-link.active {
+  background: rgba(110, 169, 192, 0.16);
+}
+
+body[data-theme="midnight"] .modal-backdrop {
+  background: rgba(7, 10, 15, 0.7);
+}
+
+body[data-theme="midnight"] .task-card-copy,
+body[data-theme="midnight"] .search-card-copy,
+body[data-theme="midnight"] .tasks-copy,
+body[data-theme="midnight"] .search-copy,
+body[data-theme="midnight"] .settings-card-copy,
+body[data-theme="midnight"] .integration-meta,
+body[data-theme="midnight"] .task-card-meta,
+body[data-theme="midnight"] .integration-calendar-tz,
+body[data-theme="midnight"] .sidebar-link-subtitle,
+body[data-theme="midnight"] .subtitle {
+  color: var(--muted);
+}
+
 .page {
   height: 100vh;
   height: 100dvh;
