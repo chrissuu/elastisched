@@ -2362,11 +2362,21 @@ body.modal-open .info-card {
   min-width: 148px;
 }
 
+#settingsSaveBtn.saved {
+  background: var(--forest);
+  color: var(--paper);
+}
+
 #settingsSaveBtn:disabled {
   opacity: 1;
   background: #b9b2a6;
   color: #f4efe6;
   cursor: not-allowed;
+}
+
+#settingsSaveBtn.saved:disabled {
+  background: var(--forest);
+  color: var(--paper);
 }
 
 .ghost.small {

@@ -58,6 +58,7 @@ let llmDragOffset = { x: 0, y: 0 };
 let llmPosition = null;
 let settingsHydrating = false;
 let settingsDirty = false;
+let settingsSavedFlashTimeout = null;
 let sidebarResizeSession = null;
 
 const DEFAULT_SIDEBAR_WIDTH = 280;
@@ -216,10 +217,29 @@ function setSettingsDirty(nextDirty) {
   settingsDirty = Boolean(nextDirty);
   if (dom.settingsSaveBtn) {
     dom.settingsSaveBtn.disabled = !settingsDirty;
+    if (settingsDirty) {
+      dom.settingsSaveBtn.classList.remove("saved");
+    }
   }
   if (dom.settingsDirtyIndicator) {
     dom.settingsDirtyIndicator.textContent = "";
   }
+  if (settingsDirty && settingsSavedFlashTimeout) {
+    window.clearTimeout(settingsSavedFlashTimeout);
+    settingsSavedFlashTimeout = null;
+  }
+}
+
+function flashSettingsSavedState() {
+  if (!dom.settingsSaveBtn) return;
+  dom.settingsSaveBtn.classList.add("saved");
+  if (settingsSavedFlashTimeout) {
+    window.clearTimeout(settingsSavedFlashTimeout);
+  }
+  settingsSavedFlashTimeout = window.setTimeout(() => {
+    dom.settingsSaveBtn?.classList.remove("saved");
+    settingsSavedFlashTimeout = null;
+  }, 1800);
 }
 
 function updateAdvancedEngineVisibility(enabled) {
@@ -3141,6 +3161,7 @@ function handleSettingsSubmit(event) {
   }
   dom.settingsStatus.textContent = "";
   setSettingsDirty(false);
+  flashSettingsSavedState();
   saveSettings(appConfig);
   window.dispatchEvent(new CustomEvent("elastisched:refresh"));
 }
