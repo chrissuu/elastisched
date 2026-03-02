@@ -275,7 +275,7 @@ html[data-zoomed="true"] .sidebar {
   align-self: start;
   width: 100%;
   border: none;
-  border-radius: 0;
+  border-radius: 12px;
   padding: 10px;
   background: rgba(255, 250, 242, 0.72);
   display: grid;
