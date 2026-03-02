@@ -2376,7 +2376,7 @@ body.modal-open .info-card {
 
 .tabs {
   display: inline-flex;
-  background: #e9dfd0;
+  background: var(--cream);
   border-radius: 999px;
   padding: 4px;
   gap: 4px;
@@ -2453,8 +2453,8 @@ body.modal-open .info-card {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
-  border: 1px solid #e0d3c1;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   border-radius: 999px;
   padding: 4px 10px;
 }
@@ -2536,8 +2536,8 @@ body.modal-open .info-card {
   margin-top: 16px;
   padding: 14px 16px;
   border-radius: 18px;
-  border: 1px solid #e0d3c1;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   display: grid;
   gap: 12px;
   grid-template-columns: minmax(160px, 1fr) auto;
@@ -2601,8 +2601,8 @@ body.modal-open .info-card {
   gap: 6px;
   padding: 10px;
   border-radius: 14px;
-  border: 1px solid #e0d3c1;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   box-shadow: 0 12px 24px rgba(27, 26, 22, 0.16);
   z-index: 12;
 }
@@ -2613,8 +2613,8 @@ body.modal-open .info-card {
 }
 
 .add-time-option {
-  border: 1px solid #d1c4b3;
-  background: #f8efe2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--cream);
   color: var(--ink);
   border-radius: 999px;
   padding: 6px 10px;
@@ -2624,7 +2624,7 @@ body.modal-open .info-card {
 }
 
 .add-time-option:hover {
-  background: #efe2d4;
+  background: rgba(107, 103, 92, 0.12);
 }
 
 .add-time-form {
@@ -2635,12 +2635,13 @@ body.modal-open .info-card {
 }
 
 .add-time-form input {
-  border: 1px solid #dfd2c2;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   border-radius: 10px;
   padding: 6px 8px;
   font-family: inherit;
   font-size: 12px;
+  color: var(--ink);
 }
 
 .now-events {
@@ -2650,8 +2651,8 @@ body.modal-open .info-card {
 }
 
 .now-event {
-  border: 1px solid #e0d3c1;
-  background: #f8efe2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--cream);
   color: var(--ink);
   border-radius: 14px;
   padding: 8px 12px;
@@ -2691,8 +2692,8 @@ body.modal-open .info-card {
   gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid #d7c8b3;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   color: var(--muted);
   font-size: 12px;
 }
@@ -2706,29 +2707,29 @@ body.modal-open .info-card {
 
 .schedule-status.clean {
   border-color: rgba(75, 107, 77, 0.45);
-  color: #3c5a3e;
+  color: var(--forest);
 }
 
 .schedule-status.clean .status-dot {
-  background: #4b6b4d;
+  background: var(--forest);
 }
 
 .schedule-status.dirty {
   border-color: rgba(192, 125, 107, 0.45);
-  color: #8f4e3e;
+  color: var(--rose);
 }
 
 .schedule-status.dirty .status-dot {
-  background: #c07d6b;
+  background: var(--rose);
 }
 
 .schedule-status.running {
   border-color: rgba(58, 110, 122, 0.5);
-  color: #2d5a65;
+  color: var(--ocean);
 }
 
 .schedule-status.running .status-dot {
-  background: #3a6e7a;
+  background: var(--ocean);
   animation: pulse 1.2s ease-in-out infinite;
 }
 
@@ -3074,9 +3075,9 @@ html[data-zoomed="true"] .views {
 
 .task-draft-form {
   margin-top: 8px;
-  border: 1px solid #decebb;
+  border: 1px solid rgba(107, 103, 92, 0.24);
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255, 250, 242, 0.92), rgba(247, 236, 216, 0.62));
+  background: linear-gradient(180deg, var(--paper), var(--cream));
   padding: 14px;
   display: grid;
   gap: 10px;
@@ -3122,8 +3123,8 @@ html[data-zoomed="true"] .views {
 .task-draft-form input:not([type="hidden"]):not(.datetime-display) {
   height: 40px;
   border-radius: 10px;
-  border: 1px solid #d9c8b3;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   color: var(--ink);
   padding: 0 11px;
   font-size: 14px;
@@ -3136,7 +3137,7 @@ html[data-zoomed="true"] .views {
 }
 
 .task-draft-form input:not([type="hidden"]):not(.datetime-display)::placeholder {
-  color: #958472;
+  color: var(--muted);
 }
 
 .task-draft-form .datetime-field {
@@ -3147,8 +3148,8 @@ html[data-zoomed="true"] .views {
 .task-draft-form .datetime-display {
   height: 40px;
   border-radius: 10px;
-  border: 1px solid #d9c8b3;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   color: var(--ink);
   padding: 0 11px;
   font-size: 14px;
@@ -4087,8 +4088,8 @@ html[data-zoomed="true"] .views {
 
 .week-day-label button {
   width: 100%;
-  border: 1px solid #e0d3c1;
-  background: #f7efe4;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--cream);
   color: var(--ink);
   border-radius: 12px;
   padding: 8px 10px;
@@ -4098,14 +4099,14 @@ html[data-zoomed="true"] .views {
 }
 
 .week-day-label button:hover {
-  background: #efe2d4;
+  background: rgba(107, 103, 92, 0.12);
 }
 
 .week-day-track {
   position: relative;
-  background: #fffaf2;
+  background: var(--paper);
   border-radius: 16px;
-  border: 1px solid #e0d3c1;
+  border: 1px solid rgba(107, 103, 92, 0.24);
   height: calc(var(--hour-height) * 24);
   overflow: hidden;
   padding: 8px;
