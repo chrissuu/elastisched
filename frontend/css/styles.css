@@ -46,7 +46,7 @@ html[data-zoomed="true"] body {
 
 body {
   margin: 0;
-  background: #ffffff;
+  background: var(--bg-2);
   color: var(--ink);
   font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
 }
@@ -420,7 +420,7 @@ html[data-zoomed="true"] .sidebar {
   border: none;
   border-radius: 12px;
   padding: 10px;
-  background: rgba(255, 250, 242, 0.72);
+  background: color-mix(in srgb, var(--paper) 78%, transparent);
   display: grid;
   gap: 8px;
 }
@@ -637,7 +637,7 @@ html[data-zoomed="true"] .sidebar {
 
 .sidebar-link:hover,
 .sidebar-icon-link:hover {
-  background: rgba(255, 250, 242, 0.7);
+  background: color-mix(in srgb, var(--paper) 74%, transparent);
 }
 
 .sidebar-link.active,
@@ -713,7 +713,7 @@ html[data-zoomed="true"] .sidebar {
 }
 
 .ghost {
-  border: 1px solid #d1c4b3;
+  border: 1px solid rgba(107, 103, 92, 0.24);
   background: transparent;
   color: var(--ink);
   padding: 8px 14px;
@@ -848,7 +848,7 @@ html[data-workspace-mode="search"] #searchBtn {
 .modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(244, 233, 218, 0.6);
+  background: color-mix(in srgb, var(--bg-2) 56%, transparent);
   backdrop-filter: blur(8px);
 }
 
@@ -1351,7 +1351,7 @@ body.modal-open .info-card {
   height: 20px;
   border-radius: 999px;
   border: 1px solid rgba(27, 26, 22, 0.24);
-  background: #d9d0c2;
+  background: color-mix(in srgb, var(--cream) 74%, var(--muted) 26%);
   position: relative;
   flex: 0 0 auto;
   cursor: pointer;
@@ -1485,8 +1485,8 @@ body.modal-open .info-card {
 }
 
 .settings-card {
-  border: 1px solid #e0d3c1;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   border-radius: 14px;
   padding: 12px;
   display: grid;
@@ -1587,10 +1587,10 @@ body.modal-open .info-card {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border: 1px solid #e0d3c1;
+  border: 1px solid rgba(107, 103, 92, 0.24);
   border-radius: 10px;
   padding: 8px 10px;
-  background: #fffaf2;
+  background: var(--paper);
 }
 
 .integration-account-meta {
@@ -1610,12 +1610,12 @@ body.modal-open .info-card {
 }
 
 .integration-manual-auth {
-  border: 1px solid #e6d9c8;
+  border: 1px solid rgba(107, 103, 92, 0.2);
   border-radius: 10px;
   padding: 8px 10px;
   display: grid;
   gap: 8px;
-  background: rgba(255, 250, 242, 0.7);
+  background: color-mix(in srgb, var(--paper) 76%, transparent);
 }
 
 .integration-manual-auth summary {
@@ -1635,10 +1635,10 @@ body.modal-open .info-card {
   grid-template-columns: auto 1fr auto;
   gap: 8px;
   align-items: center;
-  border: 1px solid #e0d3c1;
+  border: 1px solid rgba(107, 103, 92, 0.24);
   border-radius: 10px;
   padding: 8px 10px;
-  background: #fffaf2;
+  background: var(--paper);
 }
 
 .integration-calendar-item input[type="checkbox"] {
@@ -2334,7 +2334,7 @@ body.modal-open .info-card {
 
 .primary {
   background: var(--ink);
-  color: #f7f2e8;
+  color: var(--paper);
   border: none;
   padding: 10px 18px;
   border-radius: 999px;
@@ -2369,8 +2369,8 @@ body.modal-open .info-card {
 
 #settingsSaveBtn:disabled {
   opacity: 1;
-  background: #b9b2a6;
-  color: #f4efe6;
+  background: color-mix(in srgb, var(--cream) 64%, var(--muted) 36%);
+  color: color-mix(in srgb, var(--paper) 84%, var(--muted) 16%);
   cursor: not-allowed;
 }
 
@@ -2523,8 +2523,8 @@ body.modal-open .info-card {
 
 .calendar-manager {
   margin-top: 14px;
-  border: 1px solid #e0d3c1;
-  background: #fffaf2;
+  border: 1px solid rgba(107, 103, 92, 0.24);
+  background: var(--paper);
   border-radius: 16px;
   padding: 12px;
   display: grid;
@@ -3091,9 +3091,9 @@ html[data-zoomed="true"] .views {
 
 .tasks-hero,
 .search-header {
-  border: 1px solid #dfd1bf;
+  border: 1px solid rgba(107, 103, 92, 0.22);
   border-radius: 18px;
-  background: linear-gradient(135deg, #fffaf2, #f7ecd8);
+  background: linear-gradient(135deg, var(--paper), var(--cream));
   padding: 18px;
   display: grid;
   gap: 8px;
@@ -3300,9 +3300,9 @@ html[data-zoomed="true"] .views {
 
 .task-card,
 .search-card {
-  border: 1px solid #e0d3c1;
+  border: 1px solid rgba(107, 103, 92, 0.24);
   border-radius: 14px;
-  background: #fffaf2;
+  background: var(--paper);
   padding: 12px 14px;
   display: grid;
   gap: 8px;
@@ -3386,14 +3386,14 @@ html[data-zoomed="true"] .views {
 }
 
 .search-input-wrap {
-  border: 1px solid #decebb;
+  border: 1px solid rgba(107, 103, 92, 0.24);
   border-radius: 12px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
   padding: 0 12px;
-  background: #fffaf2;
+  background: var(--paper);
 }
 
 .search-input-icon {
