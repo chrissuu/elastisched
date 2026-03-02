@@ -2427,7 +2427,7 @@ body.modal-open .info-card {
 
 .tab.active {
   background: var(--ink);
-  color: #f7f2e8;
+  color: var(--paper);
 }
 
 .view-header {
