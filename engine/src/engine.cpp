@@ -86,6 +86,33 @@ double normalized_half_hour_distance(sec_t t) {
     return static_cast<double>(distance) / static_cast<double>(half_hour_seconds);
 }
 
+std::string consistency_family_key(const Job& job) {
+    const sec_t week_seconds = static_cast<sec_t>(7) * constants::DAY;
+    const sec_t default_phase = week_seconds == 0
+        ? job.default_scheduled_time_range.get_low()
+        : (job.default_scheduled_time_range.get_low() % week_seconds);
+    const sec_t schedulable_phase = week_seconds == 0
+        ? job.schedulable_time_range.get_low()
+        : (job.schedulable_time_range.get_low() % week_seconds);
+    std::string key = job.recurrence_id;
+    key.push_back('|');
+    key += std::to_string(default_phase);
+    key.push_back('|');
+    key += std::to_string(schedulable_phase);
+    key.push_back('|');
+    key += std::to_string(job.schedulable_time_range.length());
+    key.push_back('|');
+    key += std::to_string(job.duration);
+    key.push_back('|');
+    key += std::to_string(static_cast<unsigned int>(job.policy.get_scheduling_policies()));
+    key.push_back('|');
+    for (const auto& tag : job.tags) {
+        key += tag.get_name();
+        key.push_back(',');
+    }
+    return key;
+}
+
 std::vector<std::vector<Job>> get_disjoint_intervals(std::vector<Job> jobs) {
     if (jobs.empty()) {
         return {};
@@ -580,23 +607,38 @@ double ScheduleCostFunction::split_cost() const {
 }
 
 double ScheduleCostFunction::consistency_cost() const {
-    std::unordered_map<ID, std::vector<sec_t>> starts_by_recurrence;
+    struct ConsistencySample {
+        sec_t current_start;
+        sec_t baseline_start;
+    };
+    std::unordered_map<std::string, std::vector<ConsistencySample>> starts_by_family;
     for (const auto& job : schedule_ref.scheduled_jobs) {
         if (job.recurrence_id.empty()) {
             continue;
         }
-        starts_by_recurrence[job.recurrence_id].push_back(get_job_anchor_start(job));
+        starts_by_family[consistency_family_key(job)].push_back(
+            ConsistencySample{
+                get_job_anchor_start(job),
+                job.default_scheduled_time_range.get_low(),
+            }
+        );
     }
 
     double cost = 0.0;
-    for (const auto& [recurrence_id, starts] : starts_by_recurrence) {
-        (void)recurrence_id;
-        if (starts.size() < 2) {
+    for (const auto& [family_id, samples] : starts_by_family) {
+        (void)family_id;
+        if (samples.size() < 2) {
             continue;
         }
-        for (size_t i = 0; i < starts.size(); ++i) {
-            for (size_t j = i + 1; j < starts.size(); ++j) {
-                cost += normalized_weekly_distance(starts[i], starts[j]);
+        for (const auto& sample : samples) {
+            cost += normalized_weekly_distance(sample.current_start, sample.baseline_start);
+        }
+        for (size_t i = 0; i < samples.size(); ++i) {
+            for (size_t j = i + 1; j < samples.size(); ++j) {
+                cost += normalized_weekly_distance(
+                    samples[i].current_start,
+                    samples[j].current_start
+                );
             }
         }
     }

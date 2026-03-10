@@ -70,6 +70,7 @@ PYBIND11_MODULE(engine, m) {
              py::arg("recurrence_id") = "")
         .def_readwrite("duration", &Job::duration)
         .def_readwrite("schedulable_time_range", &Job::schedulable_time_range)
+        .def_readwrite("default_scheduled_time_range", &Job::default_scheduled_time_range)
         .def_readwrite("scheduled_time_range", &Job::scheduled_time_range)
         .def_readwrite("scheduled_time_ranges", &Job::scheduled_time_ranges)
         .def_readwrite("id", &Job::id)

@@ -6,6 +6,7 @@ Job::Job(sec_t duration, TimeRange schedulable_time_range, TimeRange scheduled_t
         ID id, Policy policy, std::set<ID> dependencies, std::set<Tag> tags, ID recurrence_id)
 :   duration(duration),
     schedulable_time_range(schedulable_time_range),
+    default_scheduled_time_range(scheduled_time_range),
     scheduled_time_range(scheduled_time_range),
     scheduled_time_ranges({scheduled_time_range}),
     id(id),
