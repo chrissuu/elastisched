@@ -689,49 +689,87 @@ std::pair<Schedule, std::vector<double>> schedule_jobs(
 
     std::vector<std::vector<Job>> disjoint_jobs = get_disjoint_intervals(jobs);
     (void)disjoint_jobs;
-    std::mt19937 gen(constants::RNG_SEED());
 
     Schedule initial_schedule = Schedule(jobs);
+    const uint64_t run_count = std::max<uint64_t>(1, config.num_workers);
+    const uint32_t base_seed = constants::RNG_SEED();
 
-    ScheduleCostFunction initial_cost_function = ScheduleCostFunction(
-        initial_schedule,
-        config.granularity,
-        config.illegal_schedule_weight,
-        config.overlap_cost_weight,
-        config.split_cost_weight,
-        config.consistency_cost_weight,
-        config.granularity_cost_weight
-    );
-    (void)initial_cost_function;
+    auto schedule_cost = [&config](const Schedule& s) {
+        ScheduleCostFunction cost_function = ScheduleCostFunction(
+            s,
+            config.granularity,
+            config.illegal_schedule_weight,
+            config.overlap_cost_weight,
+            config.split_cost_weight,
+            config.consistency_cost_weight,
+            config.granularity_cost_weight
+        );
+        return cost_function.schedule_cost();
+    };
+    auto illegal_cost = [&config](const Schedule& s) {
+        ScheduleCostFunction cost_function = ScheduleCostFunction(
+            s,
+            config.granularity,
+            config.illegal_schedule_weight,
+            config.overlap_cost_weight,
+            config.split_cost_weight,
+            config.consistency_cost_weight,
+            config.granularity_cost_weight
+        );
+        return cost_function.illegal_schedule_cost();
+    };
 
-    SimulatedAnnealingOptimizer<Schedule> optimizer = SimulatedAnnealingOptimizer<Schedule>(
-        [config](Schedule s) {
-            ScheduleCostFunction cost_function = ScheduleCostFunction(
-                s,
-                config.granularity,
-                config.illegal_schedule_weight,
-                config.overlap_cost_weight,
-                config.split_cost_weight,
-                config.consistency_cost_weight,
-                config.granularity_cost_weight
-            );
-            return cost_function.schedule_cost();
-        },
-        [config, &gen](Schedule s) {
-            return generate_random_schedule_neighbor(
-                s,
-                config.granularity,
-                gen);
-        },
-        config.initial_temp,
-        config.final_temp,
-        config.num_iters
-    );
+    Schedule best_schedule = initial_schedule;
+    std::vector<double> best_cost_history{};
+    double best_cost = 0.0;
+    double best_illegal_cost = constants::ILLEGAL_SCHEDULE_COST;
+    bool has_best = false;
 
-    Schedule best_schedule = optimizer.optimize(initial_schedule);
-    std::vector<double> cost_history = optimizer.get_cost_history();
+    for (uint64_t run_index = 0; run_index < run_count; ++run_index) {
+        const uint32_t run_seed = base_seed + static_cast<uint32_t>(run_index * 2654435761u);
+        std::mt19937 neighbor_gen(run_seed);
+        SimulatedAnnealingOptimizer<Schedule> optimizer = SimulatedAnnealingOptimizer<Schedule>(
+            schedule_cost,
+            [config, &neighbor_gen](Schedule s) {
+                return generate_random_schedule_neighbor(
+                    s,
+                    config.granularity,
+                    neighbor_gen);
+            },
+            config.initial_temp,
+            config.final_temp,
+            static_cast<int>(config.num_iters),
+            run_seed
+        );
 
-    return std::make_pair(best_schedule, cost_history);
+        Schedule run_best_schedule = optimizer.optimize(initial_schedule);
+        std::vector<double> run_cost_history = optimizer.get_cost_history();
+        const double run_cost = schedule_cost(run_best_schedule);
+        const double run_illegal_cost = illegal_cost(run_best_schedule);
+        const bool run_is_legal = run_illegal_cost <= constants::EPSILON;
+
+        if (!has_best) {
+            best_schedule = run_best_schedule;
+            best_cost_history = std::move(run_cost_history);
+            best_cost = run_cost;
+            best_illegal_cost = run_illegal_cost;
+            has_best = true;
+            continue;
+        }
+
+        const bool best_is_legal = best_illegal_cost <= constants::EPSILON;
+        const bool should_promote =
+            (run_is_legal && !best_is_legal) ||
+            (run_is_legal == best_is_legal && (run_cost + constants::EPSILON < best_cost));
+        if (should_promote) {
+            best_schedule = run_best_schedule;
+            best_cost_history = std::move(run_cost_history);
+            best_cost = run_cost;
+            best_illegal_cost = run_illegal_cost;
+        }
+    }
+
+    return std::make_pair(best_schedule, best_cost_history);
 }
 
 Schedule schedule(

@@ -127,7 +127,7 @@ struct EngineConfig {
     double final_temp = 1e-4;
     /** @brief Maximum simulated annealing iterations. */
     uint64_t num_iters = 1000000;
-    /** @brief Worker count for parallel scheduling runs. */
+    /** @brief Number of optimizer restarts with distinct RNG seeds. */
     uint64_t num_workers = 1;
     /** @brief Weight for illegal schedule penalties. */
     double illegal_schedule_weight = 1.0;
