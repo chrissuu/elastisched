@@ -33,9 +33,10 @@ import {
   createRecurrencesBulk,
   updateRecurrence,
 } from "./api.js";
-import { alertDialog, confirmDialog } from "./popups.js";
+import { alertDialog, choiceDialog, confirmDialog } from "./popups.js";
 import { bindDateTimePickers, syncDateTimeDisplays } from "./datetime_picker.js";
 import {
+  deleteOccurrenceAndLaterWithUndo,
   deleteOccurrenceWithUndo,
   deleteRecurrenceWithUndo,
   updateOccurrencesWithUndo,
@@ -3045,23 +3046,41 @@ async function deleteOccurrence() {
     dom.formStatus.textContent = "Missing occurrence start.";
     return;
   }
-  const confirmed = await confirmDialog("Delete only this occurrence?", {
-    confirmText: "Delete",
-    cancelText: "Cancel",
-    destructive: true,
-  });
-  if (!confirmed) return;
+  const occurrenceChoice = await choiceDialog(
+    "Delete only this occurrence, or this occurrence and later?",
+    {
+      confirmText: "Delete and later",
+      confirmValue: "occurrence-and-later",
+      altText: "Delete occurrence",
+      altValue: "occurrence",
+      cancelText: "Cancel",
+      destructive: true,
+      altDestructive: true,
+      confirmVariant: "ghost",
+      altVariant: "ghost",
+      actionOrder: "confirm-alt-cancel",
+    }
+  );
+  if (!occurrenceChoice) return;
   dom.formStatus.textContent = "Deleting occurrence...";
   try {
-    const blob = state.blobs.find((item) => item.recurrence_id === state.editingRecurrenceId);
-    await deleteOccurrenceWithUndo(
+    const occurrenceKey = normalizeOccurrenceKey(occurrenceStart);
+    const blob = state.blobs.find((item) => {
+      if (item.recurrence_id !== state.editingRecurrenceId) return false;
+      return normalizeOccurrenceKey(getOccurrenceKeyFromBlob(item)) === occurrenceKey;
+    });
+    const deleteTarget =
       blob || {
         recurrence_id: state.editingRecurrenceId,
         recurrence_type: state.editingRecurrenceType,
         recurrence_payload: state.editingRecurrencePayload,
         schedulable_timerange: { start: occurrenceStart },
-      }
-    );
+      };
+    if (occurrenceChoice === "occurrence-and-later") {
+      await deleteOccurrenceAndLaterWithUndo(deleteTarget);
+    } else {
+      await deleteOccurrenceWithUndo(deleteTarget);
+    }
     dom.formStatus.textContent = "Deleted.";
     toggleForm(false);
     resetFormMode();

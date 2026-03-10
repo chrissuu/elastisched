@@ -2,6 +2,7 @@ import { appConfig, minuteGranularity, saveView, state } from "./core.js";
 import { dom } from "./dom.js";
 import { alertDialog, choiceDialog } from "./popups.js";
 import {
+  deleteOccurrenceAndLaterWithUndo,
   deleteOccurrenceWithUndo,
   deleteRecurrenceWithUndo,
   moveOccurrenceToMainWithRefresh,
@@ -1994,12 +1995,32 @@ async function handleInfoCardDelete(event) {
   });
   if (!choice) return;
   try {
-    if (choice === "occurrence" && blob.recurrence_type === "single") {
-      await deleteRecurrenceWithUndo(blob.recurrence_id);
-      return;
-    }
     if (choice === "occurrence") {
-      await deleteOccurrenceWithUndo(blob);
+      if (blob.recurrence_type === "single") {
+        await deleteRecurrenceWithUndo(blob.recurrence_id);
+        return;
+      }
+      const occurrenceChoice = await choiceDialog(
+        "Delete only this occurrence, or this occurrence and later?",
+        {
+          confirmText: "Delete and later",
+          confirmValue: "occurrence-and-later",
+          altText: "Delete occurrence",
+          altValue: "occurrence",
+          cancelText: "Cancel",
+          destructive: true,
+          altDestructive: true,
+          confirmVariant: "ghost",
+          altVariant: "ghost",
+          actionOrder: "confirm-alt-cancel",
+        }
+      );
+      if (!occurrenceChoice) return;
+      if (occurrenceChoice === "occurrence-and-later") {
+        await deleteOccurrenceAndLaterWithUndo(blob);
+      } else {
+        await deleteOccurrenceWithUndo(blob);
+      }
       return;
     }
     if (choice === "recurrence") {

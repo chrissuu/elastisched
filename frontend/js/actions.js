@@ -32,6 +32,13 @@ function normalizeOccurrenceKey(value) {
   return parsed.toISOString();
 }
 
+function toOccurrenceTimestampMs(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  const ms = parsed.getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
 function clonePayload(payload) {
   return payload && typeof payload === "object" ? { ...payload } : {};
 }
@@ -123,6 +130,47 @@ async function deleteOccurrenceInternal(blob, previous = null) {
   const existingExclusions = Array.isArray(payload.exclusions) ? payload.exclusions : [];
   const nextExclusions = Array.from(new Set([...existingExclusions, occurrenceStart]));
   const nextPayload = { ...payload, exclusions: nextExclusions };
+  await updateRecurrence(blob.recurrence_id, recurrenceType, nextPayload);
+  return toUpdateRecord(blob.recurrence_id, recurrenceType, payload, nextPayload);
+}
+
+async function deleteOccurrenceAndLaterInternal(blob, previous = null) {
+  if (!blob?.recurrence_id) return null;
+  const occurrenceStart = getOccurrenceKeyFromBlob(blob);
+  if (!occurrenceStart) return null;
+  const existing = previous || (await getRecurrence(blob.recurrence_id));
+  const payload = clonePayload(existing.payload);
+  const recurrenceType = existing.type || blob.recurrence_type || "single";
+  if (recurrenceType === "single") {
+    return deleteRecurrenceInternal(blob.recurrence_id, existing);
+  }
+
+  const occurrenceStartMs = toOccurrenceTimestampMs(occurrenceStart);
+  if (occurrenceStartMs === null) {
+    return deleteOccurrenceInternal(blob, existing);
+  }
+
+  if (recurrenceType === "multiple") {
+    const blobs = Array.isArray(payload.blobs) ? payload.blobs : [];
+    const remaining = blobs.filter((item) => {
+      const itemStartMs = toOccurrenceTimestampMs(item?.schedulable_timerange?.start);
+      if (itemStartMs === null) return true;
+      return itemStartMs < occurrenceStartMs;
+    });
+    if (remaining.length === 0) {
+      return deleteRecurrenceInternal(blob.recurrence_id, existing);
+    }
+    const nextPayload = { ...payload, blobs: remaining };
+    await updateRecurrence(blob.recurrence_id, recurrenceType, nextPayload);
+    return toUpdateRecord(blob.recurrence_id, recurrenceType, payload, nextPayload);
+  }
+
+  const priorEndMs = toOccurrenceTimestampMs(payload.end_date);
+  const nextEndDate =
+    priorEndMs !== null && priorEndMs < occurrenceStartMs
+      ? payload.end_date
+      : occurrenceStart;
+  const nextPayload = { ...payload, end_date: nextEndDate };
   await updateRecurrence(blob.recurrence_id, recurrenceType, nextPayload);
   return toUpdateRecord(blob.recurrence_id, recurrenceType, payload, nextPayload);
 }
@@ -367,6 +415,14 @@ async function deleteOccurrenceWithUndo(blob, options = {}) {
   return record;
 }
 
+async function deleteOccurrenceAndLaterWithUndo(blob, options = {}) {
+  if (!blob?.recurrence_id) return null;
+  const record = await deleteOccurrenceAndLaterInternal(blob);
+  maybePushRecord(record, options);
+  maybeRefresh(options);
+  return record;
+}
+
 async function deleteOccurrencesWithUndo(blobs) {
   const unique = [];
   const seen = new Set();
@@ -407,6 +463,7 @@ async function moveOccurrenceToMainWithRefresh(blob) {
 }
 
 export {
+  deleteOccurrenceAndLaterWithUndo,
   deleteOccurrenceWithUndo,
   deleteOccurrencesWithUndo,
   deleteRecurrenceWithUndo,

@@ -25,6 +25,7 @@ import {
 import { pushHistoryAction, redoHistoryAction, undoHistoryAction } from "./history.js";
 import { alertDialog, bindDialogEvents, choiceDialog, confirmDialog } from "./popups.js";
 import {
+  deleteOccurrenceAndLaterWithUndo,
   deleteOccurrenceWithUndo,
   deleteOccurrencesWithUndo,
   deleteRecurrenceWithUndo,
@@ -878,7 +879,27 @@ async function deleteSelectedOccurrences() {
       if (choice === "recurrence") {
         await deleteRecurrenceWithUndo(blob.recurrence_id);
       } else {
-        await deleteOccurrenceWithUndo(blob);
+        const occurrenceChoice = await choiceDialog(
+          "Delete only this occurrence, or this occurrence and later?",
+          {
+            confirmText: "Delete and later",
+            confirmValue: "occurrence-and-later",
+            altText: "Delete occurrence",
+            altValue: "occurrence",
+            cancelText: "Cancel",
+            destructive: true,
+            altDestructive: true,
+            confirmVariant: "ghost",
+            altVariant: "ghost",
+            actionOrder: "confirm-alt-cancel",
+          }
+        );
+        if (!occurrenceChoice) return false;
+        if (occurrenceChoice === "occurrence-and-later") {
+          await deleteOccurrenceAndLaterWithUndo(blob);
+        } else {
+          await deleteOccurrenceWithUndo(blob);
+        }
       }
       state.selectedOccurrenceIds = [];
       return true;
