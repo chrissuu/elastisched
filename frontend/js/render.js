@@ -1,6 +1,6 @@
 import { appConfig, minuteGranularity, saveView, state } from "./core.js";
 import { dom } from "./dom.js";
-import { alertDialog, choiceDialog } from "./popups.js";
+import { alertDialog, choiceDialog, confirmDialog } from "./popups.js";
 import {
   deleteOccurrenceAndLaterWithUndo,
   deleteOccurrenceWithUndo,
@@ -1981,51 +1981,49 @@ async function handleInfoCardDelete(event) {
   const blob = getBlobById(blobId);
   if (blob?.preview) return;
   if (!blob?.recurrence_id) return;
-  const choice = await choiceDialog("Delete this occurrence or the full recurrence?", {
-    confirmText: "Delete recurrence",
-    confirmValue: "recurrence",
-    altText: "Delete occurrence",
-    altValue: "occurrence",
-    cancelText: "Cancel",
-    destructive: true,
-    altDestructive: true,
-    confirmVariant: "ghost",
-    altVariant: "ghost",
-    actionOrder: "confirm-alt-cancel",
-  });
+  if (blob.recurrence_type === "single") {
+    const confirmed = await confirmDialog("Delete this occurrence?", {
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await deleteRecurrenceWithUndo(blob.recurrence_id);
+    } catch (error) {
+      await alertDialog(error?.message || "Unable to delete.");
+    }
+    return;
+  }
+  const choice = await choiceDialog(
+    "Delete this occurrence, this occurrence and later, or the full recurrence?",
+    {
+      confirmText: "Delete recurrence",
+      confirmValue: "recurrence",
+      altText: "Delete and later",
+      altValue: "occurrence-and-later",
+      cancelText: "Delete occurrence",
+      cancelValue: "occurrence",
+      destructive: true,
+      altDestructive: true,
+      cancelDestructive: true,
+      confirmVariant: "ghost",
+      altVariant: "ghost",
+      actionOrder: "confirm-alt-cancel",
+      dismissValue: null,
+    }
+  );
   if (!choice) return;
   try {
-    if (choice === "occurrence") {
-      if (blob.recurrence_type === "single") {
-        await deleteRecurrenceWithUndo(blob.recurrence_id);
-        return;
-      }
-      const occurrenceChoice = await choiceDialog(
-        "Delete only this occurrence, or this occurrence and later?",
-        {
-          confirmText: "Delete and later",
-          confirmValue: "occurrence-and-later",
-          altText: "Delete occurrence",
-          altValue: "occurrence",
-          cancelText: "Cancel",
-          destructive: true,
-          altDestructive: true,
-          confirmVariant: "ghost",
-          altVariant: "ghost",
-          actionOrder: "confirm-alt-cancel",
-        }
-      );
-      if (!occurrenceChoice) return;
-      if (occurrenceChoice === "occurrence-and-later") {
-        await deleteOccurrenceAndLaterWithUndo(blob);
-      } else {
-        await deleteOccurrenceWithUndo(blob);
-      }
-      return;
-    }
     if (choice === "recurrence") {
       await deleteRecurrenceWithUndo(blob.recurrence_id);
+      return;
     }
+    if (choice === "occurrence-and-later") {
+      await deleteOccurrenceAndLaterWithUndo(blob);
+      return;
+    }
+    await deleteOccurrenceWithUndo(blob);
   } catch (error) {
     await alertDialog(error?.message || "Unable to delete.");
   }

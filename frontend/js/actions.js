@@ -39,6 +39,26 @@ function toOccurrenceTimestampMs(value) {
   return Number.isNaN(ms) ? null : ms;
 }
 
+function toOccurrenceKind(value) {
+  const defaultStartMs = toOccurrenceTimestampMs(
+    value?.default_scheduled_timerange?.start
+  );
+  const defaultEndMs = toOccurrenceTimestampMs(value?.default_scheduled_timerange?.end);
+  const schedStartMs = toOccurrenceTimestampMs(value?.schedulable_timerange?.start);
+  const schedEndMs = toOccurrenceTimestampMs(value?.schedulable_timerange?.end);
+  if (
+    defaultStartMs === null ||
+    defaultEndMs === null ||
+    schedStartMs === null ||
+    schedEndMs === null
+  ) {
+    return null;
+  }
+  return defaultStartMs === schedStartMs && defaultEndMs === schedEndMs
+    ? "event"
+    : "task";
+}
+
 function clonePayload(payload) {
   return payload && typeof payload === "object" ? { ...payload } : {};
 }
@@ -112,10 +132,15 @@ async function deleteOccurrenceInternal(blob, previous = null) {
   if (recurrenceType === "multiple") {
     const blobs = Array.isArray(payload.blobs) ? payload.blobs : [];
     const targetKey = normalizeOccurrenceKey(occurrenceStart);
+    const targetKind = toOccurrenceKind(blob);
     const remaining = blobs.filter((item) => {
       const itemStart = item?.schedulable_timerange?.start;
       if (!itemStart) return true;
-      return normalizeOccurrenceKey(itemStart) !== targetKey;
+      if (normalizeOccurrenceKey(itemStart) !== targetKey) return true;
+      if (!targetKind) return false;
+      const itemKind = toOccurrenceKind(item);
+      if (!itemKind) return true;
+      return itemKind !== targetKind;
     });
     if (remaining.length === 0) {
       return deleteRecurrenceInternal(blob.recurrence_id, existing);
@@ -152,10 +177,15 @@ async function deleteOccurrenceAndLaterInternal(blob, previous = null) {
 
   if (recurrenceType === "multiple") {
     const blobs = Array.isArray(payload.blobs) ? payload.blobs : [];
+    const targetKind = toOccurrenceKind(blob);
     const remaining = blobs.filter((item) => {
       const itemStartMs = toOccurrenceTimestampMs(item?.schedulable_timerange?.start);
       if (itemStartMs === null) return true;
-      return itemStartMs < occurrenceStartMs;
+      if (itemStartMs < occurrenceStartMs) return true;
+      if (!targetKind) return false;
+      const itemKind = toOccurrenceKind(item);
+      if (!itemKind) return true;
+      return itemKind !== targetKind;
     });
     if (remaining.length === 0) {
       return deleteRecurrenceInternal(blob.recurrence_id, existing);

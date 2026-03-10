@@ -3047,23 +3047,34 @@ async function deleteOccurrence() {
     return;
   }
   const occurrenceChoice = await choiceDialog(
-    "Delete only this occurrence, or this occurrence and later?",
+    "Delete this occurrence, this occurrence and later, or the full recurrence?",
     {
-      confirmText: "Delete and later",
-      confirmValue: "occurrence-and-later",
-      altText: "Delete occurrence",
-      altValue: "occurrence",
-      cancelText: "Cancel",
+      confirmText: "Delete recurrence",
+      confirmValue: "recurrence",
+      altText: "Delete and later",
+      altValue: "occurrence-and-later",
+      cancelText: "Delete occurrence",
+      cancelValue: "occurrence",
       destructive: true,
       altDestructive: true,
+      cancelDestructive: true,
       confirmVariant: "ghost",
       altVariant: "ghost",
       actionOrder: "confirm-alt-cancel",
+      dismissValue: null,
     }
   );
   if (!occurrenceChoice) return;
   dom.formStatus.textContent = "Deleting occurrence...";
   try {
+    if (occurrenceChoice === "recurrence") {
+      await deleteRecurrenceWithUndo(state.editingRecurrenceId);
+      dom.formStatus.textContent = "Deleted.";
+      toggleForm(false);
+      resetFormMode();
+      await refreshCalendar();
+      return;
+    }
     const occurrenceKey = normalizeOccurrenceKey(occurrenceStart);
     const blob = state.blobs.find((item) => {
       if (item.recurrence_id !== state.editingRecurrenceId) return false;
