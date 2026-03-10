@@ -866,20 +866,20 @@ async function deleteSelectedOccurrences() {
       const choice = await choiceDialog(
         "Delete this occurrence, this occurrence and later, or the full recurrence?",
         {
-        confirmText: "Delete recurrence",
-        confirmValue: "recurrence",
-        altText: "Delete and later",
-        altValue: "occurrence-and-later",
-        cancelText: "Delete occurrence",
-        cancelValue: "occurrence",
-        destructive: true,
-        altDestructive: true,
-        cancelDestructive: true,
-        confirmVariant: "ghost",
-        altVariant: "ghost",
-        actionOrder: "confirm-alt-cancel",
-        dismissValue: null,
-      }
+          confirmText: "Delete recurrence",
+          confirmValue: "recurrence",
+          altText: "Delete and later",
+          altValue: "occurrence-and-later",
+          cancelText: "Delete occurrence",
+          cancelValue: "occurrence",
+          destructive: true,
+          altDestructive: true,
+          cancelDestructive: true,
+          confirmVariant: "ghost",
+          altVariant: "ghost",
+          actionOrder: "confirm-alt-cancel",
+          dismissValue: null,
+        }
       );
       if (!choice) return false;
       if (choice === "recurrence") {

@@ -10,6 +10,7 @@ import { appConfig } from "./core.js";
 import { pushHistoryAction } from "./history.js";
 import {
   getOccurrenceKeyFromBlob,
+  formatDateTimeLocalInTimeZone,
   toProjectIsoFromDate,
 } from "./utils.js";
 
@@ -57,6 +58,57 @@ function toOccurrenceKind(value) {
   return defaultStartMs === schedStartMs && defaultEndMs === schedEndMs
     ? "event"
     : "task";
+}
+
+function normalizeText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeStringArray(values) {
+  return Array.isArray(values)
+    ? values
+        .map((item) => normalizeText(String(item ?? "")))
+        .filter(Boolean)
+        .sort()
+    : [];
+}
+
+function canonicalizeValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => canonicalizeValue(item));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, canonicalizeValue(value[key])])
+    );
+  }
+  return value;
+}
+
+function toLocalClockKey(value, timeZone) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const local = formatDateTimeLocalInTimeZone(parsed, timeZone || "UTC");
+  return local.split("T")[1] || "";
+}
+
+function toWeeklyGroupSignature(value, fallbackTimeZone = null) {
+  const timeZone = normalizeText(value?.tz) || fallbackTimeZone || appConfig.userTimeZone;
+  return JSON.stringify({
+    kind: toOccurrenceKind(value) || "",
+    name: normalizeText(value?.name),
+    description: normalizeText(value?.description),
+    location: normalizeText(value?.location),
+    defaultStart: toLocalClockKey(value?.default_scheduled_timerange?.start, timeZone),
+    defaultEnd: toLocalClockKey(value?.default_scheduled_timerange?.end, timeZone),
+    schedStart: toLocalClockKey(value?.schedulable_timerange?.start, timeZone),
+    schedEnd: toLocalClockKey(value?.schedulable_timerange?.end, timeZone),
+    dependencies: normalizeStringArray(value?.dependencies),
+    tags: normalizeStringArray(value?.tags),
+    policy: canonicalizeValue(value?.policy || {}),
+  });
 }
 
 function clonePayload(payload) {
@@ -173,6 +225,66 @@ async function deleteOccurrenceAndLaterInternal(blob, previous = null) {
   const occurrenceStartMs = toOccurrenceTimestampMs(occurrenceStart);
   if (occurrenceStartMs === null) {
     return deleteOccurrenceInternal(blob, existing);
+  }
+
+  if (recurrenceType === "weekly") {
+    const blobsOfWeek = Array.isArray(payload.blobs_of_week) ? payload.blobs_of_week : [];
+    if (!blobsOfWeek.length) {
+      return deleteOccurrenceInternal(blob, existing);
+    }
+    const targetSignature = toWeeklyGroupSignature(blob, blob?.tz || appConfig.userTimeZone);
+    const matching = [];
+    const remaining = [];
+    blobsOfWeek.forEach((item) => {
+      const signature = toWeeklyGroupSignature(item, item?.tz || blob?.tz || appConfig.userTimeZone);
+      if (signature === targetSignature) {
+        matching.push(item);
+      } else {
+        remaining.push(item);
+      }
+    });
+    if (!matching.length) {
+      return deleteOccurrenceInternal(blob, existing);
+    }
+    if (!remaining.length) {
+      const priorEndMs = toOccurrenceTimestampMs(payload.end_date);
+      const nextEndDate =
+        priorEndMs !== null && priorEndMs < occurrenceStartMs
+          ? payload.end_date
+          : occurrenceStart;
+      const nextPayload = { ...payload, end_date: nextEndDate };
+      await updateRecurrence(blob.recurrence_id, recurrenceType, nextPayload);
+      return toUpdateRecord(blob.recurrence_id, recurrenceType, payload, nextPayload);
+    }
+    const nextPayload = { ...payload, blobs_of_week: remaining };
+    await updateRecurrence(blob.recurrence_id, recurrenceType, nextPayload);
+    const updateRecord = toUpdateRecord(
+      blob.recurrence_id,
+      recurrenceType,
+      payload,
+      nextPayload
+    );
+    const earliestMatchingStartMs = matching.reduce((lowest, item) => {
+      const startMs = toOccurrenceTimestampMs(item?.schedulable_timerange?.start);
+      if (startMs === null) return lowest;
+      if (lowest === null || startMs < lowest) return startMs;
+      return lowest;
+    }, null);
+    if (earliestMatchingStartMs === null || earliestMatchingStartMs >= occurrenceStartMs) {
+      return updateRecord;
+    }
+    const historyPayload = {
+      ...payload,
+      blobs_of_week: matching,
+      end_date: occurrenceStart,
+    };
+    const created = await createRecurrence(recurrenceType, historyPayload);
+    const createRecord = toCreateRecord(
+      recurrenceType,
+      historyPayload,
+      created?.id || null
+    );
+    return createTransactionRecord([updateRecord, createRecord]);
   }
 
   if (recurrenceType === "multiple") {
