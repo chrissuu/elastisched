@@ -767,6 +767,10 @@ std::pair<Schedule, std::vector<double>> schedule_jobs(
             best_cost = run_cost;
             best_illegal_cost = run_illegal_cost;
         }
+
+        if (best_illegal_cost <= constants::EPSILON) {
+            break;
+        }
     }
 
     return std::make_pair(best_schedule, best_cost_history);
