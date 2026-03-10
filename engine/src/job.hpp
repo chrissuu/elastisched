@@ -17,8 +17,6 @@ public:
     sec_t duration;
     /** @brief Allowed placement window. */
     TimeRange schedulable_time_range;
-    /** @brief Baseline preferred placement window (immutable reference point). */
-    TimeRange default_scheduled_time_range;
     /** @brief Primary scheduled placement window. */
     TimeRange scheduled_time_range;
     /** @brief Concrete scheduled pieces (for split jobs). */

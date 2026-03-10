@@ -157,11 +157,7 @@ def test_consistency_cost_penalizes_same_recurrence_time_drift():
     )
 
     expected_pairwise_drift = HOUR / WEEK
-    expected_baseline_drift = HOUR / WEEK
-    assert cost_function.schedule_cost() == pytest.approx(
-        expected_pairwise_drift + expected_baseline_drift,
-        rel=1e-6,
-    )
+    assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
 
 
 def test_consistency_cost_scopes_to_recurrence_family_pattern():
@@ -221,11 +217,7 @@ def test_consistency_cost_scopes_to_recurrence_family_pattern():
     )
 
     expected_pairwise_drift = HOUR / WEEK
-    expected_baseline_drift = HOUR / WEEK
-    assert cost_function.schedule_cost() == pytest.approx(
-        expected_pairwise_drift + expected_baseline_drift,
-        rel=1e-6,
-    )
+    assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
 
 
 def test_granularity_cost_penalizes_off_half_hour_starts():
