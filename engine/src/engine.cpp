@@ -61,17 +61,17 @@ sec_t get_job_anchor_start(const Job& job) {
     return earliest;
 }
 
-double normalized_weekly_distance(sec_t a, sec_t b) {
-    const sec_t week_seconds = static_cast<sec_t>(7) * constants::DAY;
-    if (week_seconds == 0) {
+double normalized_daily_distance(sec_t a, sec_t b) {
+    const sec_t day_seconds = constants::DAY;
+    if (day_seconds == 0) {
         return 0.0;
     }
-    const sec_t phase_a = a % week_seconds;
-    const sec_t phase_b = b % week_seconds;
+    const sec_t phase_a = a % day_seconds;
+    const sec_t phase_b = b % day_seconds;
     const sec_t direct = (phase_a >= phase_b) ? (phase_a - phase_b) : (phase_b - phase_a);
-    const sec_t wrapped = week_seconds - direct;
+    const sec_t wrapped = day_seconds - direct;
     const sec_t distance = std::min(direct, wrapped);
-    return static_cast<double>(distance) / static_cast<double>(week_seconds);
+    return static_cast<double>(distance) / static_cast<double>(day_seconds);
 }
 
 double normalized_half_hour_distance(sec_t t) {
@@ -87,13 +87,13 @@ double normalized_half_hour_distance(sec_t t) {
 }
 
 std::string consistency_family_key(const Job& job) {
-    const sec_t week_seconds = static_cast<sec_t>(7) * constants::DAY;
-    const sec_t schedulable_phase = week_seconds == 0
-        ? job.schedulable_time_range.get_low()
-        : (job.schedulable_time_range.get_low() % week_seconds);
+    const sec_t day_seconds = constants::DAY;
+    const sec_t initial_phase = day_seconds == 0
+        ? job.initial_scheduled_time_range.get_low()
+        : (job.initial_scheduled_time_range.get_low() % day_seconds);
     std::string key = job.recurrence_id;
     key.push_back('|');
-    key += std::to_string(schedulable_phase);
+    key += std::to_string(initial_phase);
     key.push_back('|');
     key += std::to_string(job.schedulable_time_range.length());
     key.push_back('|');
@@ -618,7 +618,7 @@ double ScheduleCostFunction::consistency_cost() const {
         }
         for (size_t i = 0; i < starts.size(); ++i) {
             for (size_t j = i + 1; j < starts.size(); ++j) {
-                cost += normalized_weekly_distance(
+                cost += normalized_daily_distance(
                     starts[i],
                     starts[j]
                 );
@@ -730,7 +730,7 @@ std::pair<Schedule, std::vector<double>> schedule_jobs(
         std::mt19937 neighbor_gen(run_seed);
         SimulatedAnnealingOptimizer<Schedule> optimizer = SimulatedAnnealingOptimizer<Schedule>(
             schedule_cost,
-            [config, &neighbor_gen](Schedule s) {
+            [config, &neighbor_gen](const Schedule& s) {
                 return generate_random_schedule_neighbor(
                     s,
                     config.granularity,

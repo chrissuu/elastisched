@@ -156,7 +156,7 @@ def test_consistency_cost_penalizes_same_recurrence_time_drift():
         0.0,
     )
 
-    expected_pairwise_drift = HOUR / WEEK
+    expected_pairwise_drift = HOUR / DAY
     assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
 
 
@@ -216,7 +216,56 @@ def test_consistency_cost_scopes_to_recurrence_family_pattern():
         0.0,
     )
 
-    expected_pairwise_drift = HOUR / WEEK
+    expected_pairwise_drift = HOUR / DAY
+    assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
+
+
+def test_consistency_cost_penalizes_daily_time_drift_within_recurrence_family():
+    day_zero_start = Day.MONDAY * DAY + Hour.SIX_PM * HOUR
+
+    day_1 = _make_job(
+        schedulable_low=day_zero_start,
+        schedulable_high=day_zero_start + 3 * HOUR,
+        scheduled_low=day_zero_start,
+        scheduled_high=day_zero_start + HOUR,
+        job_id="day_1",
+        recurrence_id="recurrence-daily",
+    )
+    day_2 = _make_job(
+        schedulable_low=day_zero_start + DAY,
+        schedulable_high=day_zero_start + DAY + 3 * HOUR,
+        scheduled_low=day_zero_start + DAY,
+        scheduled_high=day_zero_start + DAY + HOUR,
+        job_id="day_2",
+        recurrence_id="recurrence-daily",
+    )
+    day_3 = _make_job(
+        schedulable_low=day_zero_start + 2 * DAY,
+        schedulable_high=day_zero_start + 2 * DAY + 3 * HOUR,
+        scheduled_low=day_zero_start + 2 * DAY,
+        scheduled_high=day_zero_start + 2 * DAY + HOUR,
+        job_id="day_3",
+        recurrence_id="recurrence-daily",
+    )
+    shifted_day_2_start = day_zero_start + DAY + HOUR
+    shifted_day_2_end = day_zero_start + DAY + 2 * HOUR
+    day_2.scheduled_time_ranges = [engine.TimeRange(shifted_day_2_start, shifted_day_2_end)]
+    day_2.scheduled_time_range = engine.TimeRange(shifted_day_2_start, shifted_day_2_end)
+
+    schedule = engine.Schedule([day_1, day_2, day_3])
+    cost_function = engine.ScheduleCostFunction(
+        schedule,
+        MINUTE,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+    )
+
+    # Only day_2 is shifted by +1h relative to day_1/day_3.
+    # Pairwise daily drifts: (day_1,day_2)=1h, (day_1,day_3)=0h, (day_2,day_3)=1h.
+    expected_pairwise_drift = 2 * (HOUR / DAY)
     assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
 
 

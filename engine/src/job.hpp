@@ -17,6 +17,8 @@ public:
     sec_t duration;
     /** @brief Allowed placement window. */
     TimeRange schedulable_time_range;
+    /** @brief Immutable initial scheduled placement used for family grouping. */
+    TimeRange initial_scheduled_time_range;
     /** @brief Primary scheduled placement window. */
     TimeRange scheduled_time_range;
     /** @brief Concrete scheduled pieces (for split jobs). */
