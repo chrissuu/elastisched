@@ -61,17 +61,18 @@ sec_t get_job_anchor_start(const Job& job) {
     return earliest;
 }
 
-double normalized_daily_distance(sec_t a, sec_t b) {
+double daily_slot_distance(sec_t a, sec_t b, sec_t slot_seconds) {
     const sec_t day_seconds = constants::DAY;
     if (day_seconds == 0) {
         return 0.0;
     }
+    const sec_t safe_slot_seconds = slot_seconds > 0 ? slot_seconds : 1;
     const sec_t phase_a = a % day_seconds;
     const sec_t phase_b = b % day_seconds;
     const sec_t direct = (phase_a >= phase_b) ? (phase_a - phase_b) : (phase_b - phase_a);
     const sec_t wrapped = day_seconds - direct;
     const sec_t distance = std::min(direct, wrapped);
-    return static_cast<double>(distance) / static_cast<double>(day_seconds);
+    return static_cast<double>(distance) / static_cast<double>(safe_slot_seconds);
 }
 
 double normalized_half_hour_distance(sec_t t) {
@@ -618,9 +619,10 @@ double ScheduleCostFunction::consistency_cost() const {
         }
         for (size_t i = 0; i < starts.size(); ++i) {
             for (size_t j = i + 1; j < starts.size(); ++j) {
-                cost += normalized_daily_distance(
+                cost += daily_slot_distance(
                     starts[i],
-                    starts[j]
+                    starts[j],
+                    granularity
                 );
             }
         }

@@ -156,7 +156,7 @@ def test_consistency_cost_penalizes_same_recurrence_time_drift():
         0.0,
     )
 
-    expected_pairwise_drift = HOUR / DAY
+    expected_pairwise_drift = HOUR / MINUTE
     assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
 
 
@@ -216,7 +216,7 @@ def test_consistency_cost_scopes_to_recurrence_family_pattern():
         0.0,
     )
 
-    expected_pairwise_drift = HOUR / DAY
+    expected_pairwise_drift = HOUR / MINUTE
     assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
 
 
@@ -265,7 +265,7 @@ def test_consistency_cost_penalizes_daily_time_drift_within_recurrence_family():
 
     # Only day_2 is shifted by +1h relative to day_1/day_3.
     # Pairwise daily drifts: (day_1,day_2)=1h, (day_1,day_3)=0h, (day_2,day_3)=1h.
-    expected_pairwise_drift = 2 * (HOUR / DAY)
+    expected_pairwise_drift = 2 * (HOUR / MINUTE)
     assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
 
 

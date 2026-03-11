@@ -211,3 +211,58 @@ def test_schedule_jobs_preserves_rigid_times():
 
     assert scheduled_job.scheduled_time_range == rigid_schedulable
     assert scheduled_job.scheduled_time_ranges[0] == rigid_schedulable
+
+
+def test_scheduler_prefers_single_consistent_daily_phase_with_one_conflict(monkeypatch):
+    monkeypatch.setenv("ELASTISCHED_RNG_SEED", "20260311")
+
+    policy = engine.Policy(0, 0)
+    family_jobs = []
+    for index, day in enumerate(
+        [Day.MONDAY, Day.TUESDAY, Day.WEDNESDAY, Day.THURSDAY], start=1
+    ):
+        schedulable_start = day * DAY + Hour.EIGHT_AM * HOUR
+        schedulable_end = day * DAY + Hour.TWELVE_PM * HOUR
+        default_start = day * DAY + Hour.EIGHT_AM * HOUR
+        default_end = default_start + HOUR
+        family_jobs.append(
+            engine.Job(
+                HOUR,
+                engine.TimeRange(schedulable_start, schedulable_end),
+                engine.TimeRange(default_start, default_end),
+                f"family_job_{index}",
+                policy,
+                set(),
+                set(),
+                "recurrence-family",
+            )
+        )
+
+    # Thursday at 08:00 is blocked, so the family should coalesce on another shared phase.
+    blocker_start = Day.THURSDAY * DAY + Hour.EIGHT_AM * HOUR
+    blocker_end = blocker_start + HOUR
+    blocker = engine.Job(
+        HOUR,
+        engine.TimeRange(blocker_start, blocker_end),
+        engine.TimeRange(blocker_start, blocker_end),
+        "blocker",
+        policy,
+        set(),
+        set(),
+    )
+
+    schedule, _ = engine.schedule_jobs(
+        [*family_jobs, blocker],
+        HOUR,
+        20.0,
+        1e-4,
+        200000,
+    )
+
+    scheduled_family = [
+        job for job in schedule.scheduled_jobs if job.id.startswith("family_job_")
+    ]
+    phases = {job.scheduled_time_range.get_low() % DAY for job in scheduled_family}
+
+    assert len(phases) == 1
+    assert next(iter(phases)) != Hour.EIGHT_AM * HOUR

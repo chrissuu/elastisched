@@ -33,6 +33,13 @@ function normalizeOccurrenceKey(value) {
   return parsed.toISOString();
 }
 
+const OCCURRENCE_TIMING_CHANGE_KEYS = new Set([
+  "defaultStart",
+  "defaultEnd",
+  "schedStart",
+  "schedEnd",
+]);
+
 function toOccurrenceTimestampMs(value) {
   if (!value) return null;
   const parsed = new Date(value);
@@ -380,6 +387,10 @@ function buildUpdatedOccurrenceValues(blob, changes = {}) {
   };
 }
 
+function hasNonTimingChanges(changes = {}) {
+  return Object.keys(changes).some((key) => !OCCURRENCE_TIMING_CHANGE_KEYS.has(key));
+}
+
 function validateOccurrenceRanges(defaultScheduledRange, schedulableRange) {
   if (!defaultScheduledRange || !schedulableRange) {
     throw new Error("Missing occurrence timing.");
@@ -479,6 +490,35 @@ async function updateOccurrenceWithUndo(blob, changes = {}, options = {}) {
           tags: nextValues.tags,
         };
       }),
+    };
+    await updateRecurrence(blob.recurrence_id, recurrenceType, nextPayload);
+    const record = toUpdateRecord(blob.recurrence_id, recurrenceType, payload, nextPayload);
+    maybePushRecord(record, options);
+    maybeRefresh(options);
+    return record;
+  }
+
+  const occurrenceKey = normalizeOccurrenceKey(getOccurrenceKeyFromBlob(blob));
+  if (occurrenceKey && !hasNonTimingChanges(changes)) {
+    const overrides =
+      payload.occurrence_overrides && typeof payload.occurrence_overrides === "object"
+        ? { ...payload.occurrence_overrides }
+        : {};
+    const currentOverride =
+      overrides[occurrenceKey] && typeof overrides[occurrenceKey] === "object"
+        ? overrides[occurrenceKey]
+        : {};
+    const nextOverride = {
+      ...currentOverride,
+      default_scheduled_timerange: serializeRange(nextValues.defaultScheduledRange),
+      schedulable_timerange: serializeRange(nextValues.schedulableRange),
+    };
+    const nextPayload = {
+      ...payload,
+      occurrence_overrides: {
+        ...overrides,
+        [occurrenceKey]: nextOverride,
+      },
     };
     await updateRecurrence(blob.recurrence_id, recurrenceType, nextPayload);
     const record = toUpdateRecord(blob.recurrence_id, recurrenceType, payload, nextPayload);

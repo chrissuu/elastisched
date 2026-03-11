@@ -348,11 +348,27 @@ def _to_occurrence_schema(
                 break
         if override:
             tzinfo = blob.tz or occurrence_start.tzinfo
+            candidate_default = None
+            default_override = override.get("default_scheduled_timerange")
+            if isinstance(default_override, dict):
+                parsed_default = _parse_timerange(default_override, tzinfo)
+                if parsed_default.start < parsed_default.end:
+                    candidate_default = parsed_default
+            candidate_schedulable = None
             sched_override = override.get("schedulable_timerange")
             if isinstance(sched_override, dict):
-                candidate = _parse_timerange(sched_override, tzinfo)
-                if candidate.start < candidate.end:
-                    schedulable_tr = candidate
+                parsed_schedulable = _parse_timerange(sched_override, tzinfo)
+                if parsed_schedulable.start < parsed_schedulable.end:
+                    candidate_schedulable = parsed_schedulable
+
+            next_default = candidate_default or default_tr
+            next_schedulable = candidate_schedulable or schedulable_tr
+            if (
+                next_schedulable.start <= next_default.start
+                and next_schedulable.end >= next_default.end
+            ):
+                default_tr = next_default
+                schedulable_tr = next_schedulable
     return OccurrenceRead(
         id=_occurrence_id(recurrence_id, blob),
         recurrence_id=recurrence_id,

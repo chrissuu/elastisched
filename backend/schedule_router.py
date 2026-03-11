@@ -84,8 +84,27 @@ def _occurrence_override(payload: dict, occurrence) -> dict | None:
     overrides = payload.get("occurrence_overrides") if isinstance(payload, dict) else None
     if not isinstance(overrides, dict):
         return None
+    candidate_timestamps: set[int] = set()
     occurrence_start = occurrence.schedulable_timerange.start
-    occurrence_ts = int(occurrence_start.timestamp())
+    candidate_timestamps.add(int(occurrence_start.timestamp()))
+
+    occurrence_id = getattr(occurrence, "id", None)
+    recurrence_id = getattr(occurrence, "recurrence_id", None)
+    if isinstance(occurrence_id, str) and isinstance(recurrence_id, str):
+        prefix = f"{recurrence_id}:"
+        if occurrence_id.startswith(prefix):
+            raw_key = occurrence_id[len(prefix):]
+            try:
+                key_dt = _parse_datetime(raw_key)
+            except HTTPException:
+                key_dt = None
+            if key_dt is not None:
+                if key_dt.tzinfo is None:
+                    key_dt = key_dt.replace(tzinfo=occurrence_start.tzinfo)
+                else:
+                    key_dt = key_dt.astimezone(occurrence_start.tzinfo)
+                candidate_timestamps.add(int(key_dt.timestamp()))
+
     for key, value in overrides.items():
         if not isinstance(value, dict):
             continue
@@ -97,7 +116,7 @@ def _occurrence_override(payload: dict, occurrence) -> dict | None:
             key_dt = key_dt.replace(tzinfo=occurrence_start.tzinfo)
         else:
             key_dt = key_dt.astimezone(occurrence_start.tzinfo)
-        if int(key_dt.timestamp()) == occurrence_ts:
+        if int(key_dt.timestamp()) in candidate_timestamps:
             return value
     return None
 

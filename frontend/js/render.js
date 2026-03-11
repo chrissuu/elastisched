@@ -1227,15 +1227,21 @@ function layoutTimedBlocks(blocks) {
   });
 }
 
-function getPointerDateForSession(session, clientX, clientY) {
+function getPointerDateForSession(session, clientX, clientY, options = {}) {
   if (!session) return null;
+  const anchorOffsetPx = Number.isFinite(options.anchorOffsetPx)
+    ? Number(options.anchorOffsetPx)
+    : 0;
   if (session.view === "day") {
-    const minutes = getTrackMinutesFromPointer(session.dayTrack, clientY);
+    const minutes = getTrackMinutesFromPointer(
+      session.dayTrack,
+      clientY - anchorOffsetPx
+    );
     return dateFromTrackPosition(state.anchorDate, minutes, session.blobTimeZone);
   }
   const columnIndex = getWeekColumnIndex(session.dayColumns, clientX);
   const track = session.dayColumns[columnIndex]?.querySelector(".week-day-track");
-  const minutes = getTrackMinutesFromPointer(track, clientY);
+  const minutes = getTrackMinutesFromPointer(track, clientY - anchorOffsetPx);
   return dateFromTrackPosition(session.days[columnIndex], minutes, session.blobTimeZone);
 }
 
@@ -1285,6 +1291,24 @@ function createNextRangesFromSession(session, pointerDate) {
   }
 
   return { defaultRange: nextDefault, schedulableRange: nextSched };
+}
+
+function resolvePointerAnchorOffsetPx(event) {
+  if (!event || !Number.isFinite(event.clientY)) return 0;
+  const directTarget =
+    event.currentTarget instanceof Element && event.currentTarget.classList.contains("day-block")
+      ? event.currentTarget
+      : null;
+  const block =
+    directTarget ||
+    (event.target instanceof Element ? event.target.closest(".day-block") : null);
+  if (!block) return 0;
+  const rect = block.getBoundingClientRect();
+  if (!Number.isFinite(rect.top) || !Number.isFinite(rect.height) || rect.height <= 0) {
+    return 0;
+  }
+  const offset = event.clientY - rect.top;
+  return Math.min(Math.max(offset, 0), rect.height);
 }
 
 function validateSessionRanges(session, nextDefaultRange, nextSchedulableRange) {
@@ -1438,7 +1462,9 @@ function beginOccurrenceDrag(session) {
       document.body.classList.add("occurrence-dragging");
       setDragSourceStateForSession(session, true);
     }
-    const pointerDate = getPointerDateForSession(session, event.clientX, event.clientY);
+    const pointerDate = getPointerDateForSession(session, event.clientX, event.clientY, {
+      anchorOffsetPx: session.mode === "move" ? session.pointerAnchorOffsetPx : 0,
+    });
     const nextRanges = createNextRangesFromSession(session, pointerDate);
     if (!nextRanges) return;
     const { valid, changed } = validateSessionRanges(
@@ -2319,6 +2345,7 @@ function renderDay() {
     const originalSchedulableRange = schedulableRangeFromBlob(blob);
     if (!originalDefaultRange || !originalSchedulableRange) return;
     const shiftTargets = mode === "move" ? getEditableSelectedShiftTargets(blob) : [];
+    const pointerAnchorOffsetPx = mode === "move" ? resolvePointerAnchorOffsetPx(event) : 0;
     const initialPointerDate = getPointerDateForSession(
       {
         view: "day",
@@ -2326,7 +2353,8 @@ function renderDay() {
         blobTimeZone: getBlobTimeZone(blob),
       },
       event.clientX,
-      event.clientY
+      event.clientY,
+      { anchorOffsetPx: pointerAnchorOffsetPx }
     );
     if (!initialPointerDate) return;
     beginOccurrenceDrag({
@@ -2345,7 +2373,11 @@ function renderDay() {
       hourHeight,
       initialClientX: event.clientX,
       initialClientY: event.clientY,
-      anchorOffsetMs: initialPointerDate.getTime() - originalDefaultRange.start.getTime(),
+      anchorOffsetMs:
+        mode === "move"
+          ? 0
+          : initialPointerDate.getTime() - originalDefaultRange.start.getTime(),
+      pointerAnchorOffsetPx,
       nextDefaultRange: originalDefaultRange,
       nextSchedulableRange: originalSchedulableRange,
       shiftTargets,
@@ -3021,6 +3053,7 @@ function renderWeek() {
     const originalSchedulableRange = schedulableRangeFromBlob(blob);
     if (!originalDefaultRange || !originalSchedulableRange) return;
     const shiftTargets = mode === "move" ? getEditableSelectedShiftTargets(blob) : [];
+    const pointerAnchorOffsetPx = mode === "move" ? resolvePointerAnchorOffsetPx(event) : 0;
     const initialPointerDate = getPointerDateForSession(
       {
         view: "week",
@@ -3029,7 +3062,8 @@ function renderWeek() {
         blobTimeZone: getBlobTimeZone(blob),
       },
       event.clientX,
-      event.clientY
+      event.clientY,
+      { anchorOffsetPx: pointerAnchorOffsetPx }
     );
     if (!initialPointerDate) return;
     beginOccurrenceDrag({
@@ -3048,7 +3082,11 @@ function renderWeek() {
       hourHeight,
       initialClientX: event.clientX,
       initialClientY: event.clientY,
-      anchorOffsetMs: initialPointerDate.getTime() - originalDefaultRange.start.getTime(),
+      anchorOffsetMs:
+        mode === "move"
+          ? 0
+          : initialPointerDate.getTime() - originalDefaultRange.start.getTime(),
+      pointerAnchorOffsetPx,
       nextDefaultRange: originalDefaultRange,
       nextSchedulableRange: originalSchedulableRange,
       shiftTargets,
