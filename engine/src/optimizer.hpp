@@ -102,9 +102,9 @@ private:
     TemperatureSchedule temp_schedule;
     std::vector<double> cost_history;
 
-    /** @brief Default geometric cooling schedule (`t0 * 0.95^iter`). */
+    /** @brief Default geometric cooling schedule with slower decay for deeper search. */
     static double default_schedule(double t0, int iter) {
-        return t0 * std::pow(0.95, iter); // geometric cooling
+        return t0 * std::pow(0.9992, iter);
     }
 };
 

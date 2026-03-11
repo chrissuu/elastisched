@@ -3539,6 +3539,11 @@ async function handleBlobSubmit(event) {
       stars: Array.isArray(priorPayload.stars) ? priorPayload.stars : [],
       exclusions: Array.isArray(priorPayload.exclusions) ? priorPayload.exclusions : [],
       unstarred: Array.isArray(priorPayload.unstarred) ? priorPayload.unstarred : [],
+      occurrence_overrides:
+        priorPayload.occurrence_overrides &&
+        typeof priorPayload.occurrence_overrides === "object"
+          ? priorPayload.occurrence_overrides
+          : {},
     };
   }
   if (recurrenceCalendarViewPayload) {
