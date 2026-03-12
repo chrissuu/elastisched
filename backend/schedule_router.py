@@ -92,22 +92,9 @@ def _occurrence_override(payload: dict, occurrence) -> dict | None:
     occurrence_start = occurrence.schedulable_timerange.start
     candidate_timestamps.add(int(occurrence_start.timestamp()))
 
-    occurrence_id = getattr(occurrence, "id", None)
-    recurrence_id = getattr(occurrence, "recurrence_id", None)
-    if isinstance(occurrence_id, str) and isinstance(recurrence_id, str):
-        prefix = f"{recurrence_id}:"
-        if occurrence_id.startswith(prefix):
-            raw_key = occurrence_id[len(prefix):]
-            try:
-                key_dt = _parse_datetime(raw_key)
-            except HTTPException:
-                key_dt = None
-            if key_dt is not None:
-                if key_dt.tzinfo is None:
-                    key_dt = key_dt.replace(tzinfo=occurrence_start.tzinfo)
-                else:
-                    key_dt = key_dt.astimezone(occurrence_start.tzinfo)
-                candidate_timestamps.add(int(key_dt.timestamp()))
+    occurrence_key_dt = _occurrence_key_datetime(occurrence, occurrence_start.tzinfo)
+    if occurrence_key_dt is not None:
+        candidate_timestamps.add(int(occurrence_key_dt.timestamp()))
 
     for key, value in overrides.items():
         if not isinstance(value, dict):
@@ -243,6 +230,22 @@ def _occurrence_key_from_id(occurrence) -> str | None:
     return key or None
 
 
+def _occurrence_key_datetime(occurrence, tzinfo) -> datetime | None:
+    raw_key = _occurrence_key_from_id(occurrence)
+    if not raw_key:
+        return None
+    try:
+        parsed = _parse_datetime(raw_key)
+    except HTTPException:
+        return None
+    if tzinfo is not None:
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=tzinfo)
+        else:
+            parsed = parsed.astimezone(tzinfo)
+    return parsed
+
+
 def _policy_signature(policy: dict | None) -> int:
     if not isinstance(policy, dict):
         return 0
@@ -266,18 +269,9 @@ def _policy_signature(policy: dict | None) -> int:
 def _occurrence_consistency_group_id(occurrence) -> str:
     sched_start = occurrence.schedulable_timerange.start
     anchor = sched_start
-    raw_key = _occurrence_key_from_id(occurrence)
-    if raw_key:
-        try:
-            parsed = _parse_datetime(raw_key)
-        except HTTPException:
-            parsed = None
-        if parsed is not None:
-            if parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=sched_start.tzinfo)
-            else:
-                parsed = parsed.astimezone(sched_start.tzinfo)
-            anchor = parsed
+    parsed = _occurrence_key_datetime(occurrence, sched_start.tzinfo)
+    if parsed is not None:
+        anchor = parsed
 
     phase_seconds = anchor.hour * 3600 + anchor.minute * 60 + anchor.second
     default_duration_seconds = int(
