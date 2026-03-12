@@ -1,4 +1,5 @@
 import { API_BASE, appConfig, state } from "./core.js";
+import { apiFetch, getCachedCsrfToken } from "./auth.js";
 import { toProjectIsoFromDate } from "./utils.js";
 
 let occurrenceRequestVersion = 0;
@@ -19,7 +20,7 @@ async function fetchOccurrences(start, end) {
       start: toProjectIsoFromDate(start, appConfig.projectTimeZone),
       end: toProjectIsoFromDate(end, appConfig.projectTimeZone),
     });
-    const response = await fetch(`${API_BASE}/occurrences?${query.toString()}`, {
+    const response = await apiFetch(`${API_BASE}/occurrences?${query.toString()}`, {
       signal: controller.signal,
     });
     if (!response.ok) {
@@ -69,7 +70,7 @@ async function fetchScheduleStatus() {
       SCHEDULE_STATUS_TIMEOUT_MS
     );
     try {
-      const response = await fetch(`${API_BASE}/schedule/status`, {
+      const response = await apiFetch(`${API_BASE}/schedule/status`, {
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -107,7 +108,7 @@ async function runSchedule(granularityMinutes, lookaheadSeconds) {
     consistency_cost_weight: appConfig.engineConsistencyCostWeight,
     granularity_cost_weight: appConfig.engineGranularityCostWeight,
   };
-  const response = await fetch(`${API_BASE}/schedule`, {
+  const response = await apiFetch(`${API_BASE}/schedule`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -127,7 +128,7 @@ async function runSchedule(granularityMinutes, lookaheadSeconds) {
 }
 
 async function getRecurrence(recurrenceId) {
-  const response = await fetch(`${API_BASE}/recurrences/${recurrenceId}`);
+  const response = await apiFetch(`${API_BASE}/recurrences/${recurrenceId}`);
   if (!response.ok) {
     throw new Error("Failed to fetch recurrence");
   }
@@ -138,7 +139,7 @@ async function createRecurrence(type, payload) {
   if (Array.isArray(type)) {
     return createRecurrencesBulk(type);
   }
-  const response = await fetch(`${API_BASE}/recurrences`, {
+  const response = await apiFetch(`${API_BASE}/recurrences`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type, payload }),
@@ -158,7 +159,7 @@ async function createRecurrence(type, payload) {
 }
 
 async function createRecurrencesBulk(recurrences) {
-  const response = await fetch(`${API_BASE}/recurrences/bulk`, {
+  const response = await apiFetch(`${API_BASE}/recurrences/bulk`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(recurrences),
@@ -180,7 +181,7 @@ async function createRecurrencesBulk(recurrences) {
 async function deleteRecurrence(recurrenceId) {
   let response = null;
   try {
-    response = await fetch(`${API_BASE}/recurrences/${recurrenceId}`, {
+    response = await apiFetch(`${API_BASE}/recurrences/${recurrenceId}`, {
       method: "DELETE",
     });
   } catch (error) {
@@ -203,7 +204,7 @@ async function deleteRecurrence(recurrenceId) {
 }
 
 async function updateRecurrence(recurrenceId, type, payload) {
-  const response = await fetch(`${API_BASE}/recurrences/${recurrenceId}`, {
+  const response = await apiFetch(`${API_BASE}/recurrences/${recurrenceId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type, payload }),
@@ -223,7 +224,10 @@ async function updateRecurrence(recurrenceId, type, payload) {
 }
 
 function flushPreferenceBatches() {
-  const url = `${API_BASE}/analytics/flush-preference-batches`;
+  const csrf = getCachedCsrfToken();
+  const url = csrf
+    ? `${API_BASE}/analytics/flush-preference-batches?csrf_token=${encodeURIComponent(csrf)}`
+    : `${API_BASE}/analytics/flush-preference-batches`;
   if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
     try {
       return navigator.sendBeacon(url, new Blob([], { type: "application/json" }));
@@ -231,7 +235,7 @@ function flushPreferenceBatches() {
       // Fall through to fetch keepalive.
     }
   }
-  fetch(url, {
+  apiFetch(url, {
     method: "POST",
     keepalive: true,
   }).catch(() => {});
@@ -239,7 +243,7 @@ function flushPreferenceBatches() {
 }
 
 async function createLLMRecurrenceDraft(payload) {
-  const response = await fetch(`${API_BASE}/llm/recurrence-draft`, {
+  const response = await apiFetch(`${API_BASE}/llm/recurrence-draft`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -259,7 +263,7 @@ async function createLLMRecurrenceDraft(payload) {
 }
 
 async function estimateTaskDuration(payload) {
-  const response = await fetch(`${API_BASE}/llm/estimate-duration`, {
+  const response = await apiFetch(`${API_BASE}/llm/estimate-duration`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -279,7 +283,7 @@ async function estimateTaskDuration(payload) {
 }
 
 async function getGoogleIntegrationStatus() {
-  const response = await fetch(`${API_BASE}/integrations/google/status`);
+  const response = await apiFetch(`${API_BASE}/integrations/google/status`);
   if (!response.ok) {
     throw new Error("Failed to fetch Google integration status");
   }
@@ -296,7 +300,7 @@ function buildGoogleOAuthStartUrl(returnTo) {
 }
 
 async function connectGoogleAccount(accessToken) {
-  const response = await fetch(`${API_BASE}/integrations/google/connect`, {
+  const response = await apiFetch(`${API_BASE}/integrations/google/connect`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ access_token: accessToken }),
@@ -321,7 +325,7 @@ async function disconnectGoogleAccount(accountKey = null) {
     params.set("account_key", accountKey);
   }
   const query = params.toString();
-  const response = await fetch(`${API_BASE}/integrations/google/connect${query ? `?${query}` : ""}`, {
+  const response = await apiFetch(`${API_BASE}/integrations/google/connect${query ? `?${query}` : ""}`, {
     method: "DELETE",
   });
   if (!response.ok && response.status !== 404) {
@@ -330,7 +334,7 @@ async function disconnectGoogleAccount(accountKey = null) {
 }
 
 async function listGoogleCalendars() {
-  const response = await fetch(`${API_BASE}/integrations/google/calendars`);
+  const response = await apiFetch(`${API_BASE}/integrations/google/calendars`);
   if (!response.ok) {
     let detail = "Failed to load Google calendars";
     const contentType = response.headers.get("content-type") || "";
@@ -346,7 +350,7 @@ async function listGoogleCalendars() {
 }
 
 async function syncGoogleCalendars(payload) {
-  const response = await fetch(`${API_BASE}/integrations/google/sync`, {
+  const response = await apiFetch(`${API_BASE}/integrations/google/sync`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -366,7 +370,7 @@ async function syncGoogleCalendars(payload) {
 }
 
 async function listCalendarViews() {
-  const response = await fetch(`${API_BASE}/integrations/calendars`);
+  const response = await apiFetch(`${API_BASE}/integrations/calendars`);
   if (!response.ok) {
     let detail = "Failed to load calendar views";
     const contentType = response.headers.get("content-type") || "";
@@ -403,7 +407,7 @@ function parseFilenameFromDisposition(value) {
 }
 
 async function exportCalendarViews(payload) {
-  const response = await fetch(`${API_BASE}/integrations/calendars/export`, {
+  const response = await apiFetch(`${API_BASE}/integrations/calendars/export`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -426,7 +430,7 @@ async function exportCalendarViews(payload) {
 }
 
 async function exportUserData(payload) {
-  const response = await fetch(`${API_BASE}/integrations/user-data/export`, {
+  const response = await apiFetch(`${API_BASE}/integrations/user-data/export`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload || {}),
@@ -449,7 +453,7 @@ async function exportUserData(payload) {
 }
 
 async function setCalendarVisibility(calendarViewId, visible) {
-  const response = await fetch(`${API_BASE}/integrations/calendars/${encodeURIComponent(calendarViewId)}/visibility`, {
+  const response = await apiFetch(`${API_BASE}/integrations/calendars/${encodeURIComponent(calendarViewId)}/visibility`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ visible: Boolean(visible) }),
@@ -482,7 +486,7 @@ async function setGoogleCalendarSelection(calendarViewId, selected, options = {}
         : Boolean(selected),
     related_view_ids: relatedViewIds,
   };
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE}/integrations/google/calendars/${encodeURIComponent(calendarViewId)}/selection`,
     {
       method: "PUT",
@@ -505,7 +509,7 @@ async function setGoogleCalendarSelection(calendarViewId, selected, options = {}
 }
 
 async function copyCalendarToMain(calendarViewId) {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE}/integrations/calendars/${encodeURIComponent(calendarViewId)}/copy-to-main`,
     { method: "POST" }
   );
@@ -524,7 +528,7 @@ async function copyCalendarToMain(calendarViewId) {
 }
 
 async function moveRecurrenceToMain(recurrenceId) {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE}/integrations/recurrences/${encodeURIComponent(recurrenceId)}/move-to-main`,
     {
       method: "POST",
@@ -545,7 +549,7 @@ async function moveRecurrenceToMain(recurrenceId) {
 }
 
 async function moveOccurrenceToMain(recurrenceId, occurrenceStart) {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE}/integrations/recurrences/${encodeURIComponent(
       recurrenceId
     )}/occurrences/move-to-main`,
@@ -570,7 +574,7 @@ async function moveOccurrenceToMain(recurrenceId, occurrenceStart) {
 }
 
 async function createCustomCalendar(name) {
-  const response = await fetch(`${API_BASE}/integrations/calendars/custom`, {
+  const response = await apiFetch(`${API_BASE}/integrations/calendars/custom`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -590,7 +594,7 @@ async function createCustomCalendar(name) {
 }
 
 async function deleteCalendarView(calendarViewId) {
-  const response = await fetch(`${API_BASE}/integrations/calendars/${encodeURIComponent(calendarViewId)}`, {
+  const response = await apiFetch(`${API_BASE}/integrations/calendars/${encodeURIComponent(calendarViewId)}`, {
     method: "DELETE",
   });
   if (!response.ok && response.status !== 404) {

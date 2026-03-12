@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Elastisched | Adaptive Scheduling</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="noise-overlay" aria-hidden="true"></div>
+    <header class="topbar">
+      <a class="wordmark" href="/">Elastisched</a>
+      <a class="launch-link" href="/ui">Open Workspace</a>
+    </header>
+
+    <main class="layout">
+      <section class="hero">
+        <p class="eyebrow">Adaptive planning for real workloads</p>
+        <h1>Schedule work around reality, not rigid calendars.</h1>
+        <p class="hero-copy">
+          Elastisched combines recurrence rules, hard constraints, and optimization to keep your
+          week executable as priorities shift.
+        </p>
+        <div class="metric-grid" role="list" aria-label="Product highlights">
+          <article class="metric-card" role="listitem">
+            <p class="metric-value">5 views</p>
+            <p class="metric-label">Day, week, month, year, and tasks focus</p>
+          </article>
+          <article class="metric-card" role="listitem">
+            <p class="metric-value">C++ engine</p>
+            <p class="metric-label">Fast schedule optimization with policy controls</p>
+          </article>
+          <article class="metric-card" role="listitem">
+            <p class="metric-value">Google sync</p>
+            <p class="metric-label">Bring external calendars into one workspace</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="auth-shell" aria-label="Account access">
+        <div class="auth-header">
+          <h2>Get started</h2>
+          <p>Create an account or sign in to your workspace.</p>
+        </div>
+        <div class="auth-tabs" role="tablist" aria-label="Authentication options">
+          <button class="auth-tab active" type="button" data-tab-target="login" role="tab">
+            Sign in
+          </button>
+          <button class="auth-tab" type="button" data-tab-target="register" role="tab">
+            Create account
+          </button>
+        </div>
+
+        <form id="loginForm" class="auth-form active" autocomplete="on">
+          <label>
+            Email
+            <input type="email" name="email" required autocomplete="email" />
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" required autocomplete="current-password" />
+          </label>
+          <button class="cta" type="submit">Sign in</button>
+        </form>
+
+        <form id="registerForm" class="auth-form" autocomplete="on">
+          <label>
+            Display name
+            <input type="text" name="display_name" maxlength="120" autocomplete="name" />
+          </label>
+          <label>
+            Email
+            <input type="email" name="email" required autocomplete="email" />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              name="password"
+              required
+              minlength="12"
+              autocomplete="new-password"
+            />
+          </label>
+          <button class="cta" type="submit">Create account</button>
+        </form>
+
+        <p class="auth-status" id="authStatus" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

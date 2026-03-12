@@ -18,6 +18,7 @@ COPY core /app/core
 COPY engine /app/engine
 COPY backend /app/backend
 COPY frontend /app/frontend
+COPY landing /app/landing
 
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt \

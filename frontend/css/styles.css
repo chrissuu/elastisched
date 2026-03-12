@@ -452,6 +452,24 @@ html[data-zoomed="true"] .sidebar {
   grid-template-columns: 1fr;
 }
 
+.account-pill {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(107, 103, 92, 0.22);
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+}
+
+.account-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .sidebar-calendars {
   min-height: 0;
   max-height: 100%;
@@ -708,7 +726,8 @@ html[data-zoomed="true"] .sidebar {
 .page.sidebar-collapsed .sidebar-link-title,
 .page.sidebar-collapsed .sidebar-link-subtitle,
 .page.sidebar-collapsed .sidebar-icon-label,
-.page.sidebar-collapsed .sidebar-calendars {
+.page.sidebar-collapsed .sidebar-calendars,
+.page.sidebar-collapsed .account-pill {
   display: none;
 }
 

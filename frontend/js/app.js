@@ -55,12 +55,29 @@ import {
   shiftAnchorDate,
   toProjectIsoFromDate,
 } from "./utils.js";
+import {
+  getAuthenticatedUser,
+  logoutAndRedirect,
+  requireAuthenticatedAppSession,
+} from "./auth.js";
+
+await requireAuthenticatedAppSession();
 
 dom.brandTitle.textContent = appConfig.scheduleName || dom.brandTitle.textContent;
 dom.brandSubtitle.textContent = appConfig.subtitle || dom.brandSubtitle.textContent;
 applyTheme(appConfig.theme);
 if (dom.timeZoneLabel) {
   dom.timeZoneLabel.textContent = appConfig.userTimeZone || "Local";
+}
+const signedInUser = getAuthenticatedUser();
+if (dom.accountLabel && signedInUser) {
+  dom.accountLabel.textContent =
+    signedInUser.display_name || signedInUser.email || "Signed in";
+}
+if (dom.logoutBtn) {
+  dom.logoutBtn.addEventListener("click", () => {
+    logoutAndRedirect();
+  });
 }
 
 function syncDeviceTimeZone() {
