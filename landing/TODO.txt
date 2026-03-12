@@ -1,3 +1,1 @@
-TODO: Landing page for elastisched.
-
-Should have docs, tips / tricks, keyboard binds, and demos.
+TODO: Expand landing with product docs, onboarding tips, keyboard shortcuts, and walkthrough demos.

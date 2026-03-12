@@ -13,6 +13,7 @@
 - Local run: `uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000`
 
 ## Route Groups
+- `/auth` in [`backend/auth_router.py`](auth_router.py)
 - `/blobs` in [`backend/router.py`](router.py)
 - `/recurrences` and `/occurrences` in [`backend/recurrence_router.py`](recurrence_router.py)
 - `/schedule` in [`backend/schedule_router.py`](schedule_router.py)
@@ -26,6 +27,11 @@
 ## Configuration
 Primary env vars are read in [`backend/config.py`](config.py):
 - `DATABASE_URL`
+- `AUTH_DATABASE_URL`
+- `USER_WORKSPACE_DIR`
+- `SESSION_TTL_HOURS`
+- `SESSION_TOKEN_SECRET`
+- `PASSWORD_PEPPER`
 - `GEMINI_API_KEY`
 - `GEMINI_MODEL`
 - `GOOGLE_OAUTH_CLIENT_ID`

@@ -1,10 +1,8 @@
 # Landing
 
-`landing/` is reserved for the public-facing landing and onboarding experience.
+`landing/` contains the public-facing entry point served at `/`.
 
-## Planned Scope
-- Product documentation and onboarding content.
-- Tips/tricks and keyboard shortcuts.
-- Feature demos and walkthroughs.
-
-Status: scaffold only (see [`landing/TODO.txt`](TODO.txt)).
+## Scope
+- Marketing hero and product positioning.
+- Account creation and sign-in flow (`/auth/register`, `/auth/login`).
+- Session resume check that forwards authenticated users to `/ui`.

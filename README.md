@@ -7,6 +7,7 @@ Elastisched is an elastic scheduling system for time-constrained tasks and recur
 - Flexible "blob"-based event model with schedulable windows and policy flags.
 - Simulated-annealing scheduler with configurable cost weights and granularity.
 - Recurrence system (`single`, `multiple`, `weekly`, `delta`, `date`).
+- Account-based authentication with per-user workspace isolation.
 - FastAPI backend with integrations and LLM-assisted scheduling flows.
 - Vanilla JS frontend with day/week/month/year views and scheduling controls.
 
@@ -14,7 +15,8 @@ Elastisched is an elastic scheduling system for time-constrained tasks and recur
 - `backend/`: FastAPI app, persistence, routing, integrations, and LLM runtime.
 - `core/`: Python scheduling domain primitives (blob, timerange, recurrence).
 - `engine/`: C++ scheduler + `pybind11` Python bindings.
-- `frontend/`: Browser UI served at `/ui`.
+- `landing/`: Public landing and sign-in page served at `/`.
+- `frontend/`: Authenticated browser UI served at `/ui`.
 - `learning/`: Preference-learning and embedding scaffolding.
 
 ## Repository Docs
@@ -35,18 +37,23 @@ Elastisched is an elastic scheduling system for time-constrained tasks and recur
 1. `cp .env.example .env`
 2. Fill `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` in `.env` if you want Google Calendar integration.
 3. `docker compose --env-file .env up --build`
-4. Open `http://localhost:8080` (recommended) or `http://localhost:8000/ui`.
+4. Open `http://localhost:8080`, create an account, then continue to `/ui`.
 
 ### Local Development
 1. `python3 -m venv .venv`
 2. `source .venv/bin/activate`
 3. `pip install -r requirements.txt`
 4. `uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000`
-5. Open `http://localhost:8000/ui`
+5. Open `http://localhost:8000`, create an account, then continue to `/ui`
 
 ## Configuration
 Common environment variables:
 - `DATABASE_URL` (default: `sqlite+aiosqlite:///./core.db`)
+- `AUTH_DATABASE_URL` (default: `sqlite+aiosqlite:///./auth.db`)
+- `USER_WORKSPACE_DIR` (default: `./workspaces`)
+- `SESSION_TTL_HOURS` (default: `336`)
+- `SESSION_TOKEN_SECRET` (required for stable multi-instance deployments)
+- `PASSWORD_PEPPER` (optional password-hardening pepper)
 - `ELASTISCHED_PROJECT_TZ` (default: `UTC`)
 - `GEMINI_API_KEY`, `GEMINI_MODEL`
 - `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`, `GOOGLE_OAUTH_SCOPES`
