@@ -266,3 +266,45 @@ def test_scheduler_prefers_single_consistent_daily_phase_with_one_conflict(monke
 
     assert len(phases) == 1
     assert next(iter(phases)) != Hour.EIGHT_AM * HOUR
+
+
+def test_scheduler_finds_legal_slot_when_default_overlaps_fixed_blocker(monkeypatch):
+    monkeypatch.setenv("ELASTISCHED_RNG_SEED", "20260312")
+
+    policy = engine.Policy(0, 0, False, False)
+    flexible = engine.Job(
+        15 * MINUTE,
+        engine.TimeRange(Day.SATURDAY * DAY + Hour.TWELVE_PM * HOUR,
+                         Day.SATURDAY * DAY + Hour.ELEVEN_PM * HOUR),
+        engine.TimeRange(Day.SATURDAY * DAY + Hour.FIVE_PM * HOUR,
+                         Day.SATURDAY * DAY + Hour.FIVE_PM * HOUR + 15 * MINUTE),
+        "flexible",
+        policy,
+        set(),
+        set(),
+        "recurrence-flex",
+    )
+    blocker = engine.Job(
+        170 * MINUTE,
+        engine.TimeRange(Day.SATURDAY * DAY + Hour.FOUR_PM * HOUR + 30 * MINUTE,
+                         Day.SATURDAY * DAY + Hour.SEVEN_PM * HOUR + 20 * MINUTE),
+        engine.TimeRange(Day.SATURDAY * DAY + Hour.FOUR_PM * HOUR + 30 * MINUTE,
+                         Day.SATURDAY * DAY + Hour.SEVEN_PM * HOUR + 20 * MINUTE),
+        "blocker",
+        policy,
+        set(),
+        set(),
+    )
+
+    schedule, _ = engine.schedule_jobs(
+        [flexible, blocker],
+        5 * MINUTE,
+        10.0,
+        1e-4,
+        20000,
+    )
+
+    flexible_job = next(job for job in schedule.scheduled_jobs if job.id == "flexible")
+    blocker_job = next(job for job in schedule.scheduled_jobs if job.id == "blocker")
+
+    assert not flexible_job.scheduled_time_range.overlaps(blocker_job.scheduled_time_range)

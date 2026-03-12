@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <queue>
 #include <random>
@@ -732,9 +733,43 @@ std::pair<Schedule, std::vector<double>> schedule_jobs(
     double best_cost = 0.0;
     double best_illegal_cost = constants::ILLEGAL_SCHEDULE_COST;
     bool has_best = false;
+    auto maybe_promote = [&](Schedule&& candidate_schedule, std::vector<double>&& candidate_cost_history) {
+        const double candidate_cost = schedule_cost(candidate_schedule);
+        const double candidate_illegal_cost = illegal_cost(candidate_schedule);
+        const bool candidate_is_legal = candidate_illegal_cost <= constants::EPSILON;
+        if (!has_best) {
+            best_schedule = std::move(candidate_schedule);
+            best_cost_history = std::move(candidate_cost_history);
+            best_cost = candidate_cost;
+            best_illegal_cost = candidate_illegal_cost;
+            has_best = true;
+            return;
+        }
+        const bool best_is_legal = best_illegal_cost <= constants::EPSILON;
+        const bool should_promote =
+            (candidate_is_legal && !best_is_legal) ||
+            (candidate_is_legal == best_is_legal && (candidate_cost + constants::EPSILON < best_cost));
+        if (should_promote) {
+            best_schedule = std::move(candidate_schedule);
+            best_cost_history = std::move(candidate_cost_history);
+            best_cost = candidate_cost;
+            best_illegal_cost = candidate_illegal_cost;
+        }
+    };
+    auto run_trial = [&](uint32_t run_seed, uint64_t max_iters, bool randomize_initial) {
+        std::mt19937 trial_gen(run_seed);
+        Schedule run_initial_schedule = initial_schedule;
+        if (randomize_initial && !run_initial_schedule.scheduled_jobs.empty()) {
+            const size_t warmup_steps = run_initial_schedule.scheduled_jobs.size() * 3;
+            for (size_t step = 0; step < warmup_steps; ++step) {
+                run_initial_schedule = generate_random_schedule_neighbor(
+                    run_initial_schedule,
+                    config.granularity,
+                    trial_gen
+                );
+            }
+        }
 
-    for (uint64_t run_index = 0; run_index < run_count; ++run_index) {
-        const uint32_t run_seed = base_seed + static_cast<uint32_t>(run_index * 2654435761u);
         std::mt19937 neighbor_gen(run_seed);
         SimulatedAnnealingOptimizer<Schedule> optimizer = SimulatedAnnealingOptimizer<Schedule>(
             schedule_cost,
@@ -746,38 +781,34 @@ std::pair<Schedule, std::vector<double>> schedule_jobs(
             },
             config.initial_temp,
             config.final_temp,
-            static_cast<int>(config.num_iters),
+            static_cast<int>(max_iters),
             run_seed
         );
 
-        Schedule run_best_schedule = optimizer.optimize(initial_schedule);
+        Schedule run_best_schedule = optimizer.optimize(run_initial_schedule);
         std::vector<double> run_cost_history = optimizer.get_cost_history();
-        const double run_cost = schedule_cost(run_best_schedule);
-        const double run_illegal_cost = illegal_cost(run_best_schedule);
-        const bool run_is_legal = run_illegal_cost <= constants::EPSILON;
+        maybe_promote(std::move(run_best_schedule), std::move(run_cost_history));
+    };
 
-        if (!has_best) {
-            best_schedule = run_best_schedule;
-            best_cost_history = std::move(run_cost_history);
-            best_cost = run_cost;
-            best_illegal_cost = run_illegal_cost;
-            has_best = true;
-            continue;
-        }
-
-        const bool best_is_legal = best_illegal_cost <= constants::EPSILON;
-        const bool should_promote =
-            (run_is_legal && !best_is_legal) ||
-            (run_is_legal == best_is_legal && (run_cost + constants::EPSILON < best_cost));
-        if (should_promote) {
-            best_schedule = run_best_schedule;
-            best_cost_history = std::move(run_cost_history);
-            best_cost = run_cost;
-            best_illegal_cost = run_illegal_cost;
-        }
-
+    for (uint64_t run_index = 0; run_index < run_count; ++run_index) {
+        const uint32_t run_seed = base_seed + static_cast<uint32_t>(run_index * 2654435761u);
+        run_trial(run_seed, config.num_iters, false);
         if (best_illegal_cost <= constants::EPSILON) {
             break;
+        }
+    }
+    if (best_illegal_cost > constants::EPSILON) {
+        const uint64_t extra_run_count = std::max<uint64_t>(8, run_count * 4);
+        const uint64_t extra_num_iters = config.num_iters > (std::numeric_limits<uint64_t>::max() / 2)
+            ? std::numeric_limits<uint64_t>::max()
+            : std::max<uint64_t>(config.num_iters, config.num_iters * 2);
+        for (uint64_t extra_index = 0; extra_index < extra_run_count; ++extra_index) {
+            const uint64_t run_index = run_count + extra_index;
+            const uint32_t run_seed = base_seed + static_cast<uint32_t>(run_index * 2654435761u);
+            run_trial(run_seed, extra_num_iters, true);
+            if (best_illegal_cost <= constants::EPSILON) {
+                break;
+            }
         }
     }
 
