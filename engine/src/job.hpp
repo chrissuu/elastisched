@@ -33,6 +33,8 @@ public:
     std::set<Tag> tags;
     /** @brief Recurrence identifier grouping related occurrences. */
     ID recurrence_id;
+    /** @brief Stable family key segment used by consistency cost grouping. */
+    ID consistency_group_id;
 
     /**
      * @brief Construct a job from core scheduling attributes.
@@ -44,7 +46,8 @@ public:
         Policy policy,
         std::set<ID> dependencies,
         std::set<Tag> tags,
-        ID recurrence_id = "");
+        ID recurrence_id = "",
+        ID consistency_group_id = "");
 
     /** @brief Whether this job has a fixed duration and window. */
     bool is_rigid() const;

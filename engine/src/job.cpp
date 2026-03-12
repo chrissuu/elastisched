@@ -3,7 +3,8 @@
 #include <sstream>
 
 Job::Job(sec_t duration, TimeRange schedulable_time_range, TimeRange scheduled_time_range,
-        ID id, Policy policy, std::set<ID> dependencies, std::set<Tag> tags, ID recurrence_id)
+        ID id, Policy policy, std::set<ID> dependencies, std::set<Tag> tags, ID recurrence_id,
+        ID consistency_group_id)
 :   duration(duration),
     schedulable_time_range(schedulable_time_range),
     initial_scheduled_time_range(scheduled_time_range),
@@ -13,7 +14,8 @@ Job::Job(sec_t duration, TimeRange schedulable_time_range, TimeRange scheduled_t
     policy(policy),
     dependencies(dependencies),
     tags(tags),
-    recurrence_id(recurrence_id)
+    recurrence_id(recurrence_id),
+    consistency_group_id(consistency_group_id)
 {
         return;
 };

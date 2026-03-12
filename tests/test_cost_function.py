@@ -11,6 +11,7 @@ def _make_job(
     policy=None,
     job_id="job",
     recurrence_id="",
+    consistency_group_id="",
 ):
     policy = policy or engine.Policy(0, 0)
     tr_schedulable = engine.TimeRange(schedulable_low, schedulable_high)
@@ -25,6 +26,7 @@ def _make_job(
         set(),
         set(),
         recurrence_id,
+        consistency_group_id,
     )
 
 
@@ -266,6 +268,45 @@ def test_consistency_cost_penalizes_daily_time_drift_within_recurrence_family():
     # Only day_2 is shifted by +1h relative to day_1/day_3.
     # Pairwise daily drifts: (day_1,day_2)=1h, (day_1,day_3)=0h, (day_2,day_3)=1h.
     expected_pairwise_drift = 2 * (HOUR / MINUTE)
+    assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
+
+
+def test_consistency_cost_uses_stable_group_even_if_default_start_is_overridden():
+    schedulable_low = 0
+    schedulable_high = 2 * DAY
+    anchor_group = "phase=14400|dur=900|span=86340|policy=0|name=japanese study|tags=|deps="
+
+    job_a = _make_job(
+        schedulable_low=schedulable_low,
+        schedulable_high=schedulable_high,
+        scheduled_low=Hour.FOUR_PM * HOUR,
+        scheduled_high=Hour.FOUR_PM * HOUR + 15 * MINUTE,
+        job_id="job_a",
+        recurrence_id="recurrence-override",
+        consistency_group_id=anchor_group,
+    )
+    job_b = _make_job(
+        schedulable_low=schedulable_low + DAY,
+        schedulable_high=schedulable_high + DAY,
+        scheduled_low=DAY + Hour.EIGHT_PM * HOUR,
+        scheduled_high=DAY + Hour.EIGHT_PM * HOUR + 15 * MINUTE,
+        job_id="job_b",
+        recurrence_id="recurrence-override",
+        consistency_group_id=anchor_group,
+    )
+
+    schedule = engine.Schedule([job_a, job_b])
+    cost_function = engine.ScheduleCostFunction(
+        schedule,
+        MINUTE,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+    )
+
+    expected_pairwise_drift = 4 * (HOUR / MINUTE)
     assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
 
 

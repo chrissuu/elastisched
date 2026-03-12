@@ -88,6 +88,12 @@ double normalized_half_hour_distance(sec_t t) {
 }
 
 std::string consistency_family_key(const Job& job) {
+    if (!job.consistency_group_id.empty()) {
+        std::string key = job.recurrence_id;
+        key.push_back('|');
+        key += job.consistency_group_id;
+        return key;
+    }
     const sec_t day_seconds = constants::DAY;
     const sec_t initial_phase = day_seconds == 0
         ? job.initial_scheduled_time_range.get_low()
