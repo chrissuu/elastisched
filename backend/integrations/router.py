@@ -15,6 +15,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.auth import require_authenticated_user
 from backend.config import (
     get_google_oauth_client_id,
     get_google_oauth_client_secret,
@@ -66,7 +67,11 @@ from backend.recurrence_router import (
 from core.timerange import TimeRange
 
 
-integration_router = APIRouter(prefix="/integrations", tags=["integrations"])
+integration_router = APIRouter(
+    prefix="/integrations",
+    tags=["integrations"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 MAX_SYNC_PREVIEW_RANGE_DAYS = 90
 OAUTH_STATE_TTL_SECONDS = 10 * 60

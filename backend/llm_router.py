@@ -3,8 +3,9 @@ import re
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from backend.auth import require_authenticated_user
 from backend.config import (
     get_gemini_api_key,
     get_gemini_http_timeout_seconds,
@@ -32,7 +33,11 @@ from backend.schemas import (
 )
 
 
-llm_router = APIRouter(prefix="/llm", tags=["llm"])
+llm_router = APIRouter(
+    prefix="/llm",
+    tags=["llm"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 def _build_gemini_provider(api_key: str) -> GeminiProvider:
@@ -53,7 +58,19 @@ async def llm_chat(payload: LLMChatRequest, request: Request) -> LLMChatResponse
         )
 
     base_url = str(request.base_url).rstrip("/")
-    registry = OpenAPIToolRegistry.from_openapi(request.app.openapi(), base_url=base_url)
+    forwarded_headers = {}
+    csrf_token = str(request.headers.get("x-csrf-token") or "").strip()
+    if csrf_token:
+        forwarded_headers["x-csrf-token"] = csrf_token
+    cookie_header = str(request.headers.get("cookie") or "").strip()
+    if cookie_header:
+        forwarded_headers["cookie"] = cookie_header
+    tool_client = httpx.AsyncClient(timeout=20.0, headers=forwarded_headers)
+    registry = OpenAPIToolRegistry.from_openapi(
+        request.app.openapi(),
+        base_url=base_url,
+        client=tool_client,
+    )
     provider = _build_gemini_provider(api_key)
     runtime = ToolCallingRuntime(provider, registry, max_steps=payload.max_steps or 6)
 
@@ -77,6 +94,7 @@ async def llm_chat(payload: LLMChatRequest, request: Request) -> LLMChatResponse
     finally:
         await provider.aclose()
         await registry.aclose()
+        await tool_client.aclose()
 
     return LLMChatResponse(text=response.text, tool_calls=response.tool_calls)
 

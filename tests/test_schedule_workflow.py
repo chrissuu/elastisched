@@ -13,20 +13,51 @@ from .constants import AFTERNOON_START, WORK_TAG
 @pytest_asyncio.fixture
 async def api_client(tmp_path_factory):
     db_path = tmp_path_factory.mktemp("db") / "test.db"
+    auth_db_path = db_path.parent / "auth.db"
     os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{db_path}"
+    os.environ["AUTH_DATABASE_URL"] = f"sqlite+aiosqlite:///{auth_db_path}"
     os.environ["ELASTISCHED_PROJECT_TZ"] = "UTC"
 
+    from backend import auth as auth_module
+    from backend import auth_db as auth_db_module
+    from backend import auth_models as auth_models_module
+    from backend import auth_router as auth_router_module
     from backend import db as db_module
     from backend import main as main_module
     from backend import models as models_module
 
+    importlib.reload(auth_models_module)
+    importlib.reload(auth_db_module)
+    importlib.reload(auth_module)
+    importlib.reload(auth_router_module)
     importlib.reload(db_module)
     importlib.reload(models_module)
     importlib.reload(main_module)
 
     await db_module.init_db()
+    await auth_db_module.init_auth_db()
     transport = ASGITransport(app=main_module.app)
-    return AsyncClient(transport=transport, base_url="http://test")
+    bootstrap = AsyncClient(transport=transport, base_url="http://test")
+    register_resp = await bootstrap.post(
+        "/auth/register",
+        json={
+            "email": "workflow@example.com",
+            "password": "StrongPassword123",
+            "display_name": "Workflow Tester",
+        },
+    )
+    assert register_resp.status_code == 201
+    client = AsyncClient(transport=transport, base_url="http://test")
+    client.headers["X-CSRF-Token"] = register_resp.json()["csrf_token"]
+    for cookie in bootstrap.cookies.jar:
+        client.cookies.set(
+            cookie.name,
+            cookie.value,
+            domain=cookie.domain,
+            path=cookie.path,
+        )
+    await bootstrap.aclose()
+    return client
 
 
 def _next_weekday_date(current: datetime, target_weekday: int) -> datetime.date:

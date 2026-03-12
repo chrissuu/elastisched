@@ -2,6 +2,7 @@ import os
 import importlib
 import json
 import sqlite3
+import uuid
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlsplit
 
@@ -10,16 +11,42 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 
-async def _build_api_client(tmp_path_factory, *, batch_size: int | None = None):
+async def _authenticate_client(client: AsyncClient, *, email: str | None = None) -> None:
+    account_email = email or f"tester-{uuid.uuid4().hex}@example.com"
+    response = await client.post(
+        "/auth/register",
+        json={
+            "email": account_email,
+            "password": "StrongPassword123",
+            "display_name": "Test Runner",
+        },
+    )
+    assert response.status_code == 201
+    csrf_token = response.json()["csrf_token"]
+    client.headers["X-CSRF-Token"] = csrf_token
+
+
+async def _build_api_client(
+    tmp_path_factory,
+    *,
+    batch_size: int | None = None,
+    authenticate: bool = True,
+):
     db_path = tmp_path_factory.mktemp("db") / "test.db"
     analytics_db_path = db_path.parent / "analytics.db"
+    auth_db_path = db_path.parent / "auth.db"
     os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{db_path}"
     os.environ["ANALYTICS_DATABASE_URL"] = f"sqlite+aiosqlite:///{analytics_db_path}"
+    os.environ["AUTH_DATABASE_URL"] = f"sqlite+aiosqlite:///{auth_db_path}"
     if batch_size is None:
         os.environ.pop("PREFERENCE_BATCH_SIZE", None)
     else:
         os.environ["PREFERENCE_BATCH_SIZE"] = str(batch_size)
 
+    from backend import auth as auth_module
+    from backend import auth_db as auth_db_module
+    from backend import auth_models as auth_models_module
+    from backend import auth_router as auth_router_module
     from backend import analytics as analytics_module
     from backend import analytics_db as analytics_db_module
     from backend import db as db_module
@@ -27,6 +54,10 @@ async def _build_api_client(tmp_path_factory, *, batch_size: int | None = None):
     from backend import models as models_module
     from backend import recurrence_router as recurrence_router_module
 
+    importlib.reload(auth_models_module)
+    importlib.reload(auth_db_module)
+    importlib.reload(auth_module)
+    importlib.reload(auth_router_module)
     importlib.reload(analytics_db_module)
     importlib.reload(db_module)
     importlib.reload(models_module)
@@ -35,9 +66,24 @@ async def _build_api_client(tmp_path_factory, *, batch_size: int | None = None):
     importlib.reload(main_module)
 
     await db_module.init_db()
+    await auth_db_module.init_auth_db()
     await analytics_db_module.init_analytics_db()
     transport = ASGITransport(app=main_module.app)
     client = AsyncClient(transport=transport, base_url="http://test")
+    if authenticate:
+        bootstrap = AsyncClient(transport=transport, base_url="http://test")
+        await _authenticate_client(bootstrap)
+        csrf_token = bootstrap.headers.get("X-CSRF-Token")
+        if csrf_token:
+            client.headers["X-CSRF-Token"] = csrf_token
+        for cookie in bootstrap.cookies.jar:
+            client.cookies.set(
+                cookie.name,
+                cookie.value,
+                domain=cookie.domain,
+                path=cookie.path,
+            )
+        await bootstrap.aclose()
     client._analytics_db_path = analytics_db_path
     return client
 
@@ -45,6 +91,70 @@ async def _build_api_client(tmp_path_factory, *, batch_size: int | None = None):
 @pytest_asyncio.fixture
 async def api_client(tmp_path_factory):
     return await _build_api_client(tmp_path_factory)
+
+
+@pytest.mark.asyncio
+async def test_auth_required_for_blob_routes(tmp_path_factory):
+    unauthenticated_client = await _build_api_client(tmp_path_factory, authenticate=False)
+    async with unauthenticated_client as client:
+        response = await client.get("/blobs")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_workspace_isolated_across_users(tmp_path_factory):
+    client = await _build_api_client(tmp_path_factory, authenticate=False)
+
+    start = datetime(2024, 1, 1, 9, 0, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    payload = {
+        "name": "Private Block",
+        "description": "Should not leak",
+        "location": None,
+        "tz": "UTC",
+        "default_scheduled_timerange": {"start": start.isoformat(), "end": end.isoformat()},
+        "schedulable_timerange": {
+            "start": (start - timedelta(minutes=30)).isoformat(),
+            "end": (end + timedelta(minutes=30)).isoformat(),
+        },
+        "policy": {},
+        "dependencies": [],
+        "tags": [],
+    }
+
+    async with client as api:
+        first_register = await api.post(
+            "/auth/register",
+            json={
+                "email": "first@example.com",
+                "password": "StrongPassword123",
+                "display_name": "First",
+            },
+        )
+        assert first_register.status_code == 201
+        api.headers["X-CSRF-Token"] = first_register.json()["csrf_token"]
+
+        create_response = await api.post("/blobs", json=payload)
+        assert create_response.status_code == 201
+
+        logout_response = await api.post("/auth/logout")
+        assert logout_response.status_code == 204
+        api.headers.pop("X-CSRF-Token", None)
+
+        second_register = await api.post(
+            "/auth/register",
+            json={
+                "email": "second@example.com",
+                "password": "StrongPassword123",
+                "display_name": "Second",
+            },
+        )
+        assert second_register.status_code == 201
+        api.headers["X-CSRF-Token"] = second_register.json()["csrf_token"]
+
+        list_response = await api.get("/blobs")
+        assert list_response.status_code == 200
+        assert list_response.json() == []
 
 
 @pytest.mark.asyncio

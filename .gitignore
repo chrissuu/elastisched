@@ -23,6 +23,8 @@ offline-packages
 elastisched.db
 elastischedcopy.db
 analytics.db
+auth.db
+workspaces/
 
 # env variables
 .env

@@ -1,39 +1,107 @@
+from __future__ import annotations
+
+import asyncio
+import re
+from pathlib import Path
 from typing import AsyncGenerator
 
+from fastapi import Depends
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from backend.config import get_database_url
+from backend.auth import AuthenticatedUser, require_authenticated_user
+from backend.config import get_database_url, get_user_workspace_dir
 
 
 DATABASE_URL = get_database_url()
-
-engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
-AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+_ENGINE_CACHE: dict[str, AsyncEngine] = {}
+_SESSION_FACTORY_CACHE: dict[str, async_sessionmaker[AsyncSession]] = {}
+_INITIALIZED_URLS: set[str] = set()
+_INIT_LOCK = asyncio.Lock()
+_SAFE_DB_NAME_PATTERN = re.compile(r"[^a-zA-Z0-9_-]+")
 
 
 class Base(DeclarativeBase):
     pass
 
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionLocal() as session:
+def _engine_for_url(database_url: str) -> AsyncEngine:
+    existing = _ENGINE_CACHE.get(database_url)
+    if existing is not None:
+        return existing
+    engine = create_async_engine(database_url, pool_pre_ping=True)
+    _ENGINE_CACHE[database_url] = engine
+    return engine
+
+
+def _session_factory_for_url(database_url: str) -> async_sessionmaker[AsyncSession]:
+    existing = _SESSION_FACTORY_CACHE.get(database_url)
+    if existing is not None:
+        return existing
+    factory = async_sessionmaker(_engine_for_url(database_url), expire_on_commit=False)
+    _SESSION_FACTORY_CACHE[database_url] = factory
+    return factory
+
+
+def _safe_user_database_name(user_id: str) -> str:
+    cleaned = _SAFE_DB_NAME_PATTERN.sub("_", str(user_id or "").strip())
+    return cleaned or "default"
+
+
+def _workspace_database_url(user_id: str) -> str:
+    workspace_dir = Path(get_user_workspace_dir()).expanduser().resolve()
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{_safe_user_database_name(user_id)}.db"
+    path = (workspace_dir / filename).resolve()
+    return f"sqlite+aiosqlite:///{path}"
+
+
+async def get_session(
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+) -> AsyncGenerator[AsyncSession, None]:
+    database_url = _workspace_database_url(current_user.user_id)
+    await _init_db_url(database_url)
+    session_factory = _session_factory_for_url(database_url)
+    async with session_factory() as session:
+        yield session
+
+
+async def get_system_session() -> AsyncGenerator[AsyncSession, None]:
+    await _init_db_url(DATABASE_URL)
+    session_factory = _session_factory_for_url(DATABASE_URL)
+    async with session_factory() as session:
         yield session
 
 
 async def init_db() -> None:
-    # Ensure model metadata is registered on the current Base.
-    import backend.models as models  # noqa: F401
-    metadata = Base.metadata
-    if not metadata.tables:
-        metadata = models.BlobModel.metadata
-    async with engine.begin() as conn:
-        await conn.run_sync(metadata.create_all)
-        if conn.dialect.name == "sqlite":
-            await _ensure_sqlite_blob_columns(conn)
-            await _ensure_sqlite_scheduled_occurrence_columns(conn)
-            await _ensure_sqlite_recurrence_columns(conn)
+    await _init_db_url(DATABASE_URL)
+
+
+async def init_user_db(user_id: str) -> None:
+    await _init_db_url(_workspace_database_url(user_id))
+
+
+async def _init_db_url(database_url: str) -> None:
+    if database_url in _INITIALIZED_URLS:
+        return
+    async with _INIT_LOCK:
+        if database_url in _INITIALIZED_URLS:
+            return
+        # Ensure model metadata is registered on the current Base.
+        import backend.models as models  # noqa: F401
+
+        metadata = Base.metadata
+        if not metadata.tables:
+            metadata = models.BlobModel.metadata
+        engine = _engine_for_url(database_url)
+        async with engine.begin() as conn:
+            await conn.run_sync(metadata.create_all)
+            if conn.dialect.name == "sqlite":
+                await _ensure_sqlite_blob_columns(conn)
+                await _ensure_sqlite_scheduled_occurrence_columns(conn)
+                await _ensure_sqlite_recurrence_columns(conn)
+        _INITIALIZED_URLS.add(database_url)
 
 
 async def _ensure_sqlite_blob_columns(conn) -> None:

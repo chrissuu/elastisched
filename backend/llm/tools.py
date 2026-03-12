@@ -119,7 +119,12 @@ class OpenAPIToolRegistry:
         self._owns_client = client is None
 
     @classmethod
-    def from_openapi(cls, openapi: dict[str, Any], base_url: str) -> "OpenAPIToolRegistry":
+    def from_openapi(
+        cls,
+        openapi: dict[str, Any],
+        base_url: str,
+        client: httpx.AsyncClient | None = None,
+    ) -> "OpenAPIToolRegistry":
         components = openapi.get("components") or {}
         tools: list[ToolSpec] = []
         operations: dict[str, OpenAPIOperation] = {}
@@ -132,7 +137,7 @@ class OpenAPIToolRegistry:
                 if not isinstance(operation, dict):
                     continue
                 tags = operation.get("tags") or []
-                if "llm" in tags:
+                if "llm" in tags or "auth" in tags:
                     continue
                 name = operation.get("operationId")
                 if not name:
@@ -178,7 +183,7 @@ class OpenAPIToolRegistry:
                     parameters_schema=parameters,
                     request_body_required=body_required,
                 )
-        return cls(base_url=base_url, tools=tools, operations=operations)
+        return cls(base_url=base_url, tools=tools, operations=operations, client=client)
 
     def list_tools(self) -> list[ToolSpec]:
         return list(self._tools)
