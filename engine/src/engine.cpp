@@ -329,6 +329,167 @@ bool apply_family_phase_neighbor(
     return changed;
 }
 
+double family_mismatch_pairs(
+    const std::vector<Job>& jobs,
+    const std::vector<size_t>& family_indices,
+    sec_t granularity
+) {
+    if (family_indices.size() < 2) {
+        return 0.0;
+    }
+    const sec_t safe_granularity = granularity > 0 ? granularity : 1;
+    std::unordered_map<sec_t, size_t> phase_counts;
+    size_t family_size = 0;
+    for (const size_t index : family_indices) {
+        if (index >= jobs.size()) {
+            continue;
+        }
+        const sec_t phase = consistency_phase_slot(get_job_anchor_start(jobs[index]), safe_granularity);
+        phase_counts[phase] += 1;
+        family_size += 1;
+    }
+    if (family_size < 2) {
+        return 0.0;
+    }
+    const double total_pairs = static_cast<double>(family_size * (family_size - 1)) / 2.0;
+    double same_phase_pairs = 0.0;
+    for (const auto& phase_count : phase_counts) {
+        const size_t count = phase_count.second;
+        same_phase_pairs += static_cast<double>(count * (count - 1)) / 2.0;
+    }
+    return total_pairs - same_phase_pairs;
+}
+
+bool is_schedule_legal(const std::vector<Job>& jobs, sec_t granularity) {
+    const Schedule candidate_schedule(jobs);
+    const ScheduleCostFunction cost_function(candidate_schedule, granularity);
+    return cost_function.illegal_schedule_cost() <= constants::EPSILON;
+}
+
+bool apply_family_consistency_refinement_pass(std::vector<Job>& jobs, sec_t granularity) {
+    std::unordered_map<std::string, std::vector<size_t>> family_to_indices;
+    for (size_t i = 0; i < jobs.size(); ++i) {
+        if (jobs[i].recurrence_id.empty()) {
+            continue;
+        }
+        family_to_indices[consistency_family_key(jobs[i])].push_back(i);
+    }
+
+    bool changed = false;
+    const sec_t safe_granularity = granularity > 0 ? granularity : 1;
+    for (const auto& family_entry : family_to_indices) {
+        const std::vector<size_t>& family_indices = family_entry.second;
+        if (family_indices.size() < 2) {
+            continue;
+        }
+
+        const double current_mismatch = family_mismatch_pairs(jobs, family_indices, granularity);
+        if (current_mismatch <= constants::EPSILON) {
+            continue;
+        }
+
+        std::unordered_map<sec_t, size_t> candidate_phase_counts;
+        for (const size_t index : family_indices) {
+            const Job& job = jobs[index];
+            const sec_t current_phase = consistency_phase_slot(get_job_anchor_start(job), safe_granularity);
+            candidate_phase_counts[current_phase] += 1;
+            const sec_t initial_phase = consistency_phase_slot(
+                job.initial_scheduled_time_range.get_low(),
+                safe_granularity
+            );
+            if (candidate_phase_counts.find(initial_phase) == candidate_phase_counts.end()) {
+                candidate_phase_counts[initial_phase] = 0;
+            }
+        }
+
+        std::vector<std::pair<sec_t, size_t>> ordered_phases;
+        ordered_phases.reserve(candidate_phase_counts.size());
+        for (const auto& phase_count : candidate_phase_counts) {
+            ordered_phases.push_back(phase_count);
+        }
+        std::sort(
+            ordered_phases.begin(),
+            ordered_phases.end(),
+            [](const auto& left, const auto& right) {
+                return left.second > right.second;
+            }
+        );
+
+        std::unordered_map<size_t, TimeRange> best_ranges;
+        double best_mismatch = current_mismatch;
+        size_t best_moved = 0;
+
+        for (const auto& phase_count : ordered_phases) {
+            const sec_t target_phase = phase_count.first;
+            std::vector<Job> candidate_jobs = jobs;
+            std::unordered_map<size_t, TimeRange> candidate_ranges;
+            size_t candidate_moved = 0;
+
+            for (const size_t index : family_indices) {
+                Job& job = candidate_jobs[index];
+                if (job.is_rigid() || job.get_scheduled_time_ranges().size() > 1) {
+                    continue;
+                }
+                const auto aligned_range = best_range_for_daily_phase(
+                    candidate_jobs,
+                    index,
+                    target_phase,
+                    granularity
+                );
+                if (!aligned_range.has_value()) {
+                    continue;
+                }
+                const auto current_ranges = job.get_scheduled_time_ranges();
+                if (current_ranges.size() == 1 && current_ranges.front() == aligned_range.value()) {
+                    continue;
+                }
+                job.set_scheduled_time_ranges({aligned_range.value()});
+                candidate_ranges[index] = aligned_range.value();
+                candidate_moved += 1;
+            }
+
+            if (candidate_ranges.empty()) {
+                continue;
+            }
+            if (!is_schedule_legal(candidate_jobs, granularity)) {
+                continue;
+            }
+
+            const double candidate_mismatch = family_mismatch_pairs(
+                candidate_jobs,
+                family_indices,
+                granularity
+            );
+            const bool better_mismatch = candidate_mismatch + constants::EPSILON < best_mismatch;
+            const bool tie_mismatch_more_moves =
+                candidate_mismatch <= best_mismatch + constants::EPSILON && candidate_moved > best_moved;
+            if (better_mismatch || tie_mismatch_more_moves) {
+                best_mismatch = candidate_mismatch;
+                best_moved = candidate_moved;
+                best_ranges = std::move(candidate_ranges);
+            }
+        }
+
+        if (best_mismatch + constants::EPSILON < current_mismatch && !best_ranges.empty()) {
+            for (const auto& range_entry : best_ranges) {
+                jobs[range_entry.first].set_scheduled_time_ranges({range_entry.second});
+            }
+            changed = true;
+        }
+    }
+
+    return changed;
+}
+
+void refine_family_consistency(std::vector<Job>& jobs, sec_t granularity) {
+    constexpr size_t max_refinement_passes = 4;
+    for (size_t pass = 0; pass < max_refinement_passes; ++pass) {
+        if (!apply_family_consistency_refinement_pass(jobs, granularity)) {
+            break;
+        }
+    }
+}
+
 std::vector<std::vector<Job>> get_disjoint_intervals(std::vector<Job> jobs) {
     if (jobs.empty()) {
         return {};
@@ -1030,6 +1191,9 @@ std::pair<Schedule, std::vector<double>> schedule_jobs(
                 break;
             }
         }
+    }
+    if (best_illegal_cost <= constants::EPSILON) {
+        refine_family_consistency(best_schedule.scheduled_jobs, config.granularity);
     }
 
     return std::make_pair(best_schedule, best_cost_history);
