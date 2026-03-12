@@ -33,6 +33,38 @@ function normalizeOccurrenceKey(value) {
   return parsed.toISOString();
 }
 
+function resolveOccurrenceOverrideKey(overrides, occurrenceKey) {
+  if (!occurrenceKey || !overrides || typeof overrides !== "object") {
+    return occurrenceKey;
+  }
+  if (Object.prototype.hasOwnProperty.call(overrides, occurrenceKey)) {
+    return occurrenceKey;
+  }
+  const targetMs = toOccurrenceTimestampMs(occurrenceKey);
+  if (targetMs === null) return occurrenceKey;
+  let matchedKey = null;
+  Object.keys(overrides).forEach((key) => {
+    if (toOccurrenceTimestampMs(key) === targetMs) {
+      matchedKey = key;
+    }
+  });
+  return matchedKey || occurrenceKey;
+}
+
+function upsertOccurrenceOverrideByTimestamp(overrides, occurrenceKey, nextOverride) {
+  const source = overrides && typeof overrides === "object" ? overrides : {};
+  const targetMs = toOccurrenceTimestampMs(occurrenceKey);
+  const nextOverrides = {};
+  Object.entries(source).forEach(([key, value]) => {
+    if (targetMs !== null && toOccurrenceTimestampMs(key) === targetMs) {
+      return;
+    }
+    nextOverrides[key] = value;
+  });
+  nextOverrides[occurrenceKey] = nextOverride;
+  return nextOverrides;
+}
+
 const OCCURRENCE_TIMING_CHANGE_KEYS = new Set([
   "defaultStart",
   "defaultEnd",
@@ -504,9 +536,10 @@ async function updateOccurrenceWithUndo(blob, changes = {}, options = {}) {
       payload.occurrence_overrides && typeof payload.occurrence_overrides === "object"
         ? { ...payload.occurrence_overrides }
         : {};
+    const overrideKey = resolveOccurrenceOverrideKey(overrides, occurrenceKey);
     const currentOverride =
-      overrides[occurrenceKey] && typeof overrides[occurrenceKey] === "object"
-        ? overrides[occurrenceKey]
+      overrides[overrideKey] && typeof overrides[overrideKey] === "object"
+        ? overrides[overrideKey]
         : {};
     const nextOverride = {
       ...currentOverride,
@@ -515,10 +548,11 @@ async function updateOccurrenceWithUndo(blob, changes = {}, options = {}) {
     };
     const nextPayload = {
       ...payload,
-      occurrence_overrides: {
-        ...overrides,
-        [occurrenceKey]: nextOverride,
-      },
+      occurrence_overrides: upsertOccurrenceOverrideByTimestamp(
+        overrides,
+        overrideKey,
+        nextOverride
+      ),
     };
     await updateRecurrence(blob.recurrence_id, recurrenceType, nextPayload);
     const record = toUpdateRecord(blob.recurrence_id, recurrenceType, payload, nextPayload);

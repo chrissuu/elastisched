@@ -72,6 +72,10 @@ def _is_main_recurrence(payload: dict | None) -> bool:
     if isinstance(calendar_view, dict):
         if "is_main" in calendar_view:
             return bool(calendar_view.get("is_main"))
+        view_id = str(calendar_view.get("id") or "").strip().lower()
+        view_source = str(calendar_view.get("source") or "").strip().lower()
+        if view_id == "main" or view_source == "main":
+            return True
         return False
     source = payload.get("integration_source")
     if not isinstance(source, dict):

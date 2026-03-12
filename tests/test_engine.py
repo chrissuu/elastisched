@@ -1,4 +1,5 @@
 import engine
+from collections import Counter
 from .constants import *
 from .constants import RANDOM_TEST_ITERATIONS
 import pytest
@@ -266,6 +267,154 @@ def test_scheduler_prefers_single_consistent_daily_phase_with_one_conflict(monke
 
     assert len(phases) == 1
     assert next(iter(phases)) != Hour.EIGHT_AM * HOUR
+
+
+def test_scheduler_keeps_majority_daily_family_aligned_under_one_day_conflict(monkeypatch):
+    monkeypatch.setenv("ELASTISCHED_RNG_SEED", "20260311")
+
+    policy = engine.Policy(0, 0)
+    family_jobs = []
+    for day in [
+        Day.MONDAY,
+        Day.TUESDAY,
+        Day.WEDNESDAY,
+        Day.THURSDAY,
+        Day.FRIDAY,
+        Day.SATURDAY,
+        Day.SUNDAY,
+    ]:
+        schedulable_start = day * DAY + Hour.TWELVE_PM * HOUR
+        schedulable_end = day * DAY + Hour.EIGHT_PM * HOUR
+        default_start = day * DAY + Hour.FOUR_PM * HOUR
+        default_end = default_start + 30 * MINUTE
+        family_jobs.append(
+            engine.Job(
+                30 * MINUTE,
+                engine.TimeRange(schedulable_start, schedulable_end),
+                engine.TimeRange(default_start, default_end),
+                f"family_job_{day}",
+                policy,
+                set(),
+                set(),
+                "recurrence-family-daily",
+            )
+        )
+
+    # Saturday cannot occupy 16:00 due to this fixed blocker.
+    saturday_blocker_start = Day.SATURDAY * DAY + Hour.FOUR_PM * HOUR
+    saturday_blocker = engine.Job(
+        2 * HOUR,
+        engine.TimeRange(saturday_blocker_start, saturday_blocker_start + 2 * HOUR),
+        engine.TimeRange(saturday_blocker_start, saturday_blocker_start + 2 * HOUR),
+        "saturday_blocker",
+        policy,
+        set(),
+        set(),
+    )
+    # Additional fixed jobs add search pressure to avoid trivial alignment by chance.
+    context_blockers = []
+    for day, hour in [
+        (Day.MONDAY, Hour.TWO_PM),
+        (Day.TUESDAY, Hour.THREE_PM),
+        (Day.WEDNESDAY, Hour.ONE_PM),
+        (Day.THURSDAY, Hour.FIVE_PM),
+        (Day.FRIDAY, Hour.TWO_PM),
+        (Day.SUNDAY, Hour.SIX_PM),
+    ]:
+        start = day * DAY + hour * HOUR
+        context_blockers.append(
+            engine.Job(
+                HOUR,
+                engine.TimeRange(start, start + HOUR),
+                engine.TimeRange(start, start + HOUR),
+                f"context_blocker_{day}_{hour}",
+                policy,
+                set(),
+                set(),
+            )
+        )
+
+    schedule, _ = engine.schedule_jobs(
+        [*family_jobs, saturday_blocker, *context_blockers],
+        5 * MINUTE,
+        20.0,
+        1e-4,
+        120000,
+    )
+
+    scheduled_family = [
+        job for job in schedule.scheduled_jobs if job.id.startswith("family_job_")
+    ]
+    phases = [job.scheduled_time_range.get_low() % DAY for job in scheduled_family]
+    most_common_phase_count = Counter(phases).most_common(1)[0][1]
+
+    assert most_common_phase_count >= 6
+
+
+def test_scheduler_forms_maximal_consistent_subsets_across_weeks_when_global_phase_impossible(
+    monkeypatch,
+):
+    monkeypatch.setenv("ELASTISCHED_RNG_SEED", "20260312")
+
+    policy = engine.Policy(0, 0)
+    family_jobs = []
+
+    # Six occurrences (across two weeks) share only an early-afternoon window.
+    for week_offset in [0, WEEK]:
+        for day in [Day.MONDAY, Day.TUESDAY, Day.WEDNESDAY]:
+            schedulable_start = week_offset + day * DAY + Hour.TWELVE_PM * HOUR
+            schedulable_end = week_offset + day * DAY + Hour.TWO_PM * HOUR
+            default_start = week_offset + day * DAY + Hour.ONE_PM * HOUR
+            default_end = default_start + 30 * MINUTE
+            family_jobs.append(
+                engine.Job(
+                    30 * MINUTE,
+                    engine.TimeRange(schedulable_start, schedulable_end),
+                    engine.TimeRange(default_start, default_end),
+                    f"family_early_{week_offset}_{day}",
+                    policy,
+                    set(),
+                    set(),
+                    "recurrence-two-phase",
+                )
+            )
+
+    # Two additional occurrences (across two weeks) can only be scheduled in late afternoon.
+    for week_offset in [0, WEEK]:
+        day = Day.THURSDAY
+        schedulable_start = week_offset + day * DAY + Hour.FOUR_PM * HOUR
+        schedulable_end = week_offset + day * DAY + Hour.SIX_PM * HOUR
+        default_start = week_offset + day * DAY + Hour.FIVE_PM * HOUR
+        default_end = default_start + 30 * MINUTE
+        family_jobs.append(
+            engine.Job(
+                30 * MINUTE,
+                engine.TimeRange(schedulable_start, schedulable_end),
+                engine.TimeRange(default_start, default_end),
+                f"family_late_{week_offset}",
+                policy,
+                set(),
+                set(),
+                "recurrence-two-phase",
+            )
+        )
+
+    schedule, _ = engine.schedule_jobs(
+        family_jobs,
+        5 * MINUTE,
+        20.0,
+        1e-4,
+        180000,
+    )
+
+    scheduled_family = [
+        job for job in schedule.scheduled_jobs if job.recurrence_id == "recurrence-two-phase"
+    ]
+    phase_counts = Counter(job.scheduled_time_range.get_low() % DAY for job in scheduled_family)
+
+    # No single phase can satisfy both windows, so the family should collapse into two maximal subsets.
+    assert len(phase_counts) == 2
+    assert sorted(phase_counts.values()) == [2, 6]
 
 
 def test_scheduler_finds_legal_slot_when_default_overlaps_fixed_blocker(monkeypatch):

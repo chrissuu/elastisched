@@ -158,8 +158,9 @@ def test_consistency_cost_penalizes_same_recurrence_time_drift():
         0.0,
     )
 
-    expected_pairwise_drift = HOUR / MINUTE
-    assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
+    # One pair in the family is in different daily-phase slots.
+    expected_mismatch_pairs = 1.0
+    assert cost_function.schedule_cost() == pytest.approx(expected_mismatch_pairs, rel=1e-6)
 
 
 def test_consistency_cost_scopes_to_recurrence_family_pattern():
@@ -218,8 +219,9 @@ def test_consistency_cost_scopes_to_recurrence_family_pattern():
         0.0,
     )
 
-    expected_pairwise_drift = HOUR / MINUTE
-    assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
+    # Family A contributes one mismatched pair; Family B remains aligned.
+    expected_mismatch_pairs = 1.0
+    assert cost_function.schedule_cost() == pytest.approx(expected_mismatch_pairs, rel=1e-6)
 
 
 def test_consistency_cost_penalizes_daily_time_drift_within_recurrence_family():
@@ -265,10 +267,9 @@ def test_consistency_cost_penalizes_daily_time_drift_within_recurrence_family():
         0.0,
     )
 
-    # Only day_2 is shifted by +1h relative to day_1/day_3.
-    # Pairwise daily drifts: (day_1,day_2)=1h, (day_1,day_3)=0h, (day_2,day_3)=1h.
-    expected_pairwise_drift = 2 * (HOUR / MINUTE)
-    assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
+    # day_2 is in a different slot than day_1/day_3, producing two mismatched pairs.
+    expected_mismatch_pairs = 2.0
+    assert cost_function.schedule_cost() == pytest.approx(expected_mismatch_pairs, rel=1e-6)
 
 
 def test_consistency_cost_uses_stable_group_even_if_default_start_is_overridden():
@@ -306,8 +307,8 @@ def test_consistency_cost_uses_stable_group_even_if_default_start_is_overridden(
         0.0,
     )
 
-    expected_pairwise_drift = 4 * (HOUR / MINUTE)
-    assert cost_function.schedule_cost() == pytest.approx(expected_pairwise_drift, rel=1e-6)
+    expected_mismatch_pairs = 1.0
+    assert cost_function.schedule_cost() == pytest.approx(expected_mismatch_pairs, rel=1e-6)
 
 
 def test_granularity_cost_penalizes_off_half_hour_starts():

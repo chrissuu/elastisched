@@ -569,13 +569,30 @@ function getPolicyAllowsOverlap(blob) {
   return getPolicyFlags(blob?.policy || {}).overlappable;
 }
 
+function isMainCalendarBlob(blob) {
+  const context = getBlobCalendarContext(blob);
+  return Boolean(context?.isMain);
+}
+
+function isNonEditableAllDayOccurrence(blob) {
+  if (!blob || canEditTiming(blob)) return false;
+  const range = getEffectiveOccurrenceRange(blob) || occurrenceRangeFromBlob(blob);
+  if (!range) return false;
+  const end = range.effectiveEnd || range.end;
+  if (!(range.start instanceof Date) || !(end instanceof Date)) return false;
+  if (Number.isNaN(range.start.getTime()) || Number.isNaN(end.getTime())) return false;
+  return end.getTime() - range.start.getTime() >= 23 * 60 * 60 * 1000;
+}
+
 function occurrenceConflict(blob, nextRange, options = {}) {
   if (!blob || !nextRange) return true;
+  if (!isMainCalendarBlob(blob)) return false;
   const ignoreBlobIds = options.ignoreBlobIds instanceof Set ? options.ignoreBlobIds : null;
   const currentBlobId = normalizeTimelineBlobId(blob.id);
   const currentKey = getOccurrenceKeyFromBlob(blob);
   return getCalendarBlobs().some((other) => {
     if (!other || other.preview) return false;
+    if (!isMainCalendarBlob(other)) return false;
     const otherBlobId = normalizeTimelineBlobId(other.id);
     if (otherBlobId && ignoreBlobIds?.has(otherBlobId)) return false;
     if (otherBlobId === currentBlobId) return false;
@@ -585,7 +602,10 @@ function occurrenceConflict(blob, nextRange, options = {}) {
     ) {
       return false;
     }
-    const otherRange = occurrenceRangeFromBlob(other) || getEffectiveOccurrenceRange(other);
+    if (isNonEditableAllDayOccurrence(other)) {
+      return false;
+    }
+    const otherRange = getEffectiveOccurrenceRange(other) || occurrenceRangeFromBlob(other);
     if (!otherRange) return false;
     const otherEnd = otherRange.effectiveEnd || otherRange.end;
     if (!overlaps(nextRange.start, nextRange.end, otherRange.start, otherEnd)) {
