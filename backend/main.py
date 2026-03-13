@@ -28,8 +28,9 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Elastisched API", lifespan=lifespan)
-_UI_DIR = Path(__file__).resolve().parents[2] / "frontend"
-_LANDING_DIR = Path(__file__).resolve().parents[2] / "landing"
+_APP_ROOT = Path(__file__).resolve().parents[1]
+_UI_DIR = _APP_ROOT / "frontend"
+_LANDING_DIR = _APP_ROOT / "landing"
 if _UI_DIR.exists():
     app.mount("/ui", StaticFiles(directory=_UI_DIR, html=True), name="ui")
 
